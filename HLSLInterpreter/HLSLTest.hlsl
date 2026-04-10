@@ -11,7 +11,6 @@
         #define ASSERT_MSG(x, msg)
         #define PASS_TEST()
         #define FAIL_TEST()
-        #define TEST_NAME
     #endif
 
 #endif
