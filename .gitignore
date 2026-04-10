@@ -1,0 +1,7 @@
+.vs/
+HLSLInterpreter/bin/
+HLSLInterpreter/obj/
+HLSLInterpreter.Tests/bin/
+HLSLInterpreter.Tests/obj/
+.claude
+CLAUDE.md

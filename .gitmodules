@@ -1,0 +1,3 @@
+[submodule "UnityShaderParser"]
+	path = UnityShaderParser
+	url = https://github.com/pema99/UnityShaderParser
