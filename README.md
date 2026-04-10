@@ -45,6 +45,8 @@ void SphereSDF_SignIsCorrect()
 ```
 To run it, you can use `HLSLRunner.RunTests()`, optionally passing a string to filter test names with.
 
+> Note: You must include [HLSLTest.hlsl](https://github.com/pema99/HLSLInterpreter/blob/master/HLSLInterpreter/HLSLTest.hlsl) in your shader for tests to compile properly.
+
 For some more examples, check the test files in [this folder](https://github.com/pema99/HLSLInterpreter/tree/master/HLSLInterpreter.Tests/Shaders). The section about [advanced testing features](#advanced-testing-features) shows more interesting things you can do in tests.
 
 ## Feature overview
