@@ -80,7 +80,7 @@ Here is a list of features I have yet to implement:
 - Assigning array literals to vectors like `float3 foo = {1,2,3}`. Same for matrices.
 - `this` keyword.
 
-There might be some more things I missed...
+There might be some more things I missed, and the library is still very much work in progress - bugs be plenty!
 
 ## Advanced testing features
 This section will show a few more advanced features you can use when writing tests. The testing API is still a work in progress, more to come.
