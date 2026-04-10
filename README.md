@@ -1,6 +1,8 @@
 # HLSLInterpreter
 A library for interpreting HLSL shader code on the CPU. The primary usecase is to run automated tests for shaders, which run entirely on the CPU. The interpreter is relatively self contained, and can also be used for other applications that want to run shader code.
 
+## Basic usage
+
 To get started, make a `HLSLRunner` object, and feed in some HLSL code:
 ```cs
 string hlslCode = "float add(float a, float b) { return a + b; }";
