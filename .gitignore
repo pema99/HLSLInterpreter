@@ -3,5 +3,7 @@ HLSLInterpreter/bin/
 HLSLInterpreter/obj/
 HLSLInterpreter.Tests/bin/
 HLSLInterpreter.Tests/obj/
+HLSLInterpreter.Examples/bin/
+HLSLInterpreter.Examples/obj/
 .claude
 CLAUDE.md

@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnityShaderParser", "..\Uni
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HLSLInterpreter.Tests", "..\HLSLInterpreter.Tests\HLSLInterpreter.Tests.csproj", "{EB528476-F60D-4E5B-AD82-968B6D207674}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HLSLInterpreter.Examples", "..\HLSLInterpreter.Examples\HLSLInterpreter.Examples.csproj", "{3F3001D7-2F05-EEC9-D1EA-B999A2F353DF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{EB528476-F60D-4E5B-AD82-968B6D207674}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EB528476-F60D-4E5B-AD82-968B6D207674}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{EB528476-F60D-4E5B-AD82-968B6D207674}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3F3001D7-2F05-EEC9-D1EA-B999A2F353DF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3F3001D7-2F05-EEC9-D1EA-B999A2F353DF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3F3001D7-2F05-EEC9-D1EA-B999A2F353DF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3F3001D7-2F05-EEC9-D1EA-B999A2F353DF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

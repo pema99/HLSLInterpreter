@@ -4,7 +4,7 @@
     <OutputType>Library</OutputType>
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>disable</ImplicitUsings>
-    <Nullable>enable</Nullable>
+    <Nullable>disable</Nullable>
     <LangVersion>9.0</LangVersion>
   </PropertyGroup>
 

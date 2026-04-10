@@ -30,6 +30,7 @@ namespace UnityShaderParser.Test
         public struct TestRun
         {
             public string TestName;
+            public string FunctionName;
             public bool UsesCustomWarpSize;
             public int WarpSizeX;
             public int WarpSizeY;
@@ -178,24 +179,20 @@ namespace UnityShaderParser.Test
         public void SetVariable(string name, HLSLValue value) => interpreter.SetVariable(name, value);
         public HLSLValue GetVariable(string name) => interpreter.GetVariable(name);
         public HLSLValue CallFunction(string name, params HLSLValue[] args) => interpreter.CallFunction(name, args);
-        public HLSLValue CallFunctionWithWarpSize(string name, int threadsX, int threadsY, params HLSLValue[] args)
-        {
-            interpreter.SetWarpSize(threadsX, threadsY);
-            return interpreter.CallFunction(name, args);
-        }
 
-        public TestResult[] RunTests(string testFilter = null, Action<TestRun> runBeforeTest = null, Action<TestRun, TestResult> runAfterTest = null)
+        public TestRun[] DiscoverTests(string testFilter = null)
         {
             FunctionDefinitionNode[] functions = interpreter.GetFunctions();
-
-            List<TestRun> testsToRun = new List<TestRun>();
+            var testsToRun = new List<TestRun>();
 
             foreach (var func in functions.Where(x => string.IsNullOrEmpty(testFilter) || Regex.IsMatch(x.Name.GetName(), testFilter)))
             {
                 bool hasTestAttribute = false;
-                List<Func<List<HLSLValue>>> testCases = new List<Func<List<HLSLValue>>>();
+                var testCases = new List<(List<HLSLValue> inputs, string formattedName)>();
                 TestRun testRun = default;
+                testRun.FunctionName = func.Name.GetName();
                 testRun.TestName = func.Name.GetName();
+
                 foreach (var attribute in func.Attributes)
                 {
                     string lexeme = attribute.Name.Identifier.ToLower();
@@ -221,13 +218,8 @@ namespace UnityShaderParser.Test
                         case "testcase":
                             if (attribute.Arguments.Count == func.Parameters.Count)
                             {
-                                testCases.Add(() =>
-                                {
-                                    List<HLSLValue> inputs = new List<HLSLValue>();
-                                    for (int i = 0; i < attribute.Arguments.Count; i++)
-                                        inputs.Add(interpreter.EvaluateExpression(attribute.Arguments[i]));
-                                    return inputs;
-                                });
+                                var inputs = attribute.Arguments.Select(a => interpreter.EvaluateExpression(a)).ToList();
+                                testCases.Add((inputs, $"{testRun.FunctionName}({string.Join(", ", inputs)})"));
                             }
                             break;
                         default: break;
@@ -242,26 +234,33 @@ namespace UnityShaderParser.Test
                     }
                     else
                     {
-                        foreach (var testCase in testCases)
+                        foreach (var (inputs, formattedName) in testCases)
                         {
-                            testRun.GetInputs = testCase;
-                            testsToRun.Add(testRun);
+                            var caseRun = testRun;
+                            caseRun.TestName = formattedName;
+                            caseRun.GetInputs = () => inputs;
+                            testsToRun.Add(caseRun);
                         }
                     }
                 }
             }
 
+            return testsToRun.ToArray();
+        }
+
+        public TestResult[] RunTests(IEnumerable<TestRun> tests, Action<TestRun> runBeforeTest = null, Action<TestRun, TestResult> runAfterTest = null)
+        {
+            var testsToRun = tests.ToList();
             TestResult[] results = new TestResult[testsToRun.Count];
             var oldConsoleOut = Console.Out;
+
             for (int i = 0; i < testsToRun.Count; i++)
             {
-                if (runBeforeTest != null)
-                    runBeforeTest(testsToRun[i]);
+                runBeforeTest?.Invoke(testsToRun[i]);
 
                 var sw = new StringWriter();
                 Console.SetOut(sw);
 
-                string formattedName = testsToRun[i].TestName;
                 try
                 {
                     if (testsToRun[i].UsesCustomWarpSize)
@@ -270,39 +269,21 @@ namespace UnityShaderParser.Test
                     if (testsToRun[i].GetInputs != null)
                     {
                         var inputs = testsToRun[i].GetInputs();
-                        formattedName += $"({string.Join(", ", inputs)})";
-                        interpreter.CallFunction(testsToRun[i].TestName, inputs.ToArray());
+                        interpreter.CallFunction(testsToRun[i].FunctionName, inputs.ToArray());
                     }
                     else
                     {
-                        interpreter.CallFunction(testsToRun[i].TestName, Array.Empty<object>());
+                        interpreter.CallFunction(testsToRun[i].FunctionName, Array.Empty<object>());
                     }
-                    results[i] = new TestResult
-                    {
-                        TestName = formattedName,
-                        Pass = true,
-                        Log = sw.ToString(),
-                    };
+                    results[i] = new TestResult { TestName = testsToRun[i].TestName, Pass = true, Log = sw.ToString() };
                 }
                 catch (TestFailException ex)
                 {
-                    results[i] = new TestResult
-                    {
-                        TestName = formattedName,
-                        Pass = false,
-                        Log = sw.ToString(),
-                        Message = ex.Message
-                    };
+                    results[i] = new TestResult { TestName = testsToRun[i].TestName, Pass = false, Log = sw.ToString(), Message = ex.Message };
                 }
                 catch (TestPassException ex)
                 {
-                    results[i] = new TestResult
-                    {
-                        TestName = formattedName,
-                        Pass = true,
-                        Log = sw.ToString(),
-                        Message = ex.Message
-                    };
+                    results[i] = new TestResult { TestName = testsToRun[i].TestName, Pass = true, Log = sw.ToString(), Message = ex.Message };
                 }
 
                 Console.SetOut(oldConsoleOut);
@@ -310,10 +291,14 @@ namespace UnityShaderParser.Test
                 if (testsToRun[i].UsesCustomWarpSize)
                     interpreter.SetWarpSize(2, 2);
 
-                if (runAfterTest != null)
-                    runAfterTest(testsToRun[i], results[i]);
+                runAfterTest?.Invoke(testsToRun[i], results[i]);
             }
             return results;
+        }
+
+        public TestResult[] RunTests(string testFilter = null, Action<TestRun> runBeforeTest = null, Action<TestRun, TestResult> runAfterTest = null)
+        {
+            return RunTests(DiscoverTests(testFilter), runBeforeTest, runAfterTest);
         }
     }
 }
