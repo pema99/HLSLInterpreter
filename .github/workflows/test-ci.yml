@@ -19,8 +19,8 @@ jobs:
       with:
         dotnet-version: '8.0.x'
     - name: Install dependencies
-      run: dotnet restore HLSLInterpreter/HLSLInterpreter.sln
+      run: dotnet restore
     - name: Build
-      run: dotnet build HLSLInterpreter/HLSLInterpreter.sln
+      run: dotnet build
     - name: Test
       run: dotnet test HLSLInterpreter.Tests/HLSLInterpreter.Tests.csproj

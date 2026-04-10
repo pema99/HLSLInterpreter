@@ -1,15 +1,15 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.14.36121.58 d17.14
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HLSLInterpreter", "HLSLInterpreter.csproj", "{3B04676A-DE9A-453F-BFBC-84031E06808D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HLSLInterpreter", "HLSLInterpreter\HLSLInterpreter.csproj", "{3B04676A-DE9A-453F-BFBC-84031E06808D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnityShaderParser", "..\UnityShaderParser\UnityShaderParser\UnityShaderParser.csproj", "{9F04751A-C6A3-BC96-ABF7-84C2B2BD1665}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnityShaderParser", "UnityShaderParser\UnityShaderParser\UnityShaderParser.csproj", "{9F04751A-C6A3-BC96-ABF7-84C2B2BD1665}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HLSLInterpreter.Tests", "..\HLSLInterpreter.Tests\HLSLInterpreter.Tests.csproj", "{EB528476-F60D-4E5B-AD82-968B6D207674}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HLSLInterpreter.Tests", "HLSLInterpreter.Tests\HLSLInterpreter.Tests.csproj", "{EB528476-F60D-4E5B-AD82-968B6D207674}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HLSLInterpreter.Examples", "..\HLSLInterpreter.Examples\HLSLInterpreter.Examples.csproj", "{3F3001D7-2F05-EEC9-D1EA-B999A2F353DF}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HLSLInterpreter.Examples", "HLSLInterpreter.Examples\HLSLInterpreter.Examples.csproj", "{3F3001D7-2F05-EEC9-D1EA-B999A2F353DF}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
