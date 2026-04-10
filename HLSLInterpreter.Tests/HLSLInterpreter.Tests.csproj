@@ -21,4 +21,14 @@
     <Using Include="NUnit.Framework" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\HLSLInterpreter\HLSLInterpreter.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Shaders\*.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
