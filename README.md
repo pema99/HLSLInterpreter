@@ -1,8 +1,23 @@
 # HLSLInterpreter
 A library for interpreting HLSL shader code on the CPU. The primary usecase is to run automated tests for shaders, which run entirely on the CPU. The interpreter is relatively self contained, and can also be used for other applications that want to run shader code.
 
+To get started, make a `HLSLRunner` object, and feed in some HLSL code:
+```cs
+string hlslCode = "float add(float a, float b) { return a + b; }";
+HLSLRunner runner = new HLSLRunner();
+runner.ProcessCode(hlslCode);
+```
+Then you can use `HLSLRunner.CallFunction()` to call HLSL functions:
+```
+HLSLValue result = runner.CallFunction("add", (NumericValue)1, (NumericValue)3);
+Console.WriteLine(result); // Prints "4"
+```
+Alternatively, you can use `HLSLRunner.RunTests()` to automatically find and run HLSL functions marked with the `[Test]` attribute as tests. For more information, check the next section.
+
+For more advanced usages, check the API exposed by by [`HLSLRunner`](https://github.com/pema99/HLSLInterpreter/blob/master/HLSLInterpreter/HLSLRunner.cs). It serves as the main entry point for the interpreter.
+
 ## Shader testing
-Shader test functions can be written either in dedicated test files, or directly inline inside existing shaders. The API exposed by `HLSLRunner` provides a way to discover and run tests across a list of files.
+Shader test functions can be written either in dedicated test files, or directly inline inside existing shaders.
 
 Here's an example of a test:
 
@@ -26,6 +41,7 @@ void SphereSDF_SignIsCorrect()
     ASSERT(signedDistance < 0);
 }
 ```
+To run it, you can use `HLSLRunner.RunTests()`, optionally passing a string to filter test names with.
 
 For some more examples, check the files in [this folder](https://github.com/pema99/HLSLInterpreter/tree/master/HLSLInterpreter.Tests/Shaders). The section about [advanced testing features](#advanced-testing-features) shows more interesting things you can do in tests.
 
