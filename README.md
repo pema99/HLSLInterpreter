@@ -24,7 +24,7 @@ Shader test functions can be written either in dedicated test files, or directly
 Here's an example of a test:
 
 ```hlsl
-#include HLSLTest.hlsl
+#include "HLSLTest.hlsl"
 
 float SphereSDF(float3 position, float radius)
 {
