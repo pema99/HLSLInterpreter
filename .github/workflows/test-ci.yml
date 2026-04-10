@@ -12,13 +12,15 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        submodules: recursive
     - name: Setup dotnet
       uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: '6.0.x'
+        dotnet-version: '8.0.x'
     - name: Install dependencies
-      run: dotnet restore
+      run: dotnet restore HLSLInterpreter/HLSLInterpreter.sln
     - name: Build
-      run: dotnet build
-    - name: Test with the dotnet CLI
-      run: dotnet test
+      run: dotnet build HLSLInterpreter/HLSLInterpreter.sln
+    - name: Test
+      run: dotnet test HLSLInterpreter.Tests/HLSLInterpreter.Tests.csproj
