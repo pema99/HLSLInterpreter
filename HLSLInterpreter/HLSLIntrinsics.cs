@@ -1458,7 +1458,9 @@ namespace UnityShaderParser.Test
                 if (exprFirst is null)
                 {
                     exprFirst = expr.Scalarize(threadIndex);
+                    #pragma warning disable CS1718 // Comparison made to same variable
                     retVal = exprFirst == exprFirst;
+                    #pragma warning restore CS1718
                 }
                 else
                 {
