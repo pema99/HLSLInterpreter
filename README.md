@@ -10,7 +10,7 @@ HLSLRunner runner = new HLSLRunner();
 runner.ProcessCode(hlslCode);
 ```
 Then you can use `HLSLRunner.CallFunction()` to call HLSL functions:
-```
+```cs
 HLSLValue result = runner.CallFunction("add", (NumericValue)1, (NumericValue)3);
 Console.WriteLine(result); // Prints "4"
 ```
