@@ -1,5 +1,5 @@
 # HLSLInterpreter
-A library for interpreting HLSL shader code on the CPU. The primary usecase is to run automated tests for shaders, which run entirely on the CPU. The interpreter is relatively self contained, and can also be used for other applications that want to run shader code, such as an HLSL REPL.
+A library for interpreting HLSL shader code on the CPU. The primary usecase is to run automated tests for shaders, which run entirely on the CPU. The interpreter is relatively self contained, and can also be used for other applications that want to run shader code.
 
 ## Shader testing
 Shader test functions can be written either in dedicated test files, or directly inline inside existing shaders. The API exposed by `HLSLRunner` provides a way to discover and run tests across a list of files.
