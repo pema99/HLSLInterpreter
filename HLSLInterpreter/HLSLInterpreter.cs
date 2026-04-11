@@ -50,9 +50,12 @@ namespace UnityShaderParser.Test
 
         public void Reset()
         {
+            var oldCallbacks = expressionEvaluator.GetCallbacks();
             context = new HLSLInterpreterContext();
             executionState = new HLSLExecutionState(executionState.GetThreadsX(), executionState.GetThreadsY());
             expressionEvaluator = new HLSLExpressionEvaluator(this, context, executionState);
+            foreach (var kvp in oldCallbacks)
+                expressionEvaluator.AddCallback(kvp.Key, kvp.Value);
         }
 
         public void AddCallback(string name, Func<HLSLExecutionState, ExpressionNode[], HLSLValue> callback) => expressionEvaluator.AddCallback(name, callback);
