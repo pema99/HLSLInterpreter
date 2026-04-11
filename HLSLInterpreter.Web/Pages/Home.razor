@@ -34,12 +34,18 @@
             <div id="monaco-container" class="editor-container"></div>
         </div>
 
+        <div class="resize-h-handle" title="Drag to resize"></div>
+
         <div class="output-panel">
             <div class="panel-header"><span>Output</span></div>
             <div class="output-body">
-                @if (output == null)
+                @if (output == null && !isRunning)
                 {
                     <div class="hint">Press <strong>Run</strong> or <strong>Ctrl+Enter</strong> to execute.</div>
+                }
+                else if (isRunning)
+                {
+                    <div class="hint running-hint"><span class="spinner spinner-output"></span> Running...</div>
                 }
                 else if (output.Length == 0 && !hasError)
                 {
@@ -61,9 +67,10 @@
             @if (hasImage)
             {
                 <div class="image-section">
+                    <div class="resize-v-handle" title="Drag to resize"></div>
                     <div class="panel-header"><span>Color Output</span></div>
                     <div class="image-container">
-                        <canvas id="color-canvas" style="aspect-ratio: @imageWidth / @imageHeight;"></canvas>
+                        <canvas id="color-canvas"></canvas>
                     </div>
                 </div>
             }
@@ -75,7 +82,15 @@
     private static readonly string DefaultCode =
 @"float4 main(uint2 thread : SV_DispatchThreadID)
 {
-    float2 uv = float2(thread) / float2(32 - 1, 32 - 1);
+    // Calculate UV coord
+    float2 resolution = float2(WARP_SIZE_X - 1, WARP_SIZE_Y - 1);
+    float2 uv = float2(thread) / resolution;
+
+    // Debug some pixels specific pixel
+    if (thread.x == 1 && thread.y <= 1)
+        PRINTF(""Thread (%d, %d) value: %d"", thread.x, thread.y, uv);
+
+    // Output some color
     return float4(uv.x, uv.y, 0.5, 1.0);
 }
 ";
@@ -100,6 +115,7 @@
         if (needsImageRender && imagePixels != null)
         {
             needsImageRender = false;
+            await JS.InvokeVoidAsync("restoreImageSectionHeight");
             await JS.InvokeVoidAsync("renderPixels", "color-canvas", imagePixels, imageWidth, imageHeight);
         }
     }
@@ -129,6 +145,8 @@
 
             runner.Reset();
             runner.SetWarpSize(wx, wy);
+            runner.SetVariable("WARP_SIZE_X", new ScalarValue(ScalarType.Uint, new HLSLRegister<object>((uint)wx)));
+            runner.SetVariable("WARP_SIZE_Y", new ScalarValue(ScalarType.Uint, new HLSLRegister<object>((uint)wy)));
             runner.ProcessCode(code);
 
             var threadIds = new object[threadCount][];

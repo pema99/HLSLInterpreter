@@ -196,7 +196,7 @@
                     value: initialCode,
                     language: 'hlsl',
                     theme: 'hlsl-dark',
-                    fontSize: 14,
+                    fontSize: 16,
                     lineNumbers: 'on',
                     minimap: { enabled: false },
                     scrollBeyondLastLine: false,
@@ -223,6 +223,32 @@
             const ctx = canvas.getContext('2d');
             const imageData = new ImageData(new Uint8ClampedArray(rgbaData), width, height);
             ctx.putImageData(imageData, 0, 0);
+            window.fitCanvas(canvas, width, height);
+        };
+
+        window.fitCanvas = function (canvas, width, height) {
+            const container = canvas.parentElement;
+            if (!container) return;
+            const cw = container.clientWidth;
+            const ch = container.clientHeight;
+            const ar = width / height;
+            let cssW, cssH;
+            if (cw / ch > ar) {
+                cssH = ch;
+                cssW = ch * ar;
+            } else {
+                cssW = cw;
+                cssH = cw / ar;
+            }
+            canvas.style.width = Math.floor(cssW) + 'px';
+            canvas.style.height = Math.floor(cssH) + 'px';
+        };
+
+        window.restoreImageSectionHeight = function () {
+            if (window._imageSectionHeight) {
+                const el = document.querySelector('.image-section');
+                if (el) el.style.height = window._imageSectionHeight;
+            }
         };
 
         window.getMonacoValue = function () {
@@ -237,6 +263,52 @@
                 window._monacoEditor.setValue(value);
             }
         };
+    </script>
+    <script>
+        (function () {
+            let activeHandle = null;
+            let startPos, startSize;
+
+            document.addEventListener('mousedown', function (e) {
+                if (e.target.classList.contains('resize-h-handle')) {
+                    activeHandle = 'horizontal';
+                    startPos = e.clientX;
+                    startSize = document.querySelector('.output-panel').getBoundingClientRect().width;
+                    e.preventDefault();
+                } else if (e.target.classList.contains('resize-v-handle')) {
+                    activeHandle = 'vertical';
+                    startPos = e.clientY;
+                    startSize = document.querySelector('.image-section').getBoundingClientRect().height;
+                    e.preventDefault();
+                }
+            });
+
+            document.addEventListener('mousemove', function (e) {
+                if (!activeHandle) return;
+                if (activeHandle === 'horizontal') {
+                    const newWidth = Math.max(160, Math.min(900, startSize - (e.clientX - startPos)));
+                    document.querySelector('.output-panel').style.width = newWidth + 'px';
+                    const canvas = document.getElementById('color-canvas');
+                    if (canvas && canvas.width && canvas.height)
+                        window.fitCanvas(canvas, canvas.width, canvas.height);
+                } else if (activeHandle === 'vertical') {
+                    const newHeight = Math.max(60, Math.min(800, startSize - (e.clientY - startPos)));
+                    document.querySelector('.image-section').style.height = newHeight + 'px';
+                    const canvas = document.getElementById('color-canvas');
+                    if (canvas && canvas.width && canvas.height)
+                        window.fitCanvas(canvas, canvas.width, canvas.height);
+                }
+                e.preventDefault();
+            });
+
+            document.addEventListener('mouseup', function () {
+                if (activeHandle === 'vertical') {
+                    const el = document.querySelector('.image-section');
+                    if (el) window._imageSectionHeight = el.style.height;
+                }
+                activeHandle = null;
+            });
+        })();
     </script>
     <script src="_framework/blazor.webassembly.js"></script>
 </body>

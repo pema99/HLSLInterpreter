@@ -135,13 +135,27 @@
     min-width: 0;
     min-height: 0;
     overflow: hidden;
-    border-right: 1px solid #3c3c3c;
+}
+
+.resize-h-handle {
+    width: 4px;
+    flex-shrink: 0;
+    background: #3c3c3c;
+    cursor: col-resize;
+    transition: background 0.15s;
+    user-select: none;
+}
+
+.resize-h-handle:hover,
+.resize-h-handle:active {
+    background: #007acc;
 }
 
 .output-panel {
     display: flex;
     flex-direction: column;
-    width: 380px;
+    width: 38vw;
+    min-width: 160px;
     min-height: 0;
     flex-shrink: 0;
     background: #252526;
@@ -189,8 +203,23 @@
     color: #888;
 }
 
+.running-hint {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: center;
+    color: #999;
+}
+
+.spinner-output {
+    border-color: rgba(255,255,255,0.15);
+    border-top-color: #999;
+    width: 14px;
+    height: 14px;
+}
+
 .output-text {
-    font-size: 13px;
+    font-size: 15px;
     color: #9cdcfe;
     white-space: pre-wrap;
     word-break: break-word;
@@ -199,7 +228,7 @@
 }
 
 .error-text {
-    font-size: 13px;
+    font-size: 15px;
     color: #f48771;
     white-space: pre-wrap;
     word-break: break-word;
@@ -209,22 +238,41 @@
 
 /* Image section */
 .image-section {
+    display: flex;
+    flex-direction: column;
     flex-shrink: 0;
-    border-top: 1px solid #3c3c3c;
+    height: 45vh;
+    min-height: 60px;
+    overflow: hidden;
+}
+
+.resize-v-handle {
+    height: 4px;
+    flex-shrink: 0;
+    background: #3c3c3c;
+    cursor: row-resize;
+    transition: background 0.15s;
+    user-select: none;
+}
+
+.resize-v-handle:hover,
+.resize-v-handle:active {
+    background: #007acc;
 }
 
 .image-container {
+    flex: 1;
+    min-height: 0;
     padding: 12px;
     background: #141414;
     display: flex;
     justify-content: center;
+    align-items: center;
+    overflow: hidden;
 }
 
 #color-canvas {
     display: block;
-    width: 100%;
-    max-height: 300px;
-    object-fit: contain;
     image-rendering: pixelated;
     image-rendering: crisp-edges;
 }
