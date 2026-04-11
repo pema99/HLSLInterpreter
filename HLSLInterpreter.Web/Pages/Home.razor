@@ -30,7 +30,17 @@
 
     <div class="main-split">
         <div class="editor-panel">
-            <div class="panel-header"><span>Input</span></div>
+            <div class="panel-header">
+                <span>Input</span>
+                <div class="panel-header-actions">
+                    <select class="footer-select" title="Font size" @onchange="OnFontSizeChanged">
+                        @foreach (var size in fontSizes)
+                        {
+                            <option value="@size" selected="@(size == fontSize)">@size</option>
+                        }
+                    </select>
+                </div>
+            </div>
             <div id="monaco-container" class="editor-container"></div>
         </div>
 
@@ -94,6 +104,18 @@
     return float4(uv.x, uv.y, 0.5, 1.0);
 }
 ";
+
+    private static readonly int[] fontSizes = { 12, 13, 14, 15, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36 };
+    private int fontSize = 16;
+
+    private async Task OnFontSizeChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int size))
+        {
+            fontSize = size;
+            await JS.InvokeVoidAsync("setMonacoFontSize", size);
+        }
+    }
 
     private HLSLRunner runner = new HLSLRunner();
     private string? output;
