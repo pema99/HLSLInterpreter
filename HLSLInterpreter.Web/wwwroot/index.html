@@ -215,6 +215,16 @@
             });
         };
 
+        window.renderPixels = function (canvasId, rgbaData, width, height) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            const imageData = new ImageData(new Uint8ClampedArray(rgbaData), width, height);
+            ctx.putImageData(imageData, 0, 0);
+        };
+
         window.getMonacoValue = function () {
             if (window._monacoEditor) {
                 return window._monacoEditor.getValue();

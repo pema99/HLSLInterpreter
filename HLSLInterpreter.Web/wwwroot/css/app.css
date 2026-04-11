@@ -207,6 +207,28 @@
     margin: 0;
 }
 
+/* Image section */
+.image-section {
+    flex-shrink: 0;
+    border-top: 1px solid #3c3c3c;
+}
+
+.image-container {
+    padding: 12px;
+    background: #141414;
+    display: flex;
+    justify-content: center;
+}
+
+#color-canvas {
+    display: block;
+    width: 100%;
+    max-height: 300px;
+    object-fit: contain;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
 /* Scrollbar */
 .output-body::-webkit-scrollbar {
     width: 6px;

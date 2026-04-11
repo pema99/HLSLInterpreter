@@ -1,6 +1,7 @@
 @page "/"
 @inject IJSRuntime JS
 @using UnityShaderParser.Test
+@using UnityShaderParser.HLSL
 @implements IAsyncDisposable
 
 <div class="app-shell">
@@ -56,20 +57,26 @@
                     }
                 }
             </div>
+
+            @if (hasImage)
+            {
+                <div class="image-section">
+                    <div class="panel-header"><span>Color Output</span></div>
+                    <div class="image-container">
+                        <canvas id="color-canvas" style="aspect-ratio: @imageWidth / @imageHeight;"></canvas>
+                    </div>
+                </div>
+            }
         </div>
     </div>
 </div>
 
 @code {
     private static readonly string DefaultCode =
-@"void main()
+@"float4 main(uint2 thread : SV_DispatchThreadID)
 {
-    float3 a = float3(1, 2, 3);
-    float3 b = float3(4, 5, 6);
-    PRINTF(""dot(a, b) = %f"", dot(a, b));
-
-    for (int i = 0; i < 5; i++)
-        PRINTF(""i = %d"", i);
+    float2 uv = float2(thread) / float2(32 - 1, 32 - 1);
+    return float4(uv.x, uv.y, 0.5, 1.0);
 }
 ";
 
@@ -78,13 +85,23 @@
     private bool isRunning;
     private bool hasError;
     private string errorMessage = "";
-    private int warpX = 2;
-    private int warpY = 2;
+    private int warpX = 32;
+    private int warpY = 32;
+    private bool hasImage = false;
+    private bool needsImageRender = false;
+    private int imageWidth, imageHeight;
+    private byte[]? imagePixels;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
             await JS.InvokeVoidAsync("initMonaco", "monaco-container", DefaultCode);
+
+        if (needsImageRender && imagePixels != null)
+        {
+            needsImageRender = false;
+            await JS.InvokeVoidAsync("renderPixels", "color-canvas", imagePixels, imageWidth, imageHeight);
+        }
     }
 
     private async Task Run()
@@ -93,6 +110,8 @@
         hasError = false;
         errorMessage = "";
         output = null;
+        hasImage = false;
+        imagePixels = null;
         StateHasChanged();
         await Task.Yield();
 
@@ -103,10 +122,31 @@
         try
         {
             string code = await JS.InvokeAsync<string>("getMonacoValue");
+
+            int wx = Math.Max(1, warpX);
+            int wy = Math.Max(1, warpY);
+            int threadCount = wx * wy;
+
             runner.Reset();
-            runner.SetWarpSize(Math.Max(1, warpX), Math.Max(1, warpY));
+            runner.SetWarpSize(wx, wy);
             runner.ProcessCode(code);
-            runner.CallFunction("main");
+
+            var threadIds = new object[threadCount][];
+            for (int i = 0; i < threadCount; i++)
+                threadIds[i] = new object[] { (uint)(i % wx), (uint)(i / wx) };
+            var threadArg = new VectorValue(ScalarType.Uint, new HLSLRegister<object[]>(threadIds).Converge());
+
+            HLSLValue result;
+            try
+            {
+                result = runner.CallFunction("main", threadArg);
+            }
+            catch (Exception ex) when (ex.Message.Contains("Unknown function 'main' called."))
+            {
+                result = runner.CallFunction("main");
+            }
+
+            TryExtractImage(result, wx, wy);
         }
         catch (Exception ex)
         {
@@ -119,9 +159,49 @@
         }
 
         output = sw.ToString();
+        needsImageRender = hasImage;
         isRunning = false;
         StateHasChanged();
     }
 
-public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    private void TryExtractImage(HLSLValue result, int wx, int wy)
+    {
+        int threadCount = wx * wy;
+
+        if (result is VectorValue vv)
+        {
+            int components = vv.Size;
+            imageWidth = wx;
+            imageHeight = wy;
+            imagePixels = new byte[threadCount * 4];
+            for (int i = 0; i < threadCount; i++)
+            {
+                var c = vv.Values.Get(i);
+                imagePixels[i * 4 + 0] = FloatToByte(components > 0 ? Convert.ToSingle(c[0]) : 0f);
+                imagePixels[i * 4 + 1] = FloatToByte(components > 1 ? Convert.ToSingle(c[1]) : 0f);
+                imagePixels[i * 4 + 2] = FloatToByte(components > 2 ? Convert.ToSingle(c[2]) : 0f);
+                imagePixels[i * 4 + 3] = FloatToByte(components > 3 ? Convert.ToSingle(c[3]) : 1f);
+            }
+            hasImage = true;
+        }
+        else if (result is ScalarValue sv && sv.Type != ScalarType.Void)
+        {
+            imageWidth = wx;
+            imageHeight = wy;
+            imagePixels = new byte[threadCount * 4];
+            for (int i = 0; i < threadCount; i++)
+            {
+                byte gray = FloatToByte(Convert.ToSingle(sv.Value.Get(i)));
+                imagePixels[i * 4 + 0] = gray;
+                imagePixels[i * 4 + 1] = gray;
+                imagePixels[i * 4 + 2] = gray;
+                imagePixels[i * 4 + 3] = 255;
+            }
+            hasImage = true;
+        }
+    }
+
+    private static byte FloatToByte(float v) => (byte)(Math.Clamp(v, 0f, 1f) * 255f + 0.5f);
+
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }
