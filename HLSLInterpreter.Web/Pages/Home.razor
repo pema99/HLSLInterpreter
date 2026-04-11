@@ -96,7 +96,7 @@
     float2 resolution = float2(WARP_SIZE_X - 1, WARP_SIZE_Y - 1);
     float2 uv = float2(thread) / resolution;
 
-    // Debug some pixels specific pixel
+    // Debug a specific pixel
     if (thread.x == 1 && thread.y <= 1)
         PRINTF(""Thread (%d, %d) value: %d"", thread.x, thread.y, uv);
 
