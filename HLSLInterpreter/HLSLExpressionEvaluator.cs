@@ -95,25 +95,60 @@ namespace UnityShaderParser.Test
         }
 
         private bool TryGetLValueReference(ExpressionNode node, out ReferenceValue reference)
+            => TryGetLValueReference(node, out reference, out _);
+
+        private bool TryGetLValueReference(ExpressionNode node, out ReferenceValue reference, out bool isGroupshared)
         {
             reference = null;
+            isGroupshared = false;
 
             if (node is NamedExpressionNode named)
             {
-                reference = context.GetReference(named.GetName());
+                isGroupshared = context.IsGroupShared(named.GetName());
+                if (isGroupshared)
+                {
+                    reference = new ReferenceValue(
+                        () => context.GetVariable(named.GetName()),
+                        newValue =>
+                        {
+                            for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
+                            {
+                                context.SetVariable(named.GetName(), HLSLValueUtils.Scalarize(newValue, threadIndex));
+                            }
+                        });
+                }
+                else
+                {
+                    reference = context.GetReference(named.GetName());
+                }
                 return reference != null;
             }
 
             if (node is FieldAccessExpressionNode fieldAccess)
             {
-                if (!TryGetLValueReference(fieldAccess.Target, out var parentRef))
+                if (!TryGetLValueReference(fieldAccess.Target, out var parentRef, out isGroupshared))
                     return false;
                 string field = fieldAccess.Name.Identifier;
                 if (parentRef.Get() is StructValue)
                 {
-                    reference = new ReferenceValue(
-                        () => ((StructValue)parentRef.Get()).Members[field],
-                        val => ((StructValue)parentRef.Get()).Members[field] = val);
+                    if (isGroupshared)
+                    {
+                        reference = new ReferenceValue(
+                            () => ((StructValue)parentRef.Get()).Members[field],
+                            newValue =>
+                            {
+                                for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
+                                {
+                                    ((StructValue)parentRef.Get()).Members[field] = HLSLValueUtils.Scalarize(newValue, threadIndex);
+                                }
+                            });
+                    }
+                    else
+                    {
+                        reference = new ReferenceValue(
+                            () => ((StructValue)parentRef.Get()).Members[field],
+                            newValue => ((StructValue)parentRef.Get()).Members[field] = newValue);
+                    }
                     return true;
                 }
                 if (parentRef.Get() is VectorValue)
@@ -134,12 +169,12 @@ namespace UnityShaderParser.Test
 
             if (node is ElementAccessExpressionNode elementAccess)
             {
-                if (!TryGetLValueReference(elementAccess.Target, out var parentRef))
+                if (!TryGetLValueReference(elementAccess.Target, out var parentRef, out isGroupshared))
                     return false;
                 var indexVal = EvaluateScalar(elementAccess.Index);
-                if (parentRef.Get() is ArrayValue)  { reference = GetArrayElementLValue(parentRef, indexVal);  return true; }
-                if (parentRef.Get() is VectorValue) { reference = GetVectorElementLValue(parentRef, indexVal); return true; }
-                if (parentRef.Get() is MatrixValue) { reference = GetMatrixElementLValue(parentRef, indexVal); return true; }
+                if (parentRef.Get() is ArrayValue)  { reference = GetArrayElementLValue(parentRef, indexVal, isGroupshared);  return true; }
+                if (parentRef.Get() is VectorValue) { reference = GetVectorElementLValue(parentRef, indexVal, isGroupshared); return true; }
+                if (parentRef.Get() is MatrixValue) { reference = GetMatrixElementLValue(parentRef, indexVal, isGroupshared); return true; }
             }
 
             return false;
@@ -147,34 +182,51 @@ namespace UnityShaderParser.Test
 
         // Lvalue reference for array[index]. Getter returns the element; setter writes it back in-place.
         // Handles varying index by scattering/gathering across all threads.
-        private ReferenceValue GetArrayElementLValue(ReferenceValue parentRef, ScalarValue indexVal)
+        // Groupshared: writes are applied serially per active thread, always producing uniform elements.
+        private ReferenceValue GetArrayElementLValue(ReferenceValue parentRef, ScalarValue indexVal, bool isGroupshared = false)
         {
             return new ReferenceValue(
                 () => {
-                    var a = (ArrayValue)parentRef.Get();
-                    if (indexVal.Value.IsUniform)
-                        return a.Values[Convert.ToInt32(indexVal.Value.UniformValue)];
-                    int threadCount = executionState.GetThreadCount();
-                    HLSLValue result = HLSLValueUtils.Vectorize(a.Values[Convert.ToInt32(indexVal.Value.Get(0))], threadCount);
-                    for (int t = 0; t < threadCount; t++)
-                        result = HLSLValueUtils.SetThreadValue(result, t, a.Values[Convert.ToInt32(indexVal.Value.Get(t))]);
-                    return result;
-                },
-                val => {
-                    var a = (ArrayValue)parentRef.Get();
+                    var array = (ArrayValue)parentRef.Get();
                     if (indexVal.Value.IsUniform)
                     {
-                        a.Values[Convert.ToInt32(indexVal.Value.UniformValue)] = val;
+                        return array.Values[Convert.ToInt32(indexVal.Value.UniformValue)];
                     }
                     else
                     {
                         int threadCount = executionState.GetThreadCount();
-                        for (int t = 0; t < threadCount; t++)
+                        HLSLValue result = HLSLValueUtils.Vectorize(array.Values[Convert.ToInt32(indexVal.Value.Get(0))], threadCount);
+                        for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
                         {
-                            int ti = Convert.ToInt32(indexVal.Value.Get(t));
-                            if (a.Values[ti].ThreadCount < threadCount)
-                                a.Values[ti] = HLSLValueUtils.Vectorize(a.Values[ti], threadCount);
-                            a.Values[ti] = HLSLValueUtils.SetThreadValue(a.Values[ti], t, HLSLValueUtils.Scalarize(val, t));
+                            int index = Convert.ToInt32(indexVal.Value.Get(threadIndex));
+                            result = HLSLValueUtils.SetThreadValue(result, threadIndex, array.Values[index]);
+                        }
+                        return result;
+                    }
+                },
+                val => {
+                    var array = (ArrayValue)parentRef.Get();
+                    if (isGroupshared)
+                    {
+                        for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
+                        {
+                            int index = Convert.ToInt32(indexVal.Value.Get(threadIndex));
+                            array.Values[index] = HLSLValueUtils.Scalarize(val, threadIndex);
+                        }
+                    }
+                    else if (indexVal.Value.IsUniform)
+                    {
+                        int index = Convert.ToInt32(indexVal.Value.UniformValue);
+                        array.Values[index] = val;
+                    }
+                    else
+                    {
+                        int threadCount = executionState.GetThreadCount();
+                        for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
+                        {
+                            int index = Convert.ToInt32(indexVal.Value.Get(threadIndex));
+                            var elem = HLSLValueUtils.Vectorize(array.Values[index], threadCount);
+                            array.Values[index] = HLSLValueUtils.SetThreadValue(elem, threadIndex, HLSLValueUtils.Scalarize(val, threadIndex));
                         }
                     }
                 });
@@ -183,69 +235,106 @@ namespace UnityShaderParser.Test
         // Lvalue reference for vector[index]. Getter returns the scalar element; setter writes it back.
         // Uniform index uses SwizzleAssign (handles all SGPR/VGPR combinations natively).
         // Varying index uses MapThreads to scatter-write each thread's chosen element.
-        private ReferenceValue GetVectorElementLValue(ReferenceValue parentRef, ScalarValue indexVal)
+        // Groupshared: writes are applied serially per active thread, always producing a uniform vector.
+        private ReferenceValue GetVectorElementLValue(ReferenceValue parentRef, ScalarValue indexVal, bool isGroupshared = false)
         {
             return new ReferenceValue(
                 () => {
                     var vec = (VectorValue)parentRef.Get();
                     if (indexVal.Value.IsUniform)
+                    {
                         return vec[Convert.ToInt32(indexVal.Value.UniformValue)];
-                    int threadCount = executionState.GetThreadCount();
-                    HLSLValue result = HLSLValueUtils.Vectorize(vec[Convert.ToInt32(indexVal.Value.Get(0))], threadCount);
-                    for (int t = 0; t < threadCount; t++)
-                        result = HLSLValueUtils.SetThreadValue(result, t, vec[Convert.ToInt32(indexVal.Value.Get(t))]);
-                    return result;
+                    }
+                    else
+                    {
+                        int threadCount = executionState.GetThreadCount();
+                        HLSLValue result = HLSLValueUtils.Vectorize(vec[Convert.ToInt32(indexVal.Value.Get(0))], threadCount);
+                        for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
+                        {
+                            int channel = Convert.ToInt32(indexVal.Value.Get(threadIndex));
+                            result = HLSLValueUtils.SetThreadValue(result, threadIndex, vec[channel]);
+                        }
+                        return result;
+                    }
                 },
                 val => {
                     var vec = (VectorValue)parentRef.Get();
-                    if (indexVal.Value.IsUniform)
+                    if (isGroupshared)
                     {
-                        string swizzle = HLSLValueUtils.IndexToVectorSwizzleChar(Convert.ToInt32(indexVal.Value.UniformValue)).ToString();
-                        parentRef.Set(vec.SwizzleAssign(swizzle, (NumericValue)val));
-                        return;
+                        for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
+                        {
+                            int channel = Convert.ToInt32(indexVal.Value.Get(threadIndex));
+                            vec = vec.ChannelAssign(channel, (NumericValue)HLSLValueUtils.Scalarize(val, threadIndex));
+                        }
+                        parentRef.Set(vec);
                     }
-                    int threadCount = Math.Max(vec.ThreadCount, ((NumericValue)val).ThreadCount);
-                    var expanded = vec.ThreadCount < threadCount ? (VectorValue)vec.Vectorize(threadCount) : vec;
-                    parentRef.Set(new VectorValue(vec.Type, expanded.Values.MapThreads((data, t) => {
-                        var d = (object[])data.Clone();
-                        d[Convert.ToInt32(indexVal.Value.Get(t))] = ((NumericValue)val).GetThreadValue(t);
-                        return d;
-                    })));
+                    else if (indexVal.Value.IsUniform)
+                    {
+                        parentRef.Set(vec.ChannelAssign(Convert.ToInt32(indexVal.Value.UniformValue), (NumericValue)val));
+                    }
+                    else
+                    {
+                        vec = (VectorValue)vec.Vectorize(executionState.GetThreadCount());
+                        for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
+                        {
+                            int channel = Convert.ToInt32(indexVal.Value.Get(threadIndex));
+                            vec = (VectorValue)HLSLValueUtils.SetThreadValue(vec, threadIndex, vec.ChannelAssign(channel, (NumericValue)val));
+                        }
+                        parentRef.Set(vec);
+                    }
                 });
         }
 
-        // Lvalue reference for matrix[index], producing a row vector. Getter extracts the row(s); setter writes
-        // them back. Uses ToScalars()+slice for uniform row, MapThreads for both the varying-row getter and
-        // the setter — expanding a uniform matrix to varying automatically when needed.
-        private ReferenceValue GetMatrixElementLValue(ReferenceValue parentRef, ScalarValue indexVal)
+        private ReferenceValue GetMatrixElementLValue(ReferenceValue parentRef, ScalarValue indexVal, bool isGroupshared = false)
         {
-            int cols = ((MatrixValue)parentRef.Get()).Columns;
+            int columnCount = ((MatrixValue)parentRef.Get()).Columns;
             return new ReferenceValue(
                 () => {
-                    var mat = (MatrixValue)parentRef.Get();
+                    var matrix = (MatrixValue)parentRef.Get();
                     if (indexVal.Value.IsUniform)
                     {
                         int row = Convert.ToInt32(indexVal.Value.UniformValue);
-                        return VectorValue.FromScalars(mat.ToScalars().Skip(row * cols).Take(cols).ToArray());
+                        return VectorValue.FromScalars(matrix.ToScalars().Skip(row * columnCount).Take(columnCount).ToArray());
                     }
-                    int threadCount = executionState.GetThreadCount();
-                    var expanded = mat.ThreadCount < threadCount ? (MatrixValue)mat.Vectorize(threadCount) : mat;
-                    return new VectorValue(mat.Type, expanded.Values.MapThreads((data, t) => {
-                        var d = new object[cols];
-                        Array.Copy(data, Convert.ToInt32(indexVal.Value.Get(t)) * cols, d, 0, cols);
-                        return d;
-                    }));
+                    else
+                    {
+                        int threadCount = executionState.GetThreadCount();
+                        var expanded = matrix.ThreadCount < threadCount ? (MatrixValue)matrix.Vectorize(threadCount) : matrix;
+                        return new VectorValue(matrix.Type, expanded.Values.MapThreads((threadData, threadIndex) =>
+                        {
+                            int row = Convert.ToInt32(indexVal.Value.Get(threadIndex));
+                            var rowElements = new object[columnCount];
+                            Array.Copy(threadData, row * columnCount, rowElements, 0, columnCount);
+                            return rowElements;
+                        }));
+                    }
                 },
                 val => {
-                    var mat = (MatrixValue)parentRef.Get();
-                    int threadCount = Math.Max(mat.ThreadCount, ((NumericValue)val).ThreadCount);
-                    var expanded = mat.ThreadCount < threadCount ? (MatrixValue)mat.Vectorize(threadCount) : mat;
-                    parentRef.Set(new MatrixValue(mat.Type, mat.Rows, cols, expanded.Values.MapThreads((data, t) => {
-                        var d = (object[])data.Clone();
-                        int row = Convert.ToInt32(indexVal.Value.Get(t));
-                        Array.Copy((object[])((NumericValue)val).GetThreadValue(t), 0, d, row * cols, cols);
-                        return d;
-                    })));
+                    var matrix = (MatrixValue)parentRef.Get();
+                    if (isGroupshared)
+                    {
+                        for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
+                        {
+                            int row = Convert.ToInt32(indexVal.Value.Get(threadIndex));
+                            var rowData = (object[])((NumericValue)HLSLValueUtils.Scalarize(val, threadIndex)).GetThreadValue(0);
+                            var matData = (object[])matrix.Values.Get(0).Clone();
+                            Array.Copy(rowData, 0, matData, row * columnCount, columnCount);
+                            matrix = new MatrixValue(matrix.Type, matrix.Rows, columnCount, new HLSLRegister<object[]>(matData));
+                        }
+                        parentRef.Set(matrix);
+                    }
+                    else
+                    {
+                        int threadCount = Math.Max(matrix.ThreadCount, ((NumericValue)val).ThreadCount);
+                        var expanded = (MatrixValue)matrix.Vectorize(threadCount);
+                        parentRef.Set(new MatrixValue(matrix.Type, matrix.Rows, columnCount, expanded.Values.MapThreads((threadData, threadIndex) =>
+                        {
+                            int row = Convert.ToInt32(indexVal.Value.Get(threadIndex));
+                            var matData = (object[])threadData.Clone();
+                            Array.Copy((object[])((NumericValue)val).GetThreadValue(threadIndex), 0, matData, row * columnCount, columnCount);
+                            return matData;
+                        })));
+                    }
                 });
         }
 
@@ -430,12 +519,15 @@ namespace UnityShaderParser.Test
             HLSLValue SetValue(HLSLValue value)
             {
                 // lhs = rhs
-                if (node.Left is NamedExpressionNode named)
+                if (node.Left is NamedExpressionNode named &&
+                    !context.IsGroupShared(named.GetName()))
                 {
                     return SetValueSimpleNamed(named.GetName(), value);
                 }
                 // lhs.member = rhs
-                else if (node.Left is FieldAccessExpressionNode fieldAccess && fieldAccess.Target is NamedExpressionNode namedTarget)
+                else if (node.Left is FieldAccessExpressionNode fieldAccess &&
+                    fieldAccess.Target is NamedExpressionNode namedTarget &&
+                    !context.IsGroupShared(namedTarget.GetName()))
                 {
                     string name = namedTarget.GetName();
                     var variable = context.GetVariable(name);

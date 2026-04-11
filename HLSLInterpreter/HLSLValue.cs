@@ -477,6 +477,11 @@ namespace UnityShaderParser.Test
             }
         }
 
+        public VectorValue ChannelAssign(int channel, NumericValue value)
+        {
+            return SwizzleAssign(HLSLValueUtils.IndexToVectorSwizzleChar(channel).ToString(), value);
+        }
+
         public static VectorValue FromScalars(params ScalarValue[] scalars)
         {
             return new VectorValue(scalars[0].Type, HLSLValueUtils.RegisterFromScalars(scalars));

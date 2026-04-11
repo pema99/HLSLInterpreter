@@ -13,6 +13,7 @@ namespace UnityShaderParser.Test
         private Dictionary<string, List<FunctionDefinitionNode>> functions = new Dictionary<string, List<FunctionDefinitionNode>>();
         private Dictionary<string, StructTypeNode> structs = new Dictionary<string, StructTypeNode>();
         private Stack<HLSLValue> returnStack = new Stack<HLSLValue>();
+        private HashSet<string> groupsharedVars = new HashSet<string>();
 
         public void EnterNamespace(string name)
         {
@@ -36,7 +37,7 @@ namespace UnityShaderParser.Test
             environment.Pop();
         }
 
-        private bool TryFindVariable(string name, out Dictionary<string, HLSLValue> resolvedScope, out string resolvedName, out HLSLValue resolvedValue)
+        private bool TryFindVariable(string name, out Dictionary<string, HLSLValue> resolvedScope, out string resolvedName, out HLSLValue resolvedValue, out bool isGlobal)
         {
             // Local scope
             var localScope = environment.Take(environment.Count - 1);
@@ -47,6 +48,7 @@ namespace UnityShaderParser.Test
                     resolvedScope = scope;
                     resolvedName = name;
                     resolvedValue = val;
+                    isGlobal = false;
                     return true;
                 }
                 if (isFunction)
@@ -69,6 +71,7 @@ namespace UnityShaderParser.Test
                         resolvedScope = globalScope.table;
                         resolvedName = qualifiedName;
                         resolvedValue = val;
+                        isGlobal = true;
                         return true;
                     }
                 }
@@ -81,6 +84,7 @@ namespace UnityShaderParser.Test
                     resolvedScope = globalScope.table;
                     resolvedName = name;
                     resolvedValue = val;
+                    isGlobal = true;
                     return true;
                 }
             }
@@ -88,18 +92,19 @@ namespace UnityShaderParser.Test
             resolvedScope = null;
             resolvedName = null;
             resolvedValue = null;
+            isGlobal = false;
             return false;
         }
 
         public HLSLValue GetVariable(string name)
         {
-            TryFindVariable(name, out _, out _, out HLSLValue value);
+            TryFindVariable(name, out _, out _, out HLSLValue value, out _);
             return value;
         }
 
         public ReferenceValue GetReference(string name)
         {
-            if (TryFindVariable(name, out var scope, out var resolvedName, out _))
+            if (TryFindVariable(name, out var scope, out var resolvedName, out _, out _))
             {
                 if (scope[resolvedName] is ReferenceValue refVal)
                     return refVal;
@@ -128,7 +133,7 @@ namespace UnityShaderParser.Test
                 return;
             }
 
-            if (TryFindVariable(name, out var scope, out var resolvedName, out _))
+            if (TryFindVariable(name, out var scope, out var resolvedName, out _, out _))
             {
                 scope[resolvedName] = val;
                 return;
@@ -138,11 +143,13 @@ namespace UnityShaderParser.Test
         }
 
         // Like SetVariable but always add to top scope
-        public void AddVariable(string name, HLSLValue val)
+        public void AddVariable(string name, HLSLValue val, bool groupShared = false)
         {
             if (environment.Count <= 1)
             {
                 SetGlobalVariable(name, val);
+                if (groupShared)
+                    groupsharedVars.Add(GetQualifiedName(name));
                 return;
             }
 
@@ -160,6 +167,13 @@ namespace UnityShaderParser.Test
         public void SetGlobalVariable(string name, HLSLValue type)
         {
             environment.Peek().table[GetQualifiedName(name)] = type;
+        }
+
+        public bool IsGroupShared(string name)
+        {
+            if (TryFindVariable(name, out _, out var resolvedName, out _, out bool isGlobal))
+                return isGlobal && groupsharedVars.Contains(resolvedName);
+            return false;
         }
 
         public FunctionDefinitionNode GetFunction(HLSLExpressionEvaluator evaluator, string name, HLSLValue[] args)
