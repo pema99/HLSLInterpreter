@@ -159,3 +159,23 @@ void GroupShared_Reduction()
 
     ASSERT(ReductionBuffer[0] == 0+1+2+3);
 }
+
+groupshared float ReductionBuffer2[4];
+
+[Test]
+void GroupShared_Reduction_Array()
+{
+    ReductionBuffer2[WaveGetLaneIndex()] = WaveGetLaneIndex();
+
+    if (WaveIsFirstLane())
+    {
+        float sum = 0;
+        for (int i = 0; i < 4; i++)
+        {
+            sum += ReductionBuffer2[i];
+        }
+        ReductionBuffer2[0] = sum;
+    }
+
+    ASSERT(ReductionBuffer2[0] == 0+1+2+3);
+}
