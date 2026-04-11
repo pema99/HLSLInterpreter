@@ -171,7 +171,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 6px 12px;
+    padding: 0 12px;
+    height: 28px;
     font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.5px;
@@ -180,6 +181,28 @@
     background: #2d2d2d;
     border-bottom: 1px solid #3c3c3c;
     flex-shrink: 0;
+}
+
+.panel-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.footer-select {
+    height: 18px;
+    padding: 0 4px;
+    background: #3c3c3c;
+    border: 1px solid #555;
+    border-radius: 3px;
+    color: #d4d4d4;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.footer-select:focus {
+    outline: none;
+    border-color: #007acc;
 }
 
 
