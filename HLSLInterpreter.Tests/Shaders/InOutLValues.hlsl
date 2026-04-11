@@ -294,9 +294,10 @@ void InoutScatteredWrite_VaryingIndex_EachThreadWritesOwnSlot()
     arr[0] = 10;
     arr[1] = 20;
     Increment(arr[WaveGetLaneIndex()]); // Thread 0: Increment(arr[0]), Thread 1: Increment(arr[1])
-    ASSERT(arr[0] == 11);
-    ASSERT(arr[1] == 21);
-    float4 a = float4(1,2,3,4);
+    ASSERT(WaveReadLaneAt(arr[0], 0) == 11);
+    ASSERT(WaveReadLaneAt(arr[0], 1) == 10);
+    ASSERT(WaveReadLaneAt(arr[1], 0) == 20);
+    ASSERT(WaveReadLaneAt(arr[1], 1) == 21);
 }
 
 // =====================================================================

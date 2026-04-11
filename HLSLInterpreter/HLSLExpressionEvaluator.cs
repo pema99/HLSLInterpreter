@@ -172,6 +172,8 @@ namespace UnityShaderParser.Test
                         for (int t = 0; t < threadCount; t++)
                         {
                             int ti = Convert.ToInt32(indexVal.Value.Get(t));
+                            if (a.Values[ti].ThreadCount < threadCount)
+                                a.Values[ti] = HLSLValueUtils.Vectorize(a.Values[ti], threadCount);
                             a.Values[ti] = HLSLValueUtils.SetThreadValue(a.Values[ti], t, HLSLValueUtils.Scalarize(val, t));
                         }
                     }
