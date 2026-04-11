@@ -25,6 +25,11 @@
     font-weight: 600;
     color: #cccccc;
     letter-spacing: 0.3px;
+    text-decoration: none;
+}
+
+.logo:hover {
+    color: #ffffff;
 }
 
 .topbar-actions {
