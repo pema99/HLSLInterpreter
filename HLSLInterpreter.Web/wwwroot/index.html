@@ -439,6 +439,12 @@
                 window._monacoEditor.setValue(value);
             }
         };
+
+        window.setMonacoFontSize = function (size) {
+            if (window._monacoEditor) {
+                window._monacoEditor.updateOptions({ fontSize: size });
+            }
+        };
     </script>
     <script>
         (function () {
