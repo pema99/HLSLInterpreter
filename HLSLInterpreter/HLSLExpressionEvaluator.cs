@@ -113,6 +113,7 @@ namespace UnityShaderParser.Test
                         {
                             for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
                             {
+                                if (!executionState.IsThreadActive(threadIndex)) continue;
                                 context.SetVariable(named.GetName(), HLSLValueUtils.Scalarize(newValue, threadIndex));
                             }
                         });
@@ -139,6 +140,7 @@ namespace UnityShaderParser.Test
                             {
                                 for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
                                 {
+                                    if (!executionState.IsThreadActive(threadIndex)) continue;
                                     ((StructValue)parentRef.Get()).Members[field] = HLSLValueUtils.Scalarize(newValue, threadIndex);
                                 }
                             });
@@ -210,6 +212,7 @@ namespace UnityShaderParser.Test
                     {
                         for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
                         {
+                            if (!executionState.IsThreadActive(threadIndex)) continue;
                             int index = Convert.ToInt32(indexVal.Value.Get(threadIndex));
                             array.Values[index] = HLSLValueUtils.Scalarize(val, threadIndex);
                         }
@@ -263,6 +266,7 @@ namespace UnityShaderParser.Test
                     {
                         for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
                         {
+                            if (!executionState.IsThreadActive(threadIndex)) continue;
                             int channel = Convert.ToInt32(indexVal.Value.Get(threadIndex));
                             vec = vec.ChannelAssign(channel, (NumericValue)HLSLValueUtils.Scalarize(val, threadIndex));
                         }
@@ -315,6 +319,7 @@ namespace UnityShaderParser.Test
                     {
                         for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
                         {
+                            if (!executionState.IsThreadActive(threadIndex)) continue;
                             int row = Convert.ToInt32(indexVal.Value.Get(threadIndex));
                             var rowData = (object[])((NumericValue)HLSLValueUtils.Scalarize(val, threadIndex)).GetThreadValue(0);
                             var matData = (object[])matrix.Values.Get(0).Clone();
