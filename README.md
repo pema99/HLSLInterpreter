@@ -1,6 +1,8 @@
 # HLSLInterpreter 🚧🛠️
 A experimental library for interpreting HLSL shader code on the CPU. The primary usecase is to run automated tests for shaders, which run entirely on the CPU. The interpreter is relatively self contained, and can also be used for other applications that want to run shader code.
 
+[Click here to try the web demo](https://pema.dev/hlsl/)
+
 ## Basic usage
 
 To get started, make a `HLSLRunner` object, and feed in some HLSL code:
@@ -80,6 +82,7 @@ Here is a list of features I have yet to implement:
 - Writes to texture and buffer types like `myTexture[int2(2,3)] = float4(1,2,3,4);`.
 - Legacy texture functions like `tex2D()` and `tex3D()`.
 - Assigning array literals to vectors like `float3 foo = {1,2,3}`. Same for matrices.
+- Groupshared memory.
 - `this` keyword.
 
 There might be some more things I missed, and the library is still very much work in progress - bugs be plenty!
