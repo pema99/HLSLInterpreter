@@ -1,0 +1,118 @@
+@page "/"
+@inject IJSRuntime JS
+@using UnityShaderParser.Test
+@implements IAsyncDisposable
+
+<div class="app-shell">
+    <header class="topbar">
+        <span class="logo">HLSL Interpreter</span>
+        <div class="topbar-actions">
+            <button class="btn-run" @onclick="Run" disabled="@isRunning">
+                @if (isRunning)
+                {
+                    <span class="spinner"></span>
+                    <span>Running...</span>
+                }
+                else
+                {
+                    <span>&#9654; Run</span>
+                }
+            </button>
+        </div>
+    </header>
+
+    <div class="main-split">
+        <div class="editor-panel">
+            <div class="panel-header"><span>Input</span></div>
+            <div id="monaco-container" class="editor-container"></div>
+        </div>
+
+        <div class="output-panel">
+            <div class="panel-header"><span>Output</span></div>
+            <div class="output-body">
+                @if (output == null)
+                {
+                    <div class="hint">Press <strong>Run</strong> to execute.</div>
+                }
+                else if (output.Length == 0 && !hasError)
+                {
+                    <div class="hint">No output.</div>
+                }
+                else
+                {
+                    @if (!string.IsNullOrEmpty(output))
+                    {
+                        <pre class="output-text">@output</pre>
+                    }
+                    @if (hasError)
+                    {
+                        <pre class="error-text">@errorMessage</pre>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private static readonly string DefaultCode =
+@"void main()
+{
+    float3 a = float3(1, 2, 3);
+    float3 b = float3(4, 5, 6);
+    PRINTF(""dot(a, b) = %f"", dot(a, b));
+
+    for (int i = 0; i < 5; i++)
+        PRINTF(""i = %d"", i);
+}
+";
+
+    private HLSLRunner runner = new HLSLRunner();
+    private string? output;
+    private bool isRunning;
+    private bool hasError;
+    private string errorMessage = "";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            await JS.InvokeVoidAsync("initMonaco", "monaco-container", DefaultCode);
+    }
+
+    private async Task Run()
+    {
+        isRunning = true;
+        hasError = false;
+        errorMessage = "";
+        output = null;
+        StateHasChanged();
+        await Task.Yield();
+
+        var sw = new System.IO.StringWriter();
+        var oldOut = Console.Out;
+        Console.SetOut(sw);
+
+        try
+        {
+            string code = await JS.InvokeAsync<string>("getMonacoValue");
+            runner.Reset();
+            runner.ProcessCode(code);
+            runner.CallFunction("main");
+        }
+        catch (Exception ex)
+        {
+            hasError = true;
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            Console.SetOut(oldOut);
+        }
+
+        output = sw.ToString();
+        isRunning = false;
+        StateHasChanged();
+    }
+
+public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+}
