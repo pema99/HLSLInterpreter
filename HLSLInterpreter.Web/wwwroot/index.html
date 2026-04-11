@@ -269,6 +269,82 @@
                     },
                 });
 
+                // Auto-complete for HLSL intrinsics
+                (function () {
+                    const intrinsics = [
+                        'abs','acos','all','any','asdouble','asfloat','asin','asint','asuint',
+                        'atan','atan2','ceil','clamp','clip','cos','cosh','countbits','cross',
+                        'D3DCOLORtoUBYTE4','ddx','ddx_coarse','ddx_fine','ddy','ddy_coarse','ddy_fine',
+                        'degrees','determinant','distance','dot','dst','exp','exp2',
+                        'f16tof32','f32tof16','faceforward','firstbithigh','firstbitlow',
+                        'floor','fma','fmod','frac','frexp','fwidth',
+                        'isfinite','isinf','isnan','ldexp','length','lerp','lit',
+                        'log','log10','log2','mad','max','min','modf','msad4','mul',
+                        'noise','normalize','pow','radians','rcp','reflect','refract',
+                        'reversebits','round','rsqrt','saturate','sign','sin','sincos','sinh',
+                        'smoothstep','sqrt','step','tan','tanh','transpose','trunc',
+                        'printf','errorf','abort',
+                        'AllMemoryBarrier','DeviceMemoryBarrier','GroupMemoryBarrier',
+                        'AllMemoryBarrierWithGroupSync','DeviceMemoryBarrierWithGroupSync','GroupMemoryBarrierWithGroupSync',
+                        'GetRenderTargetSampleCount','GetRenderTargetSamplePosition',
+                        'QuadReadAcrossDiagonal','QuadReadLaneAt','QuadReadAcrossX','QuadReadAcrossY',
+                        'WaveActiveAllEqual','WaveActiveBitAnd','WaveActiveBitOr','WaveActiveBitXor',
+                        'WaveActiveCountBits','WaveActiveMax','WaveActiveMin','WaveActiveProduct',
+                        'WaveActiveSum','WaveActiveAllTrue','WaveActiveAnyTrue','WaveActiveBallot',
+                        'WaveGetLaneCount','WaveGetLaneIndex','WaveIsFirstLane',
+                        'WavePrefixCountBits','WavePrefixProduct','WavePrefixSum',
+                        'WaveReadLaneFirst','WaveReadLaneAt',
+                        'ASSERT','ASSERT_MSG','PASS_TEST','FAIL_TEST','PRINTF',
+                    ];
+                    // Intrinsics that take no arguments (no cursor inside parens needed)
+                    const noArgIntrinsics = new Set([
+                        'AllMemoryBarrier','DeviceMemoryBarrier','GroupMemoryBarrier',
+                        'AllMemoryBarrierWithGroupSync','DeviceMemoryBarrierWithGroupSync','GroupMemoryBarrierWithGroupSync',
+                        'GetRenderTargetSampleCount','WaveGetLaneCount','WaveGetLaneIndex','WaveIsFirstLane',
+                        'abort','PASS_TEST','FAIL_TEST',
+                    ]);
+                    const intrinsicSet = new Set(intrinsics);
+                    monaco.languages.registerCompletionItemProvider('hlsl', {
+                        provideCompletionItems: function (model, position) {
+                            const word = model.getWordUntilPosition(position);
+                            const range = {
+                                startLineNumber: position.lineNumber,
+                                endLineNumber: position.lineNumber,
+                                startColumn: word.startColumn,
+                                endColumn: word.endColumn,
+                            };
+
+                            // Collect unique words from the document as identifier suggestions
+                            const content = model.getValue();
+                            const wordRegex = /[a-zA-Z_]\w*/g;
+                            const seen = new Set(intrinsicSet);
+                            const wordSuggestions = [];
+                            let m;
+                            while ((m = wordRegex.exec(content)) !== null) {
+                                if (!seen.has(m[0])) {
+                                    seen.add(m[0]);
+                                    wordSuggestions.push({
+                                        label: m[0],
+                                        kind: monaco.languages.CompletionItemKind.Text,
+                                        insertText: m[0],
+                                        range: range,
+                                    });
+                                }
+                            }
+
+                            const intrinsicSuggestions = intrinsics.map(name => ({
+                                label: name,
+                                kind: monaco.languages.CompletionItemKind.Function,
+                                insertText: noArgIntrinsics.has(name) ? name + '()' : name + '($0)',
+                                insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                                range: range,
+                            }));
+
+                            return { suggestions: [...intrinsicSuggestions, ...wordSuggestions] };
+                        },
+                    });
+                })();
+
                 monaco.editor.defineTheme('hlsl-dark', {
                     base: 'vs-dark',
                     inherit: true,
