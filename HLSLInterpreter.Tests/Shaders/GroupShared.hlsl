@@ -139,3 +139,23 @@ void GroupSharedStructMember_WhenWrittenWithRace_StaysUniform()
     ASSERT(WaveActiveAllEqual(GroupSharedStruct.x));
     ASSERT(WaveReadLaneAt(GroupSharedStruct.x, 0) == WaveReadLaneAt(GroupSharedStruct.x, 3));
 }
+
+groupshared float4 ReductionBuffer;
+
+[Test]
+void GroupShared_Reduction()
+{
+    ReductionBuffer[WaveGetLaneIndex()] = WaveGetLaneIndex();
+
+    if (WaveIsFirstLane())
+    {
+        float sum = 0;
+        for (int i = 0; i < 4; i++)
+        {
+            sum += ReductionBuffer[i];
+        }
+        ReductionBuffer[0] = sum;
+    }
+
+    ASSERT(ReductionBuffer[0] == 0+1+2+3);
+}
