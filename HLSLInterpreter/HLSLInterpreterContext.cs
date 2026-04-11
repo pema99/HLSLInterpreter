@@ -24,6 +24,8 @@ namespace UnityShaderParser.Test
             namespaceStack.Pop();
         }
 
+        public bool IsGlobalScope() => environment.Count <= 1;
+
         public void PushScope(bool isFunction = false)
         {
             environment.Push((isFunction, new Dictionary<string, HLSLValue>()));

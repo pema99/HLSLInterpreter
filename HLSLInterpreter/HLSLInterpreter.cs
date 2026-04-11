@@ -389,6 +389,14 @@ namespace UnityShaderParser.Test
 
         public override void VisitVariableDeclarationStatementNode(VariableDeclarationStatementNode node)
         {
+            if (node.Modifiers.Contains(BindingModifier.Groupshared))
+            {
+                if (!context.IsGlobalScope())
+                    throw Error(node, "Groupshared variables can only be declared in global scope.");
+                if (node.Declarators.Any(x => x.Initializer != null))
+                    throw Error(node, "Groupshared variables cannot have initializers.");
+            }
+
             foreach (VariableDeclaratorNode decl in node.Declarators)
             {
                 context.AddVariable(decl.Name, GetVariableDeclarationInitialValue(node.Kind, decl));
