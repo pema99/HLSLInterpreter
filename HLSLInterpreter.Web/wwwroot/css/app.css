@@ -29,37 +29,62 @@
 
 .topbar-actions {
     display: flex;
-    gap: 6px;
+    gap: 20px;
     align-items: center;
 }
 
-.btn-secondary {
-    padding: 6px 14px;
-    background: transparent;
-    color: #cccccc;
+.warp-control {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+}
+
+.warp-label {
+    font-size: 12px;
+    color: #888;
+    letter-spacing: 0.3px;
+}
+
+.warp-input {
+    width: 42px;
+    height: 30px;
+    padding: 0 6px;
+    background: #3c3c3c;
     border: 1px solid #555;
     border-radius: 3px;
+    color: #d4d4d4;
     font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background 0.15s, border-color 0.15s;
+    text-align: center;
+    -moz-appearance: textfield;
+    box-sizing: border-box;
 }
 
-.btn-secondary:hover:not(:disabled) {
-    background: #3c3c3c;
-    border-color: #888;
+.warp-input::-webkit-outer-spin-button,
+.warp-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
 }
 
-.btn-secondary:disabled {
+.warp-input:focus {
+    outline: none;
+    border-color: #007acc;
+}
+
+.warp-input:disabled {
     opacity: 0.5;
-    cursor: not-allowed;
+}
+
+.warp-sep {
+    font-size: 13px;
+    color: #666;
 }
 
 .btn-run {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 16px;
+    height: 30px;
+    padding: 0 16px;
     background: #0e639c;
     color: white;
     border: none;
@@ -68,6 +93,7 @@
     font-weight: 500;
     cursor: pointer;
     transition: background 0.15s;
+    box-sizing: border-box;
 }
 
 .btn-run:hover:not(:disabled) {

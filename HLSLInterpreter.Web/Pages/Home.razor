@@ -7,6 +7,12 @@
     <header class="topbar">
         <span class="logo">HLSL Interpreter</span>
         <div class="topbar-actions">
+            <div class="warp-control">
+                <label class="warp-label">Warp size</label>
+                <input class="warp-input" type="number" min="1" max="32" @bind="warpX" @bind:event="oninput" disabled="@isRunning" title="Warp X" />
+                <span class="warp-sep">×</span>
+                <input class="warp-input" type="number" min="1" max="32" @bind="warpY" @bind:event="oninput" disabled="@isRunning" title="Warp Y" />
+            </div>
             <button class="btn-run" @onclick="Run" disabled="@isRunning">
                 @if (isRunning)
                 {
@@ -32,7 +38,7 @@
             <div class="output-body">
                 @if (output == null)
                 {
-                    <div class="hint">Press <strong>Run</strong> to execute.</div>
+                    <div class="hint">Press <strong>Run</strong> or <strong>Ctrl+Enter</strong> to execute.</div>
                 }
                 else if (output.Length == 0 && !hasError)
                 {
@@ -72,6 +78,8 @@
     private bool isRunning;
     private bool hasError;
     private string errorMessage = "";
+    private int warpX = 2;
+    private int warpY = 2;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -96,6 +104,7 @@
         {
             string code = await JS.InvokeAsync<string>("getMonacoValue");
             runner.Reset();
+            runner.SetWarpSize(Math.Max(1, warpX), Math.Max(1, warpY));
             runner.ProcessCode(code);
             runner.CallFunction("main");
         }
