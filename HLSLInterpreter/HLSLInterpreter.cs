@@ -151,6 +151,7 @@ namespace UnityShaderParser.Test
 
         private HLSLValue GetVariableDeclarationInitialValue(TypeNode type, VariableDeclaratorNode decl)
         {
+            type = context.ResolveType(type);
             bool isArray = decl.ArrayRanks.Count > 0;
             int arrayLength = isArray ? Convert.ToInt32(EvaluateNumeric(decl.ArrayRanks[0].Dimension).GetThreadValue(0)) : 0;
 
@@ -609,6 +610,12 @@ namespace UnityShaderParser.Test
         public override void VisitFunctionDefinitionNode(FunctionDefinitionNode node)
         {
             context.AddFunction(node.Name.GetName(), node);
+        }
+
+        public override void VisitTypedefNode(TypedefNode node)
+        {
+            foreach (var toName in node.ToNames)
+                context.AddTypeAlias(toName.GetName(), node.FromType);
         }
 
         public override void VisitStructDefinitionNode(StructDefinitionNode node)

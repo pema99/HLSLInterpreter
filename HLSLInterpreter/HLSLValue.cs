@@ -1547,6 +1547,7 @@ namespace UnityShaderParser.Test
         // Performs any implicit conversions, either promotion or demotion, needed to pass as a function parameter.
         public static HLSLValue CastForParameter(HLSLExpressionEvaluator evaluator, HLSLValue value, TypeNode typeNode)
         {
+            typeNode = evaluator.ResolveType(typeNode);
             if (value is NumericValue valueNum && typeNode is NumericTypeNode typeNum)
             {
                 HLSLValue reshaped = valueNum;
@@ -1705,7 +1706,7 @@ namespace UnityShaderParser.Test
             for (int i = 0; i < parameters.Count; i++)
             {
                 var from = parameters[i];
-                var to = candidate.Parameters[i].ParamType;
+                var to = evaluator.ResolveType(candidate.Parameters[i].ParamType);
                 if (TypeEquals(evaluator, from, to, candidate.Parameters[i].Declarator.ArrayRanks))
                     score += 3; // Exact match, best case
                 else if (CanPromoteTo(evaluator, from, to))

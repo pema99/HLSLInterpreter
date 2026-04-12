@@ -80,8 +80,21 @@ namespace UnityShaderParser.Test
             if (HLSLIntrinsics.IsUnsupportedIntrinsic(name))
                 throw Error($"Intrinsic function '{name}' is not supported.");
 
+            // Check if name is a typedef alias for a numeric type used as a constructor.
+            if (context.TryLookupTypeAlias(name, out TypeNode aliasedType) && aliasedType is NumericTypeNode numericAliasType)
+            {
+                foreach (var arg in  args)
+                {
+                    if (arg is not NumericValue)
+                        Error("Expected numeric value arguments to constructor.");
+                }
+                return ConstructNumericValue(numericAliasType, args.Select(a => (NumericValue)a).ToArray());
+            }
+
             throw Error($"Unknown function '{name}' called.");
         }
+
+        public TypeNode ResolveType(TypeNode type) => context.ResolveType(type);
 
         // Helpers
         private static Exception Error(HLSLSyntaxNode node, string message)
@@ -92,6 +105,48 @@ namespace UnityShaderParser.Test
         private static Exception Error(string message)
         {
             return new Exception($"Error: {message}");
+        }
+
+        private NumericValue EvaluateNumeric(ExpressionNode node, ScalarType type = ScalarType.Void)
+        {
+            var value = Visit(node);
+            if (value is NumericValue num)
+            {
+                if (type != ScalarType.Void && num.Type != type)
+                    throw Error(node, $"Expected an expression of type '{PrintingUtil.GetEnumName(type)}', but got one of type '{PrintingUtil.GetEnumName(num.Type)}'.");
+                return num;
+            }
+            else if (value is ReferenceValue refVal && refVal.Get() is NumericValue refNum)
+            {
+                if (type != ScalarType.Void && refNum.Type != type)
+                    throw Error(node, $"Expected an expression of type '{PrintingUtil.GetEnumName(type)}', but got one of type '{PrintingUtil.GetEnumName(refNum.Type)}'.");
+                return refNum;
+            }
+            else
+            {
+                throw Error(node, $"Expected a numeric expression, but got a {value.GetType().Name}.");
+            }
+        }
+
+        private ScalarValue EvaluateScalar(ExpressionNode node, ScalarType type = ScalarType.Void)
+        {
+            var value = Visit(node);
+            if (value is ScalarValue num)
+            {
+                if (type != ScalarType.Void && num.Type != type)
+                    throw Error(node, $"Expected an expression of type '{PrintingUtil.GetEnumName(type)}', but got one of type '{PrintingUtil.GetEnumName(num.Type)}'.");
+                return num;
+            }
+            else if (value is ReferenceValue refVal && refVal.Get() is ScalarValue refNum)
+            {
+                if (type != ScalarType.Void && refNum.Type != type)
+                    throw Error(node, $"Expected an expression of type '{PrintingUtil.GetEnumName(type)}', but got one of type '{PrintingUtil.GetEnumName(refNum.Type)}'.");
+                return refNum;
+            }
+            else
+            {
+                throw Error(node, $"Expected a scalar expression, but got a {value.GetType().Name}.");
+            }
         }
 
         private bool TryGetLValueReference(ExpressionNode node, out ReferenceValue reference)
@@ -182,9 +237,6 @@ namespace UnityShaderParser.Test
             return false;
         }
 
-        // Lvalue reference for array[index]. Getter returns the element; setter writes it back in-place.
-        // Handles varying index by scattering/gathering across all threads.
-        // Groupshared: writes are applied serially per active thread, always producing uniform elements.
         private ReferenceValue GetArrayElementLValue(ReferenceValue parentRef, ScalarValue indexVal, bool isGroupshared = false)
         {
             return new ReferenceValue(
@@ -235,10 +287,6 @@ namespace UnityShaderParser.Test
                 });
         }
 
-        // Lvalue reference for vector[index]. Getter returns the scalar element; setter writes it back.
-        // Uniform index uses SwizzleAssign (handles all SGPR/VGPR combinations natively).
-        // Varying index uses MapThreads to scatter-write each thread's chosen element.
-        // Groupshared: writes are applied serially per active thread, always producing a uniform vector.
         private ReferenceValue GetVectorElementLValue(ReferenceValue parentRef, ScalarValue indexVal, bool isGroupshared = false)
         {
             return new ReferenceValue(
@@ -343,45 +391,58 @@ namespace UnityShaderParser.Test
                 });
         }
 
-        private NumericValue EvaluateNumeric(ExpressionNode node, ScalarType type = ScalarType.Void)
+        private HLSLValue ConstructNumericValue(NumericTypeNode type, NumericValue[] args)
         {
-            var value = Visit(node);
-            if (value is NumericValue num)
+            int maxThreadCount = 1;
+            bool anyUniform = false;
+            for (int i = 0; i < args.Length; i++)
             {
-                if (type != ScalarType.Void && num.Type != type)
-                    throw Error(node, $"Expected an expression of type '{PrintingUtil.GetEnumName(type)}', but got one of type '{PrintingUtil.GetEnumName(num.Type)}'.");
-                return num;
+                maxThreadCount = Math.Max(maxThreadCount, args[i].ThreadCount);
+                anyUniform |= args[i].ThreadCount == 1;
             }
-            else if (value is ReferenceValue refVal && refVal.Get() is NumericValue refNum)
+            if (anyUniform && maxThreadCount > 1)
             {
-                if (type != ScalarType.Void && refNum.Type != type)
-                    throw Error(node, $"Expected an expression of type '{PrintingUtil.GetEnumName(type)}', but got one of type '{PrintingUtil.GetEnumName(refNum.Type)}'.");
-                return refNum;
+                for (int i = 0; i < args.Length; i++)
+                {
+                    args[i] = args[i].Vectorize(maxThreadCount);
+                }
             }
-            else
-            {
-                throw Error(node, $"Expected a numeric expression, but got a {value.GetType().Name}.");
-            }
-        }
 
-        private ScalarValue EvaluateScalar(ExpressionNode node, ScalarType type = ScalarType.Void)
-        {
-            var value = Visit(node);
-            if (value is ScalarValue num)
+            object[][] lanes = new object[maxThreadCount][];
+            for (int threadIdx = 0; threadIdx < maxThreadCount; threadIdx++)
             {
-                if (type != ScalarType.Void && num.Type != type)
-                    throw Error(node, $"Expected an expression of type '{PrintingUtil.GetEnumName(type)}', but got one of type '{PrintingUtil.GetEnumName(num.Type)}'.");
-                return num;
+                List<object> flattened = new List<object>();
+                foreach (var numeric in args)
+                {
+                    if (numeric is ScalarValue scalar) flattened.Add(scalar.Value.Get(threadIdx));
+                    if (numeric is VectorValue vector) flattened.AddRange(vector.Values.Get(threadIdx));
+                }
+                for (int i = 0; i < flattened.Count; i++)
+                {
+                    flattened[i] = HLSLValueUtils.CastNumeric(type.Kind, flattened[i]);
+                }
+                lanes[threadIdx] = flattened.ToArray();
             }
-            else if (value is ReferenceValue refVal && refVal.Get() is ScalarValue refNum)
+
+            switch (type)
             {
-                if (type != ScalarType.Void && refNum.Type != type)
-                    throw Error(node, $"Expected an expression of type '{PrintingUtil.GetEnumName(type)}', but got one of type '{PrintingUtil.GetEnumName(refNum.Type)}'.");
-                return refNum;
-            }
-            else
-            {
-                throw Error(node, $"Expected a scalar expression, but got a {value.GetType().Name}.");
+                case ScalarTypeNode st:
+                    if (maxThreadCount == 1) return new ScalarValue(st.Kind, HLSLValueUtils.MakeScalarSGPR(lanes[0][0]));
+                    else return new ScalarValue(st.Kind, HLSLValueUtils.MakeScalarVGPR(lanes.Select(l => l[0])));
+                case VectorTypeNode _:
+                case GenericVectorTypeNode _:
+                    if (maxThreadCount == 1) return new VectorValue(type.Kind, new HLSLRegister<object[]>(lanes[0]));
+                    else return new VectorValue(type.Kind, new HLSLRegister<object[]>(lanes));
+                case MatrixTypeNode matrix:
+                    if (maxThreadCount == 1) return new MatrixValue(type.Kind, matrix.FirstDimension, matrix.SecondDimension, new HLSLRegister<object[]>(lanes[0]));
+                    else return new MatrixValue(type.Kind, matrix.FirstDimension, matrix.SecondDimension, new HLSLRegister<object[]>(lanes));
+                case GenericMatrixTypeNode genMatrix:
+                    var d1 = Visit(genMatrix.FirstDimension) as ScalarValue;
+                    var d2 = Visit(genMatrix.SecondDimension) as ScalarValue;
+                    if (maxThreadCount == 1) return new MatrixValue(type.Kind, Convert.ToInt32(d1.Value), Convert.ToInt32(d2.Value), new HLSLRegister<object[]>(lanes[0]));
+                    else return new MatrixValue(type.Kind, Convert.ToInt32(d1.Value), Convert.ToInt32(d2.Value), new HLSLRegister<object[]>(lanes));
+                default:
+                    throw Error($"Unknown numeric constructor type.");
             }
         }
 
@@ -835,71 +896,14 @@ namespace UnityShaderParser.Test
 
         public override HLSLValue VisitNumericConstructorCallExpressionNode(NumericConstructorCallExpressionNode node)
         {
-            // Get arguments, keep track of SGPR and VGPR
-            NumericValue[] args = new NumericValue[node.Arguments.Count];
-            int maxThreadCount = 1;
-            bool anyUniform = false;
+            var args = new NumericValue[node.Arguments.Count];
             for (int i = 0; i < args.Length; i++)
             {
                 args[i] = Visit(node.Arguments[i]) as NumericValue;
                 if (args[i] is null)
-                    throw Error(node, "Expected numeric arguments as inputs to vector constructor.");
-
-                int argThreadCount = args[i].ThreadCount;
-                maxThreadCount = Math.Max(maxThreadCount, argThreadCount);
-                anyUniform |= argThreadCount == 1;
+                    throw Error(node, "Expected numeric arguments as inputs to numeric constructor.");
             }
-
-            // If we are mixing VGPR and SGPR, vectorize inputs
-            if (anyUniform && maxThreadCount > 1)
-            {
-                for (int i = 0; i < args.Length; i++)
-                {
-                    args[i] = args[i].Vectorize(maxThreadCount);
-                }
-            }
-
-            object[][] lanes = new object[maxThreadCount][];
-            for (int threadIdx = 0; threadIdx < maxThreadCount; threadIdx++)
-            {
-                List<object> flattened = new List<object>();
-                foreach (var numeric in args)
-                {
-                    if (numeric is ScalarValue scalar)
-                        flattened.Add(scalar.Value.Get(threadIdx));
-                    if (numeric is VectorValue vector)
-                        flattened.AddRange(vector.Values.Get(threadIdx));
-                }
-                for (int i = 0; i < flattened.Count; i++)
-                {
-                    flattened[i] = HLSLValueUtils.CastNumeric(node.Kind.Kind, flattened[i]);
-                }
-                lanes[threadIdx] = flattened.ToArray();
-            }
-
-            switch (node.Kind)
-            {
-                case VectorTypeNode _:
-                case GenericVectorTypeNode _:
-                    if (maxThreadCount == 1)
-                        return new VectorValue(node.Kind.Kind, new HLSLRegister<object[]>(lanes[0]));
-                    else
-                        return new VectorValue(node.Kind.Kind, new HLSLRegister<object[]>(lanes));
-                case MatrixTypeNode matrix:
-                    if (maxThreadCount == 1)
-                        return new MatrixValue(node.Kind.Kind, matrix.FirstDimension, matrix.SecondDimension, new HLSLRegister<object[]>(lanes[0]));
-                    else
-                        return new MatrixValue(node.Kind.Kind, matrix.FirstDimension, matrix.SecondDimension, new HLSLRegister<object[]>(lanes));
-                case GenericMatrixTypeNode genMatrix:
-                    var d1 = Visit(genMatrix.FirstDimension) as ScalarValue;
-                    var d2 = Visit(genMatrix.SecondDimension) as ScalarValue;
-                    if (maxThreadCount == 1)
-                        return new MatrixValue(node.Kind.Kind, Convert.ToInt32(d1.Value), Convert.ToInt32(d2.Value), new HLSLRegister<object[]>(lanes[0]));
-                    else
-                        return new MatrixValue(node.Kind.Kind, Convert.ToInt32(d1.Value), Convert.ToInt32(d2.Value), new HLSLRegister<object[]>(lanes));
-                default:
-                    throw Error(node, "Unknown numeric constructor.");
-            }
+            return ConstructNumericValue(node.Kind, args);
         }
 
         public override HLSLValue VisitElementAccessExpressionNode(ElementAccessExpressionNode node)
@@ -1013,6 +1017,9 @@ namespace UnityShaderParser.Test
             if (sourceValue is ReferenceValue refVal)
                 sourceValue = refVal.Get();
 
+            // Resolve any typedef alias on the target type.
+            var targetKind = ResolveType(node.Kind);
+
             // If source or target involves an array type, use flatten-then-pack strategy.
             bool isTargetArray = node.ArrayRanks.Count > 0;
             if (isTargetArray || sourceValue is ArrayValue)
@@ -1023,7 +1030,7 @@ namespace UnityShaderParser.Test
                 {
                     int arrayLen = Convert.ToInt32(EvaluateNumeric(node.ArrayRanks[0].Dimension).GetThreadValue(0));
                     int components = 0;
-                    switch (node.Kind)
+                    switch (targetKind)
                     {
                         case ScalarTypeNode: components = 1; break;
                         case VectorTypeNode vt: components = vt.Dimension; break;
@@ -1035,13 +1042,13 @@ namespace UnityShaderParser.Test
                     {
                         int offset = (i * components);
                         int end = offset + components;
-                        elements[i] = PackScalarsToNumeric(flattened[offset..end], node.Kind, node);
+                        elements[i] = PackScalarsToNumeric(flattened[offset..end], targetKind, node);
                     }
                     return new ArrayValue(elements);
                 }
                 else
                 {
-                    return PackScalarsToNumeric(flattened, node.Kind, node);
+                    return PackScalarsToNumeric(flattened, targetKind, node);
                 }
             }
 
@@ -1049,7 +1056,7 @@ namespace UnityShaderParser.Test
             if (sourceValue is not NumericValue numeric)
                 throw Error(node, $"Expected a numeric expression, but got a {sourceValue.GetType().Name}.");
 
-            switch (node.Kind)
+            switch (targetKind)
             {
                 case ScalarTypeNode scalarType when numeric is ScalarValue scalar:
                     return scalar.Cast(scalarType.Kind);

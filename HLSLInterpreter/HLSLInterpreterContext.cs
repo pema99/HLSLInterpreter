@@ -9,10 +9,12 @@ namespace UnityShaderParser.Test
     public class HLSLInterpreterContext
     {
         private Stack<(bool isFunction, Dictionary<string, HLSLValue> table)> environment = new Stack<(bool, Dictionary<string, HLSLValue>)>(new[] { (false, new Dictionary<string, HLSLValue>()) });
+        private Stack<HLSLValue> returnStack = new Stack<HLSLValue>();
         private Stack<string> namespaceStack = new Stack<string>();
+
         private Dictionary<string, List<FunctionDefinitionNode>> functions = new Dictionary<string, List<FunctionDefinitionNode>>();
         private Dictionary<string, StructTypeNode> structs = new Dictionary<string, StructTypeNode>();
-        private Stack<HLSLValue> returnStack = new Stack<HLSLValue>();
+        private Dictionary<string, TypeNode> typeAliases = new Dictionary<string, TypeNode>();
         private HashSet<string> groupsharedVars = new HashSet<string>();
 
         public void EnterNamespace(string name)
@@ -251,6 +253,40 @@ namespace UnityShaderParser.Test
         public void AddStruct(string name, StructTypeNode structType)
         {
             structs[GetQualifiedName(name)] = structType;
+        }
+
+        public void AddTypeAlias(string name, TypeNode aliasedType)
+        {
+            typeAliases[GetQualifiedName(name)] = aliasedType;
+        }
+
+        public TypeNode ResolveType(TypeNode node)
+        {
+            int limit = 32; // guard against alias cycles
+            while (limit-- > 0 && node is UserDefinedNamedTypeNode named)
+            {
+                string rawName = named.GetName();
+                string qualName = GetQualifiedName(rawName);
+                if (typeAliases.TryGetValue(qualName, out var resolved) ||
+                    typeAliases.TryGetValue(rawName, out resolved))
+                    node = resolved;
+                else
+                    break;
+            }
+            return node;
+        }
+
+        public bool TryLookupTypeAlias(string name, out TypeNode resolvedType)
+        {
+            string qualName = GetQualifiedName(name);
+            if (typeAliases.TryGetValue(qualName, out resolvedType) ||
+                typeAliases.TryGetValue(name, out resolvedType))
+            {
+                resolvedType = ResolveType(resolvedType);
+                return true;
+            }
+            resolvedType = null;
+            return false;
         }
 
         public void PushReturn()
