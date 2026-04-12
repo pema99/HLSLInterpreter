@@ -91,7 +91,7 @@ namespace UnityShaderParser.Test
             {
                 int count = n;
                 string suffix = count == 1 ? "" : count.ToString();
-                Add($"Store{suffix}", 2, (state, rv, args) => { StoreN(rv, (NumericValue)args[0], (NumericValue)args[1], count); return null; });
+                Add($"Store{suffix}", 2, (state, rv, args) => { StoreN(rv, (NumericValue)args[0], (NumericValue)args[1], count); return ScalarValue.Null; });
             }
 
             // ==================== Sample ====================
@@ -276,34 +276,34 @@ namespace UnityShaderParser.Test
             // Single-thread assumption: no actual atomicity needed — each op is a plain read-modify-write.
 
             // Basic: InterlockedOp(byteOffset, value [, out original])
-            AddN("InterlockedAdd", 2, 3, (state, rv, args) => { InterlockedRMW32(rv, args, (a, b) => a + b); return null; });
-            AddN("InterlockedMin", 2, 3, (state, rv, args) => { InterlockedRMW32(rv, args, (a, b) => (int)a < (int)b ? a : b); return null; });
-            AddN("InterlockedMax", 2, 3, (state, rv, args) => { InterlockedRMW32(rv, args, (a, b) => (int)a > (int)b ? a : b); return null; });
-            AddN("InterlockedAnd", 2, 3, (state, rv, args) => { InterlockedRMW32(rv, args, (a, b) => a & b); return null; });
-            AddN("InterlockedOr",  2, 3, (state, rv, args) => { InterlockedRMW32(rv, args, (a, b) => a | b); return null; });
-            AddN("InterlockedXor", 2, 3, (state, rv, args) => { InterlockedRMW32(rv, args, (a, b) => a ^ b); return null; });
+            AddN("InterlockedAdd", 2, 3, (state, rv, args) => { InterlockedRMW32(rv, args, (a, b) => a + b); return ScalarValue.Null; });
+            AddN("InterlockedMin", 2, 3, (state, rv, args) => { InterlockedRMW32(rv, args, (a, b) => (int)a < (int)b ? a : b); return ScalarValue.Null; });
+            AddN("InterlockedMax", 2, 3, (state, rv, args) => { InterlockedRMW32(rv, args, (a, b) => (int)a > (int)b ? a : b); return ScalarValue.Null; });
+            AddN("InterlockedAnd", 2, 3, (state, rv, args) => { InterlockedRMW32(rv, args, (a, b) => a & b); return ScalarValue.Null; });
+            AddN("InterlockedOr",  2, 3, (state, rv, args) => { InterlockedRMW32(rv, args, (a, b) => a | b); return ScalarValue.Null; });
+            AddN("InterlockedXor", 2, 3, (state, rv, args) => { InterlockedRMW32(rv, args, (a, b) => a ^ b); return ScalarValue.Null; });
 
             // 64-bit variants: same operations on two consecutive 32-bit slots packed as ulong.
-            AddN("InterlockedAdd64", 2, 3, (state, rv, args) => { InterlockedRMW64(rv, args, (a, b) => a + b); return null; });
-            AddN("InterlockedMin64", 2, 3, (state, rv, args) => { InterlockedRMW64(rv, args, (a, b) => (long)a < (long)b ? a : b); return null; });
-            AddN("InterlockedMax64", 2, 3, (state, rv, args) => { InterlockedRMW64(rv, args, (a, b) => (long)a > (long)b ? a : b); return null; });
-            AddN("InterlockedAnd64", 2, 3, (state, rv, args) => { InterlockedRMW64(rv, args, (a, b) => a & b); return null; });
-            AddN("InterlockedOr64",  2, 3, (state, rv, args) => { InterlockedRMW64(rv, args, (a, b) => a | b); return null; });
-            AddN("InterlockedXor64", 2, 3, (state, rv, args) => { InterlockedRMW64(rv, args, (a, b) => a ^ b); return null; });
+            AddN("InterlockedAdd64", 2, 3, (state, rv, args) => { InterlockedRMW64(rv, args, (a, b) => a + b); return ScalarValue.Null; });
+            AddN("InterlockedMin64", 2, 3, (state, rv, args) => { InterlockedRMW64(rv, args, (a, b) => (long)a < (long)b ? a : b); return ScalarValue.Null; });
+            AddN("InterlockedMax64", 2, 3, (state, rv, args) => { InterlockedRMW64(rv, args, (a, b) => (long)a > (long)b ? a : b); return ScalarValue.Null; });
+            AddN("InterlockedAnd64", 2, 3, (state, rv, args) => { InterlockedRMW64(rv, args, (a, b) => a & b); return ScalarValue.Null; });
+            AddN("InterlockedOr64",  2, 3, (state, rv, args) => { InterlockedRMW64(rv, args, (a, b) => a | b); return ScalarValue.Null; });
+            AddN("InterlockedXor64", 2, 3, (state, rv, args) => { InterlockedRMW64(rv, args, (a, b) => a ^ b); return ScalarValue.Null; });
 
             // Exchange: InterlockedExchange(byteOffset, value, out original) — identity RMW, always captures original.
-            Add("InterlockedExchange",      3, (state, rv, args) => { InterlockedRMW32(rv, args, (_, b) => b); return null; });
-            Add("InterlockedExchange64",    3, (state, rv, args) => { InterlockedRMW64(rv, args, (_, b) => b); return null; });
-            Add("InterlockedExchangeFloat", 3, (state, rv, args) => { InterlockedExchangeFloat(rv, args); return null; });
+            Add("InterlockedExchange",      3, (state, rv, args) => { InterlockedRMW32(rv, args, (_, b) => b); return ScalarValue.Null; });
+            Add("InterlockedExchange64",    3, (state, rv, args) => { InterlockedRMW64(rv, args, (_, b) => b); return ScalarValue.Null; });
+            Add("InterlockedExchangeFloat", 3, (state, rv, args) => { InterlockedExchangeFloat(rv, args); return ScalarValue.Null; });
 
             // Compare-store and compare-exchange share the same implementation — the out param is
             // detected by args.Length. InterlockedCompareStore has 3 args (no out); InterlockedCompareExchange has 4 (with out).
-            Add("InterlockedCompareStore",              3, (state, rv, args) => { InterlockedCmpStore32(rv, args);    return null; });
-            Add("InterlockedCompareStore64",            3, (state, rv, args) => { InterlockedCmpStore64(rv, args);    return null; });
-            Add("InterlockedCompareStoreFloatBitwise",  3, (state, rv, args) => { InterlockedCmpStoreFloat(rv, args); return null; });
-            Add("InterlockedCompareExchange",                 4, (state, rv, args) => { InterlockedCmpStore32(rv, args);    return null; });
-            Add("InterlockedCompareExchange64",               4, (state, rv, args) => { InterlockedCmpStore64(rv, args);    return null; });
-            Add("InterlockedCompareExchangeFloatBitwise",     4, (state, rv, args) => { InterlockedCmpStoreFloat(rv, args); return null; });
+            Add("InterlockedCompareStore",              3, (state, rv, args) => { InterlockedCmpStore32(rv, args);    return ScalarValue.Null; });
+            Add("InterlockedCompareStore64",            3, (state, rv, args) => { InterlockedCmpStore64(rv, args);    return ScalarValue.Null; });
+            Add("InterlockedCompareStoreFloatBitwise",  3, (state, rv, args) => { InterlockedCmpStoreFloat(rv, args); return ScalarValue.Null; });
+            Add("InterlockedCompareExchange",                 4, (state, rv, args) => { InterlockedCmpStore32(rv, args);    return ScalarValue.Null; });
+            Add("InterlockedCompareExchange64",               4, (state, rv, args) => { InterlockedCmpStore64(rv, args);    return ScalarValue.Null; });
+            Add("InterlockedCompareExchangeFloatBitwise",     4, (state, rv, args) => { InterlockedCmpStoreFloat(rv, args); return ScalarValue.Null; });
 
             return table;
         }
@@ -369,12 +369,12 @@ namespace UnityShaderParser.Test
             var scalarOff = CastToScalar(byteOffset.Cast(ScalarType.Int));
             var vec = CastToVector(value.Cast(ScalarType.Uint), count);
             int threadCount = scalarOff.ThreadCount;
-            for (int t = 0; t < threadCount; t++)
+            for (int thread = 0; thread < threadCount; thread++)
             {
-                int baseOff = Convert.ToInt32(scalarOff.GetThreadValue(t));
+                int baseOff = Convert.ToInt32(scalarOff.GetThreadValue(thread));
                 for (int i = 0; i < count; i++)
                 {
-                    var raw = vec[i].GetThreadValue(t);
+                    var raw = vec[i].GetThreadValue(thread);
                     rv.Set(baseOff + i * 4, 0, 0, 0, 0, new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR(raw)));
                 }
             }
@@ -415,12 +415,12 @@ namespace UnityShaderParser.Test
             int threadCount = scalarOff.ThreadCount;
             bool hasOut = args.Length > 2 && args[2] is ReferenceValue;
             var originals = hasOut ? new HLSLValue[threadCount] : null;
-            for (int t = 0; t < threadCount; t++)
+            for (int thread = 0; thread < threadCount; thread++)
             {
-                int off = Convert.ToInt32(scalarOff.GetThreadValue(t));
+                int off = Convert.ToInt32(scalarOff.GetThreadValue(thread));
                 uint old = ReadUint32(rv, off);
-                uint val = Convert.ToUInt32(scalarVal.GetThreadValue(t));
-                if (originals is not null) originals[t] = new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR(old));
+                uint val = Convert.ToUInt32(scalarVal.GetThreadValue(thread));
+                if (originals is not null) originals[thread] = new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR(old));
                 WriteUint32(rv, off, op(old, val));
             }
             if (originals is not null)
@@ -436,14 +436,14 @@ namespace UnityShaderParser.Test
             int threadCount = scalarOff.ThreadCount;
             bool hasOut = args.Length > 2 && args[2] is ReferenceValue;
             var originals = hasOut ? new HLSLValue[threadCount] : null;
-            for (int t = 0; t < threadCount; t++)
+            for (int thread = 0; thread < threadCount; thread++)
             {
-                int off    = Convert.ToInt32(scalarOff.GetThreadValue(t));
+                int off    = Convert.ToInt32(scalarOff.GetThreadValue(thread));
                 ulong old  = ReadUint64(rv, off);
-                ulong val  = Convert.ToUInt32(valVec[0].GetThreadValue(t)) |
-                             ((ulong)Convert.ToUInt32(valVec[1].GetThreadValue(t)) << 32);
+                ulong val  = Convert.ToUInt32(valVec[0].GetThreadValue(thread)) |
+                             ((ulong)Convert.ToUInt32(valVec[1].GetThreadValue(thread)) << 32);
                 if (originals is not null)
-                    originals[t] = VectorValue.FromScalars(
+                    originals[thread] = VectorValue.FromScalars(
                         new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR((uint)(old & 0xFFFFFFFF))),
                         new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR((uint)(old >> 32))));
                 WriteUint64(rv, off, op(old, val));
@@ -459,12 +459,12 @@ namespace UnityShaderParser.Test
             var scalarVal = CastToScalar(((NumericValue)args[1]).Cast(ScalarType.Float));
             int threadCount = scalarOff.ThreadCount;
             var originals = new HLSLValue[threadCount];
-            for (int t = 0; t < threadCount; t++)
+            for (int thread = 0; thread < threadCount; thread++)
             {
-                int off   = Convert.ToInt32(scalarOff.GetThreadValue(t));
+                int off   = Convert.ToInt32(scalarOff.GetThreadValue(thread));
                 float old = BitConverter.UInt32BitsToSingle(ReadUint32(rv, off));
-                float val = Convert.ToSingle(scalarVal.GetThreadValue(t));
-                originals[t] = new ScalarValue(ScalarType.Float, HLSLValueUtils.MakeScalarSGPR(old));
+                float val = Convert.ToSingle(scalarVal.GetThreadValue(thread));
+                originals[thread] = new ScalarValue(ScalarType.Float, HLSLValueUtils.MakeScalarSGPR(old));
                 WriteUint32(rv, off, BitConverter.SingleToUInt32Bits(val));
             }
             if (args[2] is ReferenceValue outRef)
@@ -481,13 +481,13 @@ namespace UnityShaderParser.Test
             int threadCount = scalarOff.ThreadCount;
             bool hasOut = args.Length > 3 && args[3] is ReferenceValue;
             var originals = hasOut ? new HLSLValue[threadCount] : null;
-            for (int t = 0; t < threadCount; t++)
+            for (int thread = 0; thread < threadCount; thread++)
             {
-                int off  = Convert.ToInt32(scalarOff.GetThreadValue(t));
+                int off  = Convert.ToInt32(scalarOff.GetThreadValue(thread));
                 uint old = ReadUint32(rv, off);
-                uint cmp = Convert.ToUInt32(scalarCmp.GetThreadValue(t));
-                uint val = Convert.ToUInt32(scalarVal.GetThreadValue(t));
-                if (originals is not null) originals[t] = new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR(old));
+                uint cmp = Convert.ToUInt32(scalarCmp.GetThreadValue(thread));
+                uint val = Convert.ToUInt32(scalarVal.GetThreadValue(thread));
+                if (originals is not null) originals[thread] = new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR(old));
                 if (old == cmp) WriteUint32(rv, off, val);
             }
             if (originals is not null)
@@ -503,14 +503,14 @@ namespace UnityShaderParser.Test
             int threadCount = scalarOff.ThreadCount;
             bool hasOut = args.Length > 3 && args[3] is ReferenceValue;
             var originals = hasOut ? new HLSLValue[threadCount] : null;
-            for (int t = 0; t < threadCount; t++)
+            for (int thread = 0; thread < threadCount; thread++)
             {
-                int off   = Convert.ToInt32(scalarOff.GetThreadValue(t));
+                int off   = Convert.ToInt32(scalarOff.GetThreadValue(thread));
                 ulong old = ReadUint64(rv, off);
-                ulong cmp = Convert.ToUInt32(cmpVec[0].GetThreadValue(t)) | ((ulong)Convert.ToUInt32(cmpVec[1].GetThreadValue(t)) << 32);
-                ulong val = Convert.ToUInt32(valVec[0].GetThreadValue(t)) | ((ulong)Convert.ToUInt32(valVec[1].GetThreadValue(t)) << 32);
+                ulong cmp = Convert.ToUInt32(cmpVec[0].GetThreadValue(thread)) | ((ulong)Convert.ToUInt32(cmpVec[1].GetThreadValue(thread)) << 32);
+                ulong val = Convert.ToUInt32(valVec[0].GetThreadValue(thread)) | ((ulong)Convert.ToUInt32(valVec[1].GetThreadValue(thread)) << 32);
                 if (originals is not null)
-                    originals[t] = VectorValue.FromScalars(
+                    originals[thread] = VectorValue.FromScalars(
                         new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR((uint)(old & 0xFFFFFFFF))),
                         new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR((uint)(old >> 32))));
                 if (old == cmp) WriteUint64(rv, off, val);
@@ -528,14 +528,14 @@ namespace UnityShaderParser.Test
             int threadCount = scalarOff.ThreadCount;
             bool hasOut = args.Length > 3 && args[3] is ReferenceValue;
             var originals = hasOut ? new HLSLValue[threadCount] : null;
-            for (int t = 0; t < threadCount; t++)
+            for (int thread = 0; thread < threadCount; thread++)
             {
-                int off      = Convert.ToInt32(scalarOff.GetThreadValue(t));
+                int off      = Convert.ToInt32(scalarOff.GetThreadValue(thread));
                 uint oldBits = ReadUint32(rv, off);
-                uint cmpBits = BitConverter.SingleToUInt32Bits(Convert.ToSingle(scalarCmp.GetThreadValue(t)));
-                uint valBits = BitConverter.SingleToUInt32Bits(Convert.ToSingle(scalarVal.GetThreadValue(t)));
+                uint cmpBits = BitConverter.SingleToUInt32Bits(Convert.ToSingle(scalarCmp.GetThreadValue(thread)));
+                uint valBits = BitConverter.SingleToUInt32Bits(Convert.ToSingle(scalarVal.GetThreadValue(thread)));
                 if (originals is not null)
-                    originals[t] = new ScalarValue(ScalarType.Float, HLSLValueUtils.MakeScalarSGPR(BitConverter.UInt32BitsToSingle(oldBits)));
+                    originals[thread] = new ScalarValue(ScalarType.Float, HLSLValueUtils.MakeScalarSGPR(BitConverter.UInt32BitsToSingle(oldBits)));
                 if (oldBits == cmpBits) WriteUint32(rv, off, valBits);
             }
             if (originals is not null)
@@ -566,7 +566,7 @@ namespace UnityShaderParser.Test
             for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
             {
                 // Read spatial coordinate i (with optional offset).
-                int S(int i)
+                int CoordWithOffset(int i)
                 {
                     int v = Convert.ToInt32(scalarLoc[i].GetThreadValue(threadIndex));
                     if (scalarOff != null)
@@ -574,17 +574,17 @@ namespace UnityShaderParser.Test
                     return v;
                 }
                 // Read a raw (non-offset) coordinate.
-                int R(int i) => Convert.ToInt32(scalarLoc[i].GetThreadValue(threadIndex));
+                int RawCoord(int i) => Convert.ToInt32(scalarLoc[i].GetThreadValue(threadIndex));
 
-                int x = rv.Dimension >= 1 ? S(0) : 0;
-                int y = rv.Dimension >= 2 ? S(1) : 0;
-                int z = rv.Dimension >= 3 ? S(2) : 0;
+                int x = rv.Dimension >= 1 ? CoordWithOffset(0) : 0;
+                int y = rv.Dimension >= 2 ? CoordWithOffset(1) : 0;
+                int z = rv.Dimension >= 3 ? CoordWithOffset(2) : 0;
                 int mip = 0;
 
                 // Array slice follows the spatial dimensions; no offset applied.
                 if (rv.IsArray)
                 {
-                    int slice = R(rv.Dimension);
+                    int slice = RawCoord(rv.Dimension);
                     // 1D arrays: slice goes into the y parameter of Get.
                     // 2D arrays: slice goes into the z parameter of Get.
                     if (rv.Dimension == 1) y = slice;
@@ -593,7 +593,7 @@ namespace UnityShaderParser.Test
 
                 // Mip level is the very last component (non-RW textures only).
                 if (hasMip)
-                    mip = R(rv.Dimension + (rv.IsArray ? 1 : 0));
+                    mip = RawCoord(rv.Dimension + (rv.IsArray ? 1 : 0));
 
                 results[threadIndex] = rv.Get(x, y, z, 0, mip);
             }
@@ -616,7 +616,7 @@ namespace UnityShaderParser.Test
 
             var texelPos = CastToVector(location, dim) * size - 0.5f;
             if (offset is not null)
-                texelPos = (VectorValue)(texelPos + CastToVector(offset, dim));
+                texelPos = texelPos + CastToVector(offset, dim);
 
             var basePos = Floor(texelPos).Cast(ScalarType.Int);
             var frac = (VectorValue)Frac(texelPos);
@@ -726,19 +726,19 @@ namespace UnityShaderParser.Test
             int threadCount = dir.ThreadCount;
             HLSLValue[] results = new HLSLValue[threadCount];
 
-            for (int t = 0; t < threadCount; t++)
+            for (int thread = 0; thread < threadCount; thread++)
             {
                 ProjectCubeDirection(
-                    Convert.ToSingle(dir.x.GetThreadValue(t)),
-                    Convert.ToSingle(dir.y.GetThreadValue(t)),
-                    Convert.ToSingle(dir.z.GetThreadValue(t)),
+                    Convert.ToSingle(dir.x.GetThreadValue(thread)),
+                    Convert.ToSingle(dir.y.GetThreadValue(thread)),
+                    Convert.ToSingle(dir.z.GetThreadValue(thread)),
                     out int face, out float u, out float v);
 
-                float lodClamped = MathF.Max(0f, Convert.ToSingle(scalarLod.GetThreadValue(t)));
+                float lodClamped = MathF.Max(0f, Convert.ToSingle(scalarLod.GetThreadValue(thread)));
                 float faceSize = MathF.Max(1f, rv.SizeX / MathF.Pow(2f, lodClamped));
                 int mip = (int)lodClamped;
                 int maxC = (int)faceSize - 1;
-                int arraySlice = rv.IsArray ? Convert.ToInt32(dir[3].GetThreadValue(t)) : 0;
+                int arraySlice = rv.IsArray ? Convert.ToInt32(dir[3].GetThreadValue(thread)) : 0;
 
                 float texelU = u * faceSize - 0.5f;
                 float texelV = v * faceSize - 0.5f;
@@ -761,7 +761,7 @@ namespace UnityShaderParser.Test
 
                 var cx0 = Lerp(c00, c10, (ScalarValue)fracU);
                 var cx1 = Lerp(c01, c11, (ScalarValue)fracU);
-                results[t] = Lerp(cx0, cx1, (ScalarValue)fracV);
+                results[thread] = Lerp(cx0, cx1, (ScalarValue)fracV);
             }
 
             return (NumericValue)HLSLValueUtils.MergeThreadValues(results);
@@ -810,14 +810,14 @@ namespace UnityShaderParser.Test
         {
             int threadCount = dir.ThreadCount;
             HLSLValue[] results = new HLSLValue[threadCount];
-            for (int t = 0; t < threadCount; t++)
+            for (int thread = 0; thread < threadCount; thread++)
             {
                 ProjectCubeDirection(
-                    Convert.ToSingle(dir.x.GetThreadValue(t)),
-                    Convert.ToSingle(dir.y.GetThreadValue(t)),
-                    Convert.ToSingle(dir.z.GetThreadValue(t)),
+                    Convert.ToSingle(dir.x.GetThreadValue(thread)),
+                    Convert.ToSingle(dir.y.GetThreadValue(thread)),
+                    Convert.ToSingle(dir.z.GetThreadValue(thread)),
                     out _, out float u, out float v);
-                results[t] = VectorValue.FromScalars(u, v);
+                results[thread] = VectorValue.FromScalars(u, v);
             }
             return (VectorValue)HLSLValueUtils.MergeThreadValues(results);
         }
@@ -835,7 +835,7 @@ namespace UnityShaderParser.Test
             else
             {
                 var sizeVec = VectorValue.FromScalars(rv.SizeX, rv.SizeY, rv.SizeZ).BroadcastToVector(rv.Dimension);
-                scaledUV = (VectorValue)(CastToVector(location, rv.Dimension) * sizeVec);
+                scaledUV = CastToVector(location, rv.Dimension) * sizeVec;
             }
             var gradX = (VectorValue)Ddx(executionState, scaledUV);
             var gradY = (VectorValue)Ddy(executionState, scaledUV);
@@ -853,8 +853,8 @@ namespace UnityShaderParser.Test
         public static NumericValue SampleGrad(ResourceValue rv, SamplerStateValue sampler, NumericValue location, NumericValue ddx, NumericValue ddy, NumericValue offset = null, NumericValue clamp = null, Func<NumericValue, NumericValue> perTexel = null)
         {
             var sizeVec = VectorValue.FromScalars(rv.SizeX, rv.SizeY, rv.SizeZ).BroadcastToVector(rv.Dimension);
-            var gradX = (VectorValue)(CastToVector(ddx, rv.Dimension) * sizeVec);
-            var gradY = (VectorValue)(CastToVector(ddy, rv.Dimension) * sizeVec);
+            var gradX = CastToVector(ddx, rv.Dimension) * sizeVec;
+            var gradY = CastToVector(ddy, rv.Dimension) * sizeVec;
 
             float maxDim = MathF.Max(rv.SizeX, MathF.Max(rv.SizeY, rv.SizeZ));
             var lod = Clamp(Log2(RhoFromGradients(gradX, gradY)), 0.0f, MathF.Log(maxDim) / MathF.Log(2) + 1);
@@ -921,11 +921,11 @@ namespace UnityShaderParser.Test
             int threadCount = loc.ThreadCount;
             HLSLValue[] results = new HLSLValue[threadCount];
 
-            for (int t = 0; t < threadCount; t++)
+            for (int thread = 0; thread < threadCount; thread++)
             {
-                float u = Convert.ToSingle(loc[0].GetThreadValue(t));
-                float v = spatialDim >= 2 ? Convert.ToSingle(loc[1].GetThreadValue(t)) : 0f;
-                int arraySlice = rv.IsArray ? Convert.ToInt32(loc[spatialDim].GetThreadValue(t)) : 0;
+                float u = Convert.ToSingle(loc[0].GetThreadValue(thread));
+                float v = spatialDim >= 2 ? Convert.ToSingle(loc[1].GetThreadValue(thread)) : 0f;
+                int arraySlice = rv.IsArray ? Convert.ToInt32(loc[spatialDim].GetThreadValue(thread)) : 0;
 
                 // Bilinear footprint base coordinates (mip 0, no LOD scaling).
                 int baseX = (int)MathF.Floor(u * rv.SizeX - 0.5f);
@@ -935,7 +935,7 @@ namespace UnityShaderParser.Test
                 int[] cornerX = { baseX,     baseX + 1, baseX + 1, baseX     };
                 int[] cornerY = { baseY + 1, baseY + 1, baseY,     baseY     };
 
-                float cmpV = scalarCmp is not null ? Convert.ToSingle(scalarCmp.GetThreadValue(t)) : 0f;
+                float cmpV = scalarCmp is not null ? Convert.ToSingle(scalarCmp.GetThreadValue(thread)) : 0f;
 
                 float[] components = new float[4];
                 for (int i = 0; i < 4; i++)
@@ -948,12 +948,12 @@ namespace UnityShaderParser.Test
                         if (spatialDim >= 2)
                         {
                             var ov = CastToVector(offSrc.Cast(ScalarType.Int), 2);
-                            ox = Convert.ToInt32(ov.x.GetThreadValue(t));
-                            oy = Convert.ToInt32(ov.y.GetThreadValue(t));
+                            ox = Convert.ToInt32(ov.x.GetThreadValue(thread));
+                            oy = Convert.ToInt32(ov.y.GetThreadValue(thread));
                         }
                         else
                         {
-                            ox = Convert.ToInt32(CastToScalar(offSrc.Cast(ScalarType.Int)).GetThreadValue(t));
+                            ox = Convert.ToInt32(CastToScalar(offSrc.Cast(ScalarType.Int)).GetThreadValue(thread));
                         }
                     }
 
@@ -969,11 +969,11 @@ namespace UnityShaderParser.Test
                     if (texel is VectorValue vv)
                     {
                         int idx = Math.Min(channelIndex, vv.Size - 1);
-                        texelCh = Convert.ToSingle(vv[idx].GetThreadValue(0));
+                        texelCh = Convert.ToSingle(vv[idx].GetThreadValue(thread));
                     }
                     else
                     {
-                        texelCh = Convert.ToSingle(CastToScalar((NumericValue)texel).GetThreadValue(0));
+                        texelCh = Convert.ToSingle(CastToScalar((NumericValue)texel).GetThreadValue(thread));
                     }
 
                     // Apply comparison for GatherCmp* (returns 1.0 if passes, 0.0 if fails).
@@ -983,7 +983,7 @@ namespace UnityShaderParser.Test
                     components[i] = texelCh;
                 }
 
-                results[t] = VectorValue.FromScalars(
+                results[thread] = VectorValue.FromScalars(
                     (ScalarValue)components[0], (ScalarValue)components[1],
                     (ScalarValue)components[2], (ScalarValue)components[3]);
             }
