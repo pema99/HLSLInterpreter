@@ -422,6 +422,17 @@ namespace UnityShaderParser.Test
                     throw Error(node, "Groupshared variables cannot have initializers.");
             }
 
+            // Inline struct definition: register the struct and its static methods before processing declarators.
+            if (node.Kind is StructTypeNode inlineStruct)
+            {
+                context.AddStruct(inlineStruct.Name.GetName(), inlineStruct);
+                foreach (var method in inlineStruct.Methods)
+                {
+                    if (method is FunctionDefinitionNode func && method.Modifiers.Contains(BindingModifier.Static))
+                        context.AddFunction($"{inlineStruct.Name.GetName()}::{func.Name.GetName()}", func);
+                }
+            }
+
             foreach (VariableDeclaratorNode decl in node.Declarators)
             {
                 context.AddVariable(decl.Name, GetVariableDeclarationInitialValue(node.Kind, decl), isGroupshared);

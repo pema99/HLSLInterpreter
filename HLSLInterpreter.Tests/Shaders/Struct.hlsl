@@ -313,3 +313,137 @@ void Namespace_DeepInheritance_InheritsAllFields()
     ASSERT(lc.Area() == 16);
     ASSERT(lc.label == 99);
 }
+
+// --- Inline struct definitions ---
+[Test]
+void StructType_DefinedInline_CanAccessField()
+{
+    struct Foo { int a; };
+    Foo f;
+    f.a = 1;
+    ASSERT(f.a == 1);
+
+    struct Bar { int b; } h;
+    h.b = 2;
+    ASSERT(h.b == 2);
+}
+
+[Test]
+void StructType_DefinedInline_CanCallInstanceMethods()
+{
+    struct Foo { int a; int boo() { return a; } };
+    Foo f;
+    f.a = 1;
+    ASSERT(f.boo() == 1);
+
+    struct Bar { int a; int boo() { return a*2; } } h;
+    h.a = 2;
+    ASSERT(h.boo() == 4);
+}
+
+[Test]
+void StructType_DefinedInline_CanCallStaticMethods()
+{
+    struct Foo { static int boo() { return 1; } };
+    Foo f;
+    ASSERT(Foo::boo() == 1);
+
+    struct Bar { static int boo() { return 2; } } h;
+    ASSERT(Bar::boo() == 2);
+}
+
+[Test]
+void StructType_DefinedInline_RespectsScoping()
+{
+    {
+        struct Foo { int boo() { return 1; } };
+        Foo a;
+        ASSERT(a.boo() == 1);
+    }
+    {
+        struct Foo { int boo() { return 2; } };
+        Foo a;
+        ASSERT(a.boo() == 2);
+    }
+}
+
+void InnerStruct()
+{
+    struct Foo { int boo() { return 2; } };
+    Foo a;
+    ASSERT(a.boo() == 2);
+}
+
+[Test]
+void StructType_DefinedInlineInFunction_DoesNotLinger()
+{
+    struct Foo { int boo() { return 1; } };
+    Foo a;
+    ASSERT(a.boo() == 1);
+
+    InnerStruct();
+    ASSERT(a.boo() == 1);
+
+    Foo b;
+    ASSERT(b.boo() == 1);
+}
+
+// --- Inline struct initializers ---
+
+[Test]
+void StructType_DefinedInline_WithScalarInitializer()
+{
+    struct Foo { int a; int b; } f = (Foo)7;
+    ASSERT(f.a == 7);
+    ASSERT(f.b == 7);
+}
+
+[Test]
+void StructType_DefinedInline_WithArrayInitializer()
+{
+    struct Foo { int a; int b; } f = {3, 5};
+    ASSERT(f.a == 3);
+    ASSERT(f.b == 5);
+}
+
+// --- Multiple declarators ---
+
+[Test]
+void StructType_DefinedInline_MultipleDeclarators_AreIndependent()
+{
+    struct Foo { int a; } x, y;
+    x.a = 1;
+    y.a = 2;
+    ASSERT(x.a == 1);
+    ASSERT(y.a == 2);
+}
+
+// --- Static method lingering ---
+
+void InnerStaticStruct()
+{
+    struct Qux { static int boo() { return 2; } };
+}
+
+[Test]
+void StructType_InlineStaticMethod_DoesNotLingerAfterFunctionReturn()
+{
+    struct Qux { static int boo() { return 1; } };
+    ASSERT(Qux::boo() == 1);
+
+    InnerStaticStruct();
+    ASSERT(Qux::boo() == 1);
+}
+
+void InnerRegistersFirst()
+{
+    struct Ghost { static int val() { return 2; } };
+}
+
+[Test]
+void StructType_InlineStaticMethod_LateRegistration_NotPoisoned()
+{
+    InnerRegistersFirst();
+    struct Ghost { static int val() { return 1; } };
+    ASSERT(Ghost::val() == 1);
+}

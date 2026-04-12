@@ -1,19 +1,26 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Xml.Linq;
 using UnityShaderParser.HLSL;
 
 namespace UnityShaderParser.Test
 {
     public class HLSLInterpreterContext
     {
-        private Stack<(bool isFunction, Dictionary<string, HLSLValue> table)> environment = new Stack<(bool, Dictionary<string, HLSLValue>)>(new[] { (false, new Dictionary<string, HLSLValue>()) });
+        private sealed class Scope
+        {
+            public readonly bool IsFunction;
+            public readonly Dictionary<string, HLSLValue> Variables = new Dictionary<string, HLSLValue>();
+            public readonly Dictionary<string, List<FunctionDefinitionNode>> Functions = new Dictionary<string, List<FunctionDefinitionNode>>();
+            public readonly Dictionary<string, StructTypeNode> Structs = new Dictionary<string, StructTypeNode>();
+
+            public Scope(bool isFunction) => IsFunction = isFunction;
+        }
+
+        private Stack<Scope> environment = new Stack<Scope>(new[] { new Scope(false) });
         private Stack<HLSLValue> returnStack = new Stack<HLSLValue>();
         private Stack<string> namespaceStack = new Stack<string>();
 
-        private Dictionary<string, List<FunctionDefinitionNode>> functions = new Dictionary<string, List<FunctionDefinitionNode>>();
-        private Dictionary<string, StructTypeNode> structs = new Dictionary<string, StructTypeNode>();
         private Dictionary<string, TypeNode> typeAliases = new Dictionary<string, TypeNode>();
         private HashSet<string> groupsharedVars = new HashSet<string>();
 
@@ -31,7 +38,7 @@ namespace UnityShaderParser.Test
 
         public void PushScope(bool isFunction = false)
         {
-            environment.Push((isFunction, new Dictionary<string, HLSLValue>()));
+            environment.Push(new Scope(isFunction));
         }
 
         public void PopScope()
@@ -41,36 +48,35 @@ namespace UnityShaderParser.Test
 
         private bool TryFindVariable(string name, out Dictionary<string, HLSLValue> resolvedScope, out string resolvedName, out HLSLValue resolvedValue, out bool isGlobal)
         {
-            // Local scope
-            var localScope = environment.Take(environment.Count - 1);
-            foreach (var (isFunction, scope) in localScope)
+            // Local scope: search all scopes except the global one, stopping at a function boundary.
+            var localScopes = environment.Take(environment.Count - 1);
+            foreach (var scope in localScopes)
             {
-                if (scope.TryGetValue(name, out var val))
+                if (scope.Variables.TryGetValue(name, out var val))
                 {
-                    resolvedScope = scope;
+                    resolvedScope = scope.Variables;
                     resolvedName = name;
                     resolvedValue = val;
                     isGlobal = false;
                     return true;
                 }
-                if (isFunction)
+                if (scope.IsFunction)
                     break;
             }
 
-            // Not in local scope, try global scope
-            var globalScope = environment.Last();
+            // Not in local scope, try global scope with namespace resolution.
+            var globalVars = environment.Last().Variables;
             if (namespaceStack.Count > 0)
             {
-                // In a namespace, start with most specific prefix, and try each possible prefix
                 var reverseNamespace = namespaceStack.Reverse().ToArray();
                 for (int i = 0; i < namespaceStack.Count + 1; i++)
                 {
                     int prefixLength = namespaceStack.Count - i;
                     string currPrefix = string.Join("::", reverseNamespace.Take(prefixLength));
                     string qualifiedName = string.IsNullOrEmpty(currPrefix) ? name : $"{currPrefix}::{name}";
-                    if (globalScope.table.TryGetValue(qualifiedName, out var val))
+                    if (globalVars.TryGetValue(qualifiedName, out var val))
                     {
-                        resolvedScope = globalScope.table;
+                        resolvedScope = globalVars;
                         resolvedName = qualifiedName;
                         resolvedValue = val;
                         isGlobal = true;
@@ -80,10 +86,9 @@ namespace UnityShaderParser.Test
             }
             else
             {
-                // No namespace, resolve the name directly
-                if (globalScope.table.TryGetValue(name, out var val))
+                if (globalVars.TryGetValue(name, out var val))
                 {
-                    resolvedScope = globalScope.table;
+                    resolvedScope = globalVars;
                     resolvedName = name;
                     resolvedValue = val;
                     isGlobal = true;
@@ -141,10 +146,10 @@ namespace UnityShaderParser.Test
                 return;
             }
 
-            environment.Peek().table[name] = val;
+            environment.Peek().Variables[name] = val;
         }
 
-        // Like SetVariable but always add to top scope
+        // Like SetVariable but always add to top scope.
         public void AddVariable(string name, HLSLValue val, bool groupShared = false)
         {
             if (environment.Count <= 1)
@@ -155,7 +160,7 @@ namespace UnityShaderParser.Test
                 return;
             }
 
-            environment.Peek().table[name] = val;
+            environment.Peek().Variables[name] = val;
         }
 
         public string GetQualifiedName(string name)
@@ -168,7 +173,7 @@ namespace UnityShaderParser.Test
 
         public void SetGlobalVariable(string name, HLSLValue type)
         {
-            environment.Peek().table[GetQualifiedName(name)] = type;
+            environment.Peek().Variables[GetQualifiedName(name)] = type;
         }
 
         public bool IsGroupShared(string name)
@@ -178,45 +183,52 @@ namespace UnityShaderParser.Test
             return false;
         }
 
-        public FunctionDefinitionNode GetFunction(HLSLExpressionEvaluator evaluator, string name, HLSLValue[] args)
+        // Yields candidate qualified names for a given name under the current namespace stack,
+        // from most-specific prefix to least-specific (unqualified).
+        private IEnumerable<string> CandidateNames(string name)
         {
-            FunctionDefinitionNode overload = null;
             if (namespaceStack.Count > 0)
             {
-                // If we are in a namespace, try to resolve the name with the namespace prefix, starting from the most specific
                 var revNamespace = namespaceStack.Reverse().ToArray();
                 for (int i = 0; i < namespaceStack.Count + 1; i++)
                 {
                     int prefixLen = namespaceStack.Count - i;
                     string prefix = string.Join("::", revNamespace.Take(prefixLen));
-                    string fullName = string.IsNullOrEmpty(prefix) ? name : $"{prefix}::{name}";
-                    if (functions.TryGetValue(fullName, out var funcs))
-                    {
-                        overload = HLSLValueUtils.PickOverload(evaluator, funcs, args);
-                    }
+                    yield return string.IsNullOrEmpty(prefix) ? name : $"{prefix}::{name}";
                 }
             }
             else
             {
-                // If we are not in a namespace, just try to resolve the name directly
-                if (functions.TryGetValue(name, out var funcs))
+                yield return name;
+            }
+        }
+
+        public FunctionDefinitionNode GetFunction(HLSLExpressionEvaluator evaluator, string name, HLSLValue[] args)
+        {
+            foreach (var scope in environment)
+            {
+                foreach (string candidate in CandidateNames(name))
                 {
-                    overload = HLSLValueUtils.PickOverload(evaluator, funcs, args);
+                    if (scope.Functions.TryGetValue(candidate, out var funcs))
+                    {
+                        var overload = HLSLValueUtils.PickOverload(evaluator, funcs, args);
+                        if (overload != null)
+                            return overload;
+                    }
                 }
             }
-
-            return overload;
+            return null;
         }
 
         public FunctionDefinitionNode[] GetFunctions()
         {
-            return functions.Values.SelectMany(x => x).ToArray();
+            return environment.SelectMany(s => s.Functions.Values).SelectMany(x => x).ToArray();
         }
 
         public void AddFunction(string name, FunctionDefinitionNode func)
         {
             name = GetQualifiedName(name);
-
+            var functions = environment.Peek().Functions;
             if (!functions.TryGetValue(name, out var overloads))
             {
                 overloads = new List<FunctionDefinitionNode>();
@@ -224,35 +236,23 @@ namespace UnityShaderParser.Test
             }
             overloads.Add(func);
         }
-        
+
         public StructTypeNode GetStruct(string name)
         {
-            if (namespaceStack.Count > 0)
+            foreach (var scope in environment)
             {
-                // If we are in a namespace, try to resolve the name with the namespace prefix, starting from the most specific
-                var revNamespace = namespaceStack.Reverse().ToArray();
-                for (int i = 0; i < namespaceStack.Count + 1; i++)
+                foreach (string candidate in CandidateNames(name))
                 {
-                    int prefixLen = namespaceStack.Count - i;
-                    string prefix = string.Join("::", revNamespace.Take(prefixLen));
-                    string fullName = string.IsNullOrEmpty(prefix) ? name : $"{prefix}::{name}";
-                    if (structs.TryGetValue(fullName, out var structType))
+                    if (scope.Structs.TryGetValue(candidate, out var structType))
                         return structType;
                 }
             }
-            else
-            {
-                // If we are not in a namespace, just try to resolve the name directly
-                if (structs.TryGetValue(name, out var structType))
-                    return structType;
-            }
-
             return null;
         }
 
         public void AddStruct(string name, StructTypeNode structType)
         {
-            structs[GetQualifiedName(name)] = structType;
+            environment.Peek().Structs[GetQualifiedName(name)] = structType;
         }
 
         public void AddTypeAlias(string name, TypeNode aliasedType)
