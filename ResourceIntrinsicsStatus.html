@@ -30,7 +30,7 @@
 <body>
 
 <h1>HLSL Resource Intrinsics — Implementation Status</h1>
-<p class="generated">Generated 2026-04-12 &nbsp;·&nbsp; Source: <code>HLSLIntrinsics.Resources.cs</code></p>
+<p class="generated">Generated 2026-04-12 (updated 2026-04-12) &nbsp;·&nbsp; Source: <code>HLSLIntrinsics.Resources.cs</code></p>
 
 <div class="legend">
   <span class="legend-item green">Fully implemented</span>
@@ -44,23 +44,23 @@
   <li class="green"><span class="sig">GetDimensions(out uint Width)</span></li>
   <li class="yellow"><span class="sig">GetDimensions(uint MipLevel, out uint Width, out uint NumberOfLevels)</span> <span class="note">NumberOfLevels always reported as 1</span></li>
   <li class="green"><span class="sig">Load(int2 Location)</span></li>
-  <li class="yellow"><span class="sig">Load(int2 Location, int Offset)</span> <span class="note">Offset ignored</span></li>
-  <li class="yellow"><span class="sig">Load(int2 Location, int Offset, out uint Status)</span> <span class="note">Offset ignored; Status always 0</span></li>
+  <li class="green"><span class="sig">Load(int2 Location, int Offset)</span></li>
+  <li class="green"><span class="sig">Load(int2 Location, int Offset, out uint Status)</span></li>
   <li class="green"><span class="sig">Sample(SamplerState s, float u)</span></li>
-  <li class="yellow"><span class="sig">Sample(SamplerState s, float u, int Offset)</span> <span class="note">Offset ignored</span></li>
-  <li class="yellow"><span class="sig">Sample(SamplerState s, float u, int Offset, float Clamp)</span> <span class="note">Offset and Clamp ignored</span></li>
-  <li class="yellow"><span class="sig">Sample(SamplerState s, float u, int Offset, float Clamp, out uint Status)</span> <span class="note">Offset, Clamp, and Status ignored</span></li>
+  <li class="green"><span class="sig">Sample(SamplerState s, float u, int Offset)</span></li>
+  <li class="green"><span class="sig">Sample(SamplerState s, float u, int Offset, float Clamp)</span></li>
+  <li class="green"><span class="sig">Sample(SamplerState s, float u, int Offset, float Clamp, out uint Status)</span></li>
   <li class="green"><span class="sig">SampleLevel(SamplerState s, float u, float Lod)</span></li>
-  <li class="yellow"><span class="sig">SampleLevel(SamplerState s, float u, float Lod, int Offset)</span> <span class="note">Offset ignored</span></li>
-  <li class="yellow"><span class="sig">SampleLevel(SamplerState s, float u, float Lod, int Offset, out uint Status)</span> <span class="note">Offset and Status ignored</span></li>
+  <li class="green"><span class="sig">SampleLevel(SamplerState s, float u, float Lod, int Offset)</span></li>
+  <li class="green"><span class="sig">SampleLevel(SamplerState s, float u, float Lod, int Offset, out uint Status)</span></li>
   <li class="green"><span class="sig">SampleBias(SamplerState s, float u, float Bias)</span></li>
-  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float u, float Bias, int Offset)</span> <span class="note">Offset ignored</span></li>
-  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float u, float Bias, int Offset, float Clamp)</span> <span class="note">Offset and Clamp ignored</span></li>
-  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float u, float Bias, int Offset, float Clamp, out uint Status)</span> <span class="note">Offset, Clamp, and Status ignored</span></li>
+  <li class="green"><span class="sig">SampleBias(SamplerState s, float u, float Bias, int Offset)</span></li>
+  <li class="green"><span class="sig">SampleBias(SamplerState s, float u, float Bias, int Offset, float Clamp)</span></li>
+  <li class="green"><span class="sig">SampleBias(SamplerState s, float u, float Bias, int Offset, float Clamp, out uint Status)</span></li>
   <li class="green"><span class="sig">SampleGrad(SamplerState s, float u, float Ddx, float Ddy)</span></li>
-  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float u, float Ddx, float Ddy, int Offset)</span> <span class="note">Offset ignored</span></li>
-  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float u, float Ddx, float Ddy, int Offset, float Clamp)</span> <span class="note">Offset and Clamp ignored</span></li>
-  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float u, float Ddx, float Ddy, int Offset, float Clamp, out uint Status)</span> <span class="note">Offset, Clamp, and Status ignored</span></li>
+  <li class="green"><span class="sig">SampleGrad(SamplerState s, float u, float Ddx, float Ddy, int Offset)</span></li>
+  <li class="green"><span class="sig">SampleGrad(SamplerState s, float u, float Ddx, float Ddy, int Offset, float Clamp)</span></li>
+  <li class="green"><span class="sig">SampleGrad(SamplerState s, float u, float Ddx, float Ddy, int Offset, float Clamp, out uint Status)</span></li>
   <li class="red"><span class="sig">SampleCmp(SamplerComparisonState s, float u, float CmpVal)</span></li>
   <li class="red"><span class="sig">SampleCmp(SamplerComparisonState s, float u, float CmpVal, int Offset)</span></li>
   <li class="red"><span class="sig">SampleCmp(SamplerComparisonState s, float u, float CmpVal, int Offset, float Clamp)</span></li>
@@ -81,23 +81,23 @@
   <li class="green"><span class="sig">GetDimensions(out uint Width, out uint Elements)</span></li>
   <li class="yellow"><span class="sig">GetDimensions(uint MipLevel, out uint Width, out uint Elements, out uint NumberOfLevels)</span> <span class="note">NumberOfLevels always reported as 1</span></li>
   <li class="green"><span class="sig">Load(int3 Location)</span></li>
-  <li class="yellow"><span class="sig">Load(int3 Location, int Offset)</span> <span class="note">Offset ignored</span></li>
-  <li class="yellow"><span class="sig">Load(int3 Location, int Offset, out uint Status)</span> <span class="note">Offset ignored; Status always 0</span></li>
+  <li class="green"><span class="sig">Load(int3 Location, int Offset)</span></li>
+  <li class="green"><span class="sig">Load(int3 Location, int Offset, out uint Status)</span></li>
   <li class="green"><span class="sig">Sample(SamplerState s, float2 uv)</span></li>
-  <li class="yellow"><span class="sig">Sample(SamplerState s, float2 uv, int Offset)</span> <span class="note">Offset ignored</span></li>
-  <li class="yellow"><span class="sig">Sample(SamplerState s, float2 uv, int Offset, float Clamp)</span> <span class="note">Offset and Clamp ignored</span></li>
-  <li class="yellow"><span class="sig">Sample(SamplerState s, float2 uv, int Offset, float Clamp, out uint Status)</span> <span class="note">Offset, Clamp, and Status ignored</span></li>
+  <li class="green"><span class="sig">Sample(SamplerState s, float2 uv, int Offset)</span></li>
+  <li class="green"><span class="sig">Sample(SamplerState s, float2 uv, int Offset, float Clamp)</span></li>
+  <li class="green"><span class="sig">Sample(SamplerState s, float2 uv, int Offset, float Clamp, out uint Status)</span></li>
   <li class="green"><span class="sig">SampleLevel(SamplerState s, float2 uv, float Lod)</span></li>
-  <li class="yellow"><span class="sig">SampleLevel(SamplerState s, float2 uv, float Lod, int Offset)</span> <span class="note">Offset ignored</span></li>
-  <li class="yellow"><span class="sig">SampleLevel(SamplerState s, float2 uv, float Lod, int Offset, out uint Status)</span> <span class="note">Offset and Status ignored</span></li>
+  <li class="green"><span class="sig">SampleLevel(SamplerState s, float2 uv, float Lod, int Offset)</span></li>
+  <li class="green"><span class="sig">SampleLevel(SamplerState s, float2 uv, float Lod, int Offset, out uint Status)</span></li>
   <li class="green"><span class="sig">SampleBias(SamplerState s, float2 uv, float Bias)</span></li>
-  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float2 uv, float Bias, int Offset)</span> <span class="note">Offset ignored</span></li>
-  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float2 uv, float Bias, int Offset, float Clamp)</span> <span class="note">Offset and Clamp ignored</span></li>
-  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float2 uv, float Bias, int Offset, float Clamp, out uint Status)</span> <span class="note">Offset, Clamp, and Status ignored</span></li>
+  <li class="green"><span class="sig">SampleBias(SamplerState s, float2 uv, float Bias, int Offset)</span></li>
+  <li class="green"><span class="sig">SampleBias(SamplerState s, float2 uv, float Bias, int Offset, float Clamp)</span></li>
+  <li class="green"><span class="sig">SampleBias(SamplerState s, float2 uv, float Bias, int Offset, float Clamp, out uint Status)</span></li>
   <li class="green"><span class="sig">SampleGrad(SamplerState s, float2 uv, float Ddx, float Ddy)</span></li>
-  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float2 uv, float Ddx, float Ddy, int Offset)</span> <span class="note">Offset ignored</span></li>
-  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float2 uv, float Ddx, float Ddy, int Offset, float Clamp)</span> <span class="note">Offset and Clamp ignored</span></li>
-  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float2 uv, float Ddx, float Ddy, int Offset, float Clamp, out uint Status)</span> <span class="note">Offset, Clamp, and Status ignored</span></li>
+  <li class="green"><span class="sig">SampleGrad(SamplerState s, float2 uv, float Ddx, float Ddy, int Offset)</span></li>
+  <li class="green"><span class="sig">SampleGrad(SamplerState s, float2 uv, float Ddx, float Ddy, int Offset, float Clamp)</span></li>
+  <li class="green"><span class="sig">SampleGrad(SamplerState s, float2 uv, float Ddx, float Ddy, int Offset, float Clamp, out uint Status)</span></li>
   <li class="red"><span class="sig">SampleCmp(SamplerComparisonState s, float2 uv, float CmpVal)</span></li>
   <li class="red"><span class="sig">SampleCmp(SamplerComparisonState s, float2 uv, float CmpVal, int Offset)</span></li>
   <li class="red"><span class="sig">SampleCmp(SamplerComparisonState s, float2 uv, float CmpVal, int Offset, float Clamp)</span></li>
@@ -118,23 +118,23 @@
   <li class="green"><span class="sig">GetDimensions(out uint Width, out uint Height)</span></li>
   <li class="yellow"><span class="sig">GetDimensions(uint MipLevel, out uint Width, out uint Height, out uint NumberOfLevels)</span> <span class="note">NumberOfLevels always reported as 1</span></li>
   <li class="green"><span class="sig">Load(int3 Location)</span></li>
-  <li class="yellow"><span class="sig">Load(int3 Location, int2 Offset)</span> <span class="note">Offset ignored</span></li>
-  <li class="yellow"><span class="sig">Load(int3 Location, int2 Offset, out uint Status)</span> <span class="note">Offset ignored; Status always 0</span></li>
+  <li class="green"><span class="sig">Load(int3 Location, int2 Offset)</span></li>
+  <li class="green"><span class="sig">Load(int3 Location, int2 Offset, out uint Status)</span></li>
   <li class="green"><span class="sig">Sample(SamplerState s, float2 uv)</span></li>
-  <li class="yellow"><span class="sig">Sample(SamplerState s, float2 uv, int2 Offset)</span> <span class="note">Offset ignored</span></li>
-  <li class="yellow"><span class="sig">Sample(SamplerState s, float2 uv, int2 Offset, float Clamp)</span> <span class="note">Offset and Clamp ignored</span></li>
-  <li class="yellow"><span class="sig">Sample(SamplerState s, float2 uv, int2 Offset, float Clamp, out uint Status)</span> <span class="note">Offset, Clamp, and Status ignored</span></li>
+  <li class="green"><span class="sig">Sample(SamplerState s, float2 uv, int2 Offset)</span></li>
+  <li class="green"><span class="sig">Sample(SamplerState s, float2 uv, int2 Offset, float Clamp)</span></li>
+  <li class="green"><span class="sig">Sample(SamplerState s, float2 uv, int2 Offset, float Clamp, out uint Status)</span></li>
   <li class="green"><span class="sig">SampleLevel(SamplerState s, float2 uv, float Lod)</span></li>
-  <li class="yellow"><span class="sig">SampleLevel(SamplerState s, float2 uv, float Lod, int2 Offset)</span> <span class="note">Offset ignored</span></li>
-  <li class="yellow"><span class="sig">SampleLevel(SamplerState s, float2 uv, float Lod, int2 Offset, out uint Status)</span> <span class="note">Offset and Status ignored</span></li>
+  <li class="green"><span class="sig">SampleLevel(SamplerState s, float2 uv, float Lod, int2 Offset)</span></li>
+  <li class="green"><span class="sig">SampleLevel(SamplerState s, float2 uv, float Lod, int2 Offset, out uint Status)</span></li>
   <li class="green"><span class="sig">SampleBias(SamplerState s, float2 uv, float Bias)</span></li>
-  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float2 uv, float Bias, int2 Offset)</span> <span class="note">Offset ignored</span></li>
-  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float2 uv, float Bias, int2 Offset, float Clamp)</span> <span class="note">Offset and Clamp ignored</span></li>
-  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float2 uv, float Bias, int2 Offset, float Clamp, out uint Status)</span> <span class="note">Offset, Clamp, and Status ignored</span></li>
+  <li class="green"><span class="sig">SampleBias(SamplerState s, float2 uv, float Bias, int2 Offset)</span></li>
+  <li class="green"><span class="sig">SampleBias(SamplerState s, float2 uv, float Bias, int2 Offset, float Clamp)</span></li>
+  <li class="green"><span class="sig">SampleBias(SamplerState s, float2 uv, float Bias, int2 Offset, float Clamp, out uint Status)</span></li>
   <li class="green"><span class="sig">SampleGrad(SamplerState s, float2 uv, float2 Ddx, float2 Ddy)</span></li>
-  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float2 uv, float2 Ddx, float2 Ddy, int2 Offset)</span> <span class="note">Offset ignored</span></li>
-  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float2 uv, float2 Ddx, float2 Ddy, int2 Offset, float Clamp)</span> <span class="note">Offset and Clamp ignored</span></li>
-  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float2 uv, float2 Ddx, float2 Ddy, int2 Offset, float Clamp, out uint Status)</span> <span class="note">Offset, Clamp, and Status ignored</span></li>
+  <li class="green"><span class="sig">SampleGrad(SamplerState s, float2 uv, float2 Ddx, float2 Ddy, int2 Offset)</span></li>
+  <li class="green"><span class="sig">SampleGrad(SamplerState s, float2 uv, float2 Ddx, float2 Ddy, int2 Offset, float Clamp)</span></li>
+  <li class="green"><span class="sig">SampleGrad(SamplerState s, float2 uv, float2 Ddx, float2 Ddy, int2 Offset, float Clamp, out uint Status)</span></li>
   <li class="red"><span class="sig">SampleCmp(SamplerComparisonState s, float2 uv, float CmpVal)</span></li>
   <li class="red"><span class="sig">SampleCmp(SamplerComparisonState s, float2 uv, float CmpVal, int2 Offset)</span></li>
   <li class="red"><span class="sig">SampleCmp(SamplerComparisonState s, float2 uv, float CmpVal, int2 Offset, float Clamp)</span></li>
@@ -173,9 +173,9 @@
 <h2>Texture2DMS</h2>
 <ul>
   <li class="yellow"><span class="sig">GetDimensions(out uint Width, out uint Height, out uint NumberOfSamples)</span> <span class="note">NumberOfSamples always reported as 1</span></li>
-  <li class="red"><span class="sig">Load(int2 Location, int SampleIndex)</span></li>
-  <li class="red"><span class="sig">Load(int2 Location, int SampleIndex, int2 Offset)</span></li>
-  <li class="red"><span class="sig">Load(int2 Location, int SampleIndex, int2 Offset, out uint Status)</span></li>
+  <li class="green"><span class="sig">Load(int2 Location, int SampleIndex)</span></li>
+  <li class="green"><span class="sig">Load(int2 Location, int SampleIndex, int2 Offset)</span></li>
+  <li class="green"><span class="sig">Load(int2 Location, int SampleIndex, int2 Offset, out uint Status)</span></li>
   <li class="red"><span class="sig">GetSamplePosition(int SampleIndex)</span></li>
 </ul>
 
@@ -185,23 +185,23 @@
   <li class="green"><span class="sig">GetDimensions(out uint Width, out uint Height, out uint Elements)</span></li>
   <li class="yellow"><span class="sig">GetDimensions(uint MipLevel, out uint Width, out uint Height, out uint Elements, out uint NumberOfLevels)</span> <span class="note">NumberOfLevels always reported as 1</span></li>
   <li class="green"><span class="sig">Load(int4 Location)</span></li>
-  <li class="yellow"><span class="sig">Load(int4 Location, int2 Offset)</span> <span class="note">Offset ignored</span></li>
-  <li class="yellow"><span class="sig">Load(int4 Location, int2 Offset, out uint Status)</span> <span class="note">Offset ignored; Status always 0</span></li>
+  <li class="green"><span class="sig">Load(int4 Location, int2 Offset)</span></li>
+  <li class="green"><span class="sig">Load(int4 Location, int2 Offset, out uint Status)</span></li>
   <li class="green"><span class="sig">Sample(SamplerState s, float3 uvw)</span></li>
-  <li class="yellow"><span class="sig">Sample(SamplerState s, float3 uvw, int2 Offset)</span> <span class="note">Offset ignored</span></li>
-  <li class="yellow"><span class="sig">Sample(SamplerState s, float3 uvw, int2 Offset, float Clamp)</span> <span class="note">Offset and Clamp ignored</span></li>
-  <li class="yellow"><span class="sig">Sample(SamplerState s, float3 uvw, int2 Offset, float Clamp, out uint Status)</span> <span class="note">Offset, Clamp, and Status ignored</span></li>
+  <li class="green"><span class="sig">Sample(SamplerState s, float3 uvw, int2 Offset)</span></li>
+  <li class="green"><span class="sig">Sample(SamplerState s, float3 uvw, int2 Offset, float Clamp)</span></li>
+  <li class="green"><span class="sig">Sample(SamplerState s, float3 uvw, int2 Offset, float Clamp, out uint Status)</span></li>
   <li class="green"><span class="sig">SampleLevel(SamplerState s, float3 uvw, float Lod)</span></li>
-  <li class="yellow"><span class="sig">SampleLevel(SamplerState s, float3 uvw, float Lod, int2 Offset)</span> <span class="note">Offset ignored</span></li>
-  <li class="yellow"><span class="sig">SampleLevel(SamplerState s, float3 uvw, float Lod, int2 Offset, out uint Status)</span> <span class="note">Offset and Status ignored</span></li>
+  <li class="green"><span class="sig">SampleLevel(SamplerState s, float3 uvw, float Lod, int2 Offset)</span></li>
+  <li class="green"><span class="sig">SampleLevel(SamplerState s, float3 uvw, float Lod, int2 Offset, out uint Status)</span></li>
   <li class="green"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias)</span></li>
-  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias, int2 Offset)</span> <span class="note">Offset ignored</span></li>
-  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias, int2 Offset, float Clamp)</span> <span class="note">Offset and Clamp ignored</span></li>
-  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias, int2 Offset, float Clamp, out uint Status)</span> <span class="note">Offset, Clamp, and Status ignored</span></li>
+  <li class="green"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias, int2 Offset)</span></li>
+  <li class="green"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias, int2 Offset, float Clamp)</span></li>
+  <li class="green"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias, int2 Offset, float Clamp, out uint Status)</span></li>
   <li class="green"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float2 Ddx, float2 Ddy)</span></li>
-  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float2 Ddx, float2 Ddy, int2 Offset)</span> <span class="note">Offset ignored</span></li>
-  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float2 Ddx, float2 Ddy, int2 Offset, float Clamp)</span> <span class="note">Offset and Clamp ignored</span></li>
-  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float2 Ddx, float2 Ddy, int2 Offset, float Clamp, out uint Status)</span> <span class="note">Offset, Clamp, and Status ignored</span></li>
+  <li class="green"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float2 Ddx, float2 Ddy, int2 Offset)</span></li>
+  <li class="green"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float2 Ddx, float2 Ddy, int2 Offset, float Clamp)</span></li>
+  <li class="green"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float2 Ddx, float2 Ddy, int2 Offset, float Clamp, out uint Status)</span></li>
   <li class="red"><span class="sig">SampleCmp(SamplerComparisonState s, float3 uvw, float CmpVal [, ...])</span> <span class="note">All overloads (3–6 args) not implemented</span></li>
   <li class="red"><span class="sig">SampleCmpLevel(SamplerComparisonState s, float3 uvw, float CmpVal, float Lod [, ...])</span> <span class="note">All overloads (4–6 args) not implemented</span></li>
   <li class="red"><span class="sig">SampleCmpLevelZero(SamplerComparisonState s, float3 uvw, float CmpVal [, ...])</span> <span class="note">All overloads (3–5 args) not implemented</span></li>
@@ -217,9 +217,9 @@
 <h2>Texture2DMSArray</h2>
 <ul>
   <li class="yellow"><span class="sig">GetDimensions(out uint Width, out uint Height, out uint Elements, out uint NumberOfSamples)</span> <span class="note">NumberOfSamples always reported as 1</span></li>
-  <li class="red"><span class="sig">Load(int3 Location, int SampleIndex)</span></li>
-  <li class="red"><span class="sig">Load(int3 Location, int SampleIndex, int2 Offset)</span></li>
-  <li class="red"><span class="sig">Load(int3 Location, int SampleIndex, int2 Offset, out uint Status)</span></li>
+  <li class="green"><span class="sig">Load(int3 Location, int SampleIndex)</span></li>
+  <li class="green"><span class="sig">Load(int3 Location, int SampleIndex, int2 Offset)</span></li>
+  <li class="green"><span class="sig">Load(int3 Location, int SampleIndex, int2 Offset, out uint Status)</span></li>
   <li class="red"><span class="sig">GetSamplePosition(int SampleIndex)</span></li>
 </ul>
 
@@ -229,23 +229,23 @@
   <li class="green"><span class="sig">GetDimensions(out uint Width, out uint Height, out uint Depth)</span></li>
   <li class="yellow"><span class="sig">GetDimensions(uint MipLevel, out uint Width, out uint Height, out uint Depth, out uint NumberOfLevels)</span> <span class="note">NumberOfLevels always reported as 1</span></li>
   <li class="green"><span class="sig">Load(int4 Location)</span></li>
-  <li class="yellow"><span class="sig">Load(int4 Location, int3 Offset)</span> <span class="note">Offset ignored</span></li>
-  <li class="yellow"><span class="sig">Load(int4 Location, int3 Offset, out uint Status)</span> <span class="note">Offset ignored; Status always 0</span></li>
+  <li class="green"><span class="sig">Load(int4 Location, int3 Offset)</span></li>
+  <li class="green"><span class="sig">Load(int4 Location, int3 Offset, out uint Status)</span></li>
   <li class="yellow"><span class="sig">Sample(SamplerState s, float3 uvw)</span> <span class="note">Z (depth) axis not interpolated; only XY bilinear sampling performed</span></li>
-  <li class="yellow"><span class="sig">Sample(SamplerState s, float3 uvw, int3 Offset)</span> <span class="note">Z not interpolated; Offset ignored</span></li>
-  <li class="yellow"><span class="sig">Sample(SamplerState s, float3 uvw, int3 Offset, float Clamp)</span> <span class="note">Z not interpolated; Offset and Clamp ignored</span></li>
-  <li class="yellow"><span class="sig">Sample(SamplerState s, float3 uvw, int3 Offset, float Clamp, out uint Status)</span> <span class="note">Z not interpolated; Offset, Clamp, and Status ignored</span></li>
+  <li class="yellow"><span class="sig">Sample(SamplerState s, float3 uvw, int3 Offset)</span> <span class="note">Z not interpolated</span></li>
+  <li class="yellow"><span class="sig">Sample(SamplerState s, float3 uvw, int3 Offset, float Clamp)</span> <span class="note">Z not interpolated</span></li>
+  <li class="yellow"><span class="sig">Sample(SamplerState s, float3 uvw, int3 Offset, float Clamp, out uint Status)</span> <span class="note">Z not interpolated</span></li>
   <li class="yellow"><span class="sig">SampleLevel(SamplerState s, float3 uvw, float Lod)</span> <span class="note">Z axis not interpolated</span></li>
-  <li class="yellow"><span class="sig">SampleLevel(SamplerState s, float3 uvw, float Lod, int3 Offset)</span> <span class="note">Z not interpolated; Offset ignored</span></li>
-  <li class="yellow"><span class="sig">SampleLevel(SamplerState s, float3 uvw, float Lod, int3 Offset, out uint Status)</span> <span class="note">Z not interpolated; Offset and Status ignored</span></li>
+  <li class="yellow"><span class="sig">SampleLevel(SamplerState s, float3 uvw, float Lod, int3 Offset)</span> <span class="note">Z not interpolated</span></li>
+  <li class="yellow"><span class="sig">SampleLevel(SamplerState s, float3 uvw, float Lod, int3 Offset, out uint Status)</span> <span class="note">Z not interpolated</span></li>
   <li class="yellow"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias)</span> <span class="note">Z axis not interpolated</span></li>
-  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias, int3 Offset)</span> <span class="note">Z not interpolated; Offset ignored</span></li>
-  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias, int3 Offset, float Clamp)</span> <span class="note">Z not interpolated; Offset and Clamp ignored</span></li>
-  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias, int3 Offset, float Clamp, out uint Status)</span> <span class="note">Z not interpolated; Offset, Clamp, and Status ignored</span></li>
+  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias, int3 Offset)</span> <span class="note">Z not interpolated</span></li>
+  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias, int3 Offset, float Clamp)</span> <span class="note">Z not interpolated</span></li>
+  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias, int3 Offset, float Clamp, out uint Status)</span> <span class="note">Z not interpolated</span></li>
   <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float3 Ddx, float3 Ddy)</span> <span class="note">Z axis not interpolated</span></li>
-  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float3 Ddx, float3 Ddy, int3 Offset)</span> <span class="note">Z not interpolated; Offset ignored</span></li>
-  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float3 Ddx, float3 Ddy, int3 Offset, float Clamp)</span> <span class="note">Z not interpolated; Offset and Clamp ignored</span></li>
-  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float3 Ddx, float3 Ddy, int3 Offset, float Clamp, out uint Status)</span> <span class="note">Z not interpolated; Offset, Clamp, and Status ignored</span></li>
+  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float3 Ddx, float3 Ddy, int3 Offset)</span> <span class="note">Z not interpolated</span></li>
+  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float3 Ddx, float3 Ddy, int3 Offset, float Clamp)</span> <span class="note">Z not interpolated</span></li>
+  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float3 Ddx, float3 Ddy, int3 Offset, float Clamp, out uint Status)</span> <span class="note">Z not interpolated</span></li>
   <li class="yellow"><span class="sig">CalculateLevelOfDetail(SamplerState s, float3 uvw)</span> <span class="note">Z component of UV not included in derivative calculation</span></li>
   <li class="yellow"><span class="sig">CalculateLevelOfDetailUnclamped(SamplerState s, float3 uvw)</span> <span class="note">Z component of UV not included in derivative calculation</span></li>
 </ul>
@@ -256,16 +256,16 @@
   <li class="green"><span class="sig">GetDimensions(out uint Width, out uint Height)</span></li>
   <li class="yellow"><span class="sig">GetDimensions(uint MipLevel, out uint Width, out uint Height, out uint NumberOfLevels)</span> <span class="note">NumberOfLevels always reported as 1</span></li>
   <li class="yellow"><span class="sig">Sample(SamplerState s, float3 uvw)</span> <span class="note">Cube face selection not implemented; direction vector not mapped to face + 2D UV</span></li>
-  <li class="yellow"><span class="sig">Sample(SamplerState s, float3 uvw, float Clamp)</span> <span class="note">Cube face selection not implemented; Clamp ignored</span></li>
-  <li class="yellow"><span class="sig">Sample(SamplerState s, float3 uvw, float Clamp, out uint Status)</span> <span class="note">Cube face selection not implemented; Clamp and Status ignored</span></li>
+  <li class="yellow"><span class="sig">Sample(SamplerState s, float3 uvw, float Clamp)</span> <span class="note">Cube face selection not implemented</span></li>
+  <li class="yellow"><span class="sig">Sample(SamplerState s, float3 uvw, float Clamp, out uint Status)</span> <span class="note">Cube face selection not implemented</span></li>
   <li class="yellow"><span class="sig">SampleLevel(SamplerState s, float3 uvw, float Lod)</span> <span class="note">Cube face selection not implemented</span></li>
-  <li class="yellow"><span class="sig">SampleLevel(SamplerState s, float3 uvw, float Lod, out uint Status)</span> <span class="note">Cube face selection not implemented; Status ignored</span></li>
+  <li class="yellow"><span class="sig">SampleLevel(SamplerState s, float3 uvw, float Lod, out uint Status)</span> <span class="note">Cube face selection not implemented</span></li>
   <li class="yellow"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias)</span> <span class="note">Cube face selection not implemented</span></li>
-  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias, float Clamp)</span> <span class="note">Cube face selection not implemented; Clamp ignored</span></li>
-  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias, float Clamp, out uint Status)</span> <span class="note">Cube face selection not implemented; Clamp and Status ignored</span></li>
+  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias, float Clamp)</span> <span class="note">Cube face selection not implemented</span></li>
+  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias, float Clamp, out uint Status)</span> <span class="note">Cube face selection not implemented</span></li>
   <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float3 Ddx, float3 Ddy)</span> <span class="note">Cube face selection not implemented</span></li>
-  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float3 Ddx, float3 Ddy, float Clamp)</span> <span class="note">Cube face selection not implemented; Clamp ignored</span></li>
-  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float3 Ddx, float3 Ddy, float Clamp, out uint Status)</span> <span class="note">Cube face selection not implemented; Clamp and Status ignored</span></li>
+  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float3 Ddx, float3 Ddy, float Clamp)</span> <span class="note">Cube face selection not implemented</span></li>
+  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float3 Ddx, float3 Ddy, float Clamp, out uint Status)</span> <span class="note">Cube face selection not implemented</span></li>
   <li class="red"><span class="sig">SampleCmp / SampleCmpLevel / SampleCmpLevelZero / SampleCmpBias / SampleCmpGrad</span> <span class="note">All overloads not implemented</span></li>
   <li class="yellow"><span class="sig">CalculateLevelOfDetail(SamplerState s, float3 uvw)</span> <span class="note">Cube face selection not implemented; derivative computed on raw xyz direction</span></li>
   <li class="yellow"><span class="sig">CalculateLevelOfDetailUnclamped(SamplerState s, float3 uvw)</span> <span class="note">Same as above; unclamped variant</span></li>
@@ -279,16 +279,16 @@
   <li class="green"><span class="sig">GetDimensions(out uint Width, out uint Height, out uint Elements)</span></li>
   <li class="yellow"><span class="sig">GetDimensions(uint MipLevel, out uint Width, out uint Height, out uint Elements, out uint NumberOfLevels)</span> <span class="note">NumberOfLevels always reported as 1</span></li>
   <li class="yellow"><span class="sig">Sample(SamplerState s, float4 uvwa)</span> <span class="note">Cube face selection not implemented; array slice ignored in sampling</span></li>
-  <li class="yellow"><span class="sig">Sample(SamplerState s, float4 uvwa, float Clamp)</span> <span class="note">Cube face selection not implemented; Clamp ignored</span></li>
-  <li class="yellow"><span class="sig">Sample(SamplerState s, float4 uvwa, float Clamp, out uint Status)</span> <span class="note">Cube face selection not implemented; Clamp and Status ignored</span></li>
+  <li class="yellow"><span class="sig">Sample(SamplerState s, float4 uvwa, float Clamp)</span> <span class="note">Cube face selection not implemented</span></li>
+  <li class="yellow"><span class="sig">Sample(SamplerState s, float4 uvwa, float Clamp, out uint Status)</span> <span class="note">Cube face selection not implemented</span></li>
   <li class="yellow"><span class="sig">SampleLevel(SamplerState s, float4 uvwa, float Lod)</span> <span class="note">Cube face selection not implemented; array slice ignored</span></li>
-  <li class="yellow"><span class="sig">SampleLevel(SamplerState s, float4 uvwa, float Lod, out uint Status)</span> <span class="note">Cube face selection not implemented; Status ignored</span></li>
+  <li class="yellow"><span class="sig">SampleLevel(SamplerState s, float4 uvwa, float Lod, out uint Status)</span> <span class="note">Cube face selection not implemented</span></li>
   <li class="yellow"><span class="sig">SampleBias(SamplerState s, float4 uvwa, float Bias)</span> <span class="note">Cube face selection not implemented; array slice ignored</span></li>
-  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float4 uvwa, float Bias, float Clamp)</span> <span class="note">Cube face selection not implemented; Clamp ignored</span></li>
-  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float4 uvwa, float Bias, float Clamp, out uint Status)</span> <span class="note">Cube face selection not implemented; Clamp and Status ignored</span></li>
+  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float4 uvwa, float Bias, float Clamp)</span> <span class="note">Cube face selection not implemented</span></li>
+  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float4 uvwa, float Bias, float Clamp, out uint Status)</span> <span class="note">Cube face selection not implemented</span></li>
   <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float4 uvwa, float4 Ddx, float4 Ddy)</span> <span class="note">Cube face selection not implemented; array slice ignored</span></li>
-  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float4 uvwa, float4 Ddx, float4 Ddy, float Clamp)</span> <span class="note">Cube face selection not implemented; Clamp ignored</span></li>
-  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float4 uvwa, float4 Ddx, float4 Ddy, float Clamp, out uint Status)</span> <span class="note">Cube face selection not implemented; Clamp and Status ignored</span></li>
+  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float4 uvwa, float4 Ddx, float4 Ddy, float Clamp)</span> <span class="note">Cube face selection not implemented</span></li>
+  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float4 uvwa, float4 Ddx, float4 Ddy, float Clamp, out uint Status)</span> <span class="note">Cube face selection not implemented</span></li>
   <li class="red"><span class="sig">SampleCmp / SampleCmpLevel / SampleCmpLevelZero / SampleCmpBias / SampleCmpGrad</span> <span class="note">All overloads not implemented</span></li>
   <li class="yellow"><span class="sig">CalculateLevelOfDetail(SamplerState s, float4 uvwa)</span> <span class="note">Cube face selection not implemented; array slice ignored in derivative</span></li>
   <li class="yellow"><span class="sig">CalculateLevelOfDetailUnclamped(SamplerState s, float4 uvwa)</span> <span class="note">Same as above; unclamped variant</span></li>
@@ -301,35 +301,35 @@
 <ul>
   <li class="green"><span class="sig">GetDimensions(out uint Width)</span></li>
   <li class="green"><span class="sig">Load(int Location)</span></li>
-  <li class="yellow"><span class="sig">Load(int Location, out uint Status)</span> <span class="note">Status always 0</span></li>
+  <li class="green"><span class="sig">Load(int Location, out uint Status)</span></li>
 </ul>
 
 <!-- ===================== RWTexture1D ===================== -->
 <h2>RWTexture1D&lt;T&gt;</h2>
 <ul>
   <li class="green"><span class="sig">GetDimensions(out uint Width)</span></li>
-  <li class="yellow"><span class="sig">Load(int Location)</span> <span class="note">Mip level incorrectly included in coordinate count (rv.IsTexture is true for RW textures); location vector must supply an extra component</span></li>
+  <li class="green"><span class="sig">Load(int Location)</span></li>
 </ul>
 
 <!-- ===================== RWTexture1DArray ===================== -->
 <h2>RWTexture1DArray&lt;T&gt;</h2>
 <ul>
   <li class="green"><span class="sig">GetDimensions(out uint Width, out uint Elements)</span></li>
-  <li class="yellow"><span class="sig">Load(int2 Location)</span> <span class="note">Mip level incorrectly included in coordinate count; caller must supply an extra component</span></li>
+  <li class="green"><span class="sig">Load(int2 Location)</span></li>
 </ul>
 
 <!-- ===================== RWTexture2D ===================== -->
 <h2>RWTexture2D&lt;T&gt;</h2>
 <ul>
   <li class="green"><span class="sig">GetDimensions(out uint Width, out uint Height)</span></li>
-  <li class="yellow"><span class="sig">Load(int2 Location)</span> <span class="note">Mip level incorrectly included in coordinate count (rv.IsTexture is true for RW textures); int3 expected instead of int2</span></li>
+  <li class="green"><span class="sig">Load(int2 Location)</span></li>
 </ul>
 
 <!-- ===================== RWTexture2DArray ===================== -->
 <h2>RWTexture2DArray&lt;T&gt;</h2>
 <ul>
   <li class="green"><span class="sig">GetDimensions(out uint Width, out uint Height, out uint Elements)</span></li>
-  <li class="yellow"><span class="sig">Load(int3 Location)</span> <span class="note">Mip level incorrectly included in coordinate count; int4 expected instead of int3</span></li>
+  <li class="green"><span class="sig">Load(int3 Location)</span></li>
 </ul>
 
 <!-- ===================== RWTexture2DMS ===================== -->
@@ -356,7 +356,7 @@
 <h2>RWTexture3D&lt;T&gt;</h2>
 <ul>
   <li class="green"><span class="sig">GetDimensions(out uint Width, out uint Height, out uint Depth)</span></li>
-  <li class="yellow"><span class="sig">Load(int3 Location)</span> <span class="note">Mip level incorrectly included in coordinate count; int4 expected instead of int3</span></li>
+  <li class="green"><span class="sig">Load(int3 Location)</span></li>
 </ul>
 
 <!-- ===================== RWBuffer ===================== -->
@@ -364,7 +364,7 @@
 <ul>
   <li class="green"><span class="sig">GetDimensions(out uint Width)</span></li>
   <li class="green"><span class="sig">Load(int Location)</span></li>
-  <li class="yellow"><span class="sig">Load(int Location, out uint Status)</span> <span class="note">Status always 0</span></li>
+  <li class="green"><span class="sig">Load(int Location, out uint Status)</span></li>
 </ul>
 
 <!-- ===================== ByteAddressBuffer ===================== -->
@@ -372,13 +372,13 @@
 <ul>
   <li class="green"><span class="sig">GetDimensions(out uint Dim)</span></li>
   <li class="green"><span class="sig">Load(int ByteOffset)</span></li>
-  <li class="yellow"><span class="sig">Load(int ByteOffset, out uint Status)</span> <span class="note">Status always 0</span></li>
-  <li class="red"><span class="sig">Load2(int ByteOffset)</span></li>
-  <li class="red"><span class="sig">Load2(int ByteOffset, out uint Status)</span></li>
-  <li class="red"><span class="sig">Load3(int ByteOffset)</span></li>
-  <li class="red"><span class="sig">Load3(int ByteOffset, out uint Status)</span></li>
-  <li class="red"><span class="sig">Load4(int ByteOffset)</span></li>
-  <li class="red"><span class="sig">Load4(int ByteOffset, out uint Status)</span></li>
+  <li class="green"><span class="sig">Load(int ByteOffset, out uint Status)</span></li>
+  <li class="green"><span class="sig">Load2(int ByteOffset)</span></li>
+  <li class="green"><span class="sig">Load2(int ByteOffset, out uint Status)</span></li>
+  <li class="green"><span class="sig">Load3(int ByteOffset)</span></li>
+  <li class="green"><span class="sig">Load3(int ByteOffset, out uint Status)</span></li>
+  <li class="green"><span class="sig">Load4(int ByteOffset)</span></li>
+  <li class="green"><span class="sig">Load4(int ByteOffset, out uint Status)</span></li>
 </ul>
 
 <!-- ===================== RWByteAddressBuffer ===================== -->
@@ -386,13 +386,13 @@
 <ul>
   <li class="green"><span class="sig">GetDimensions(out uint Dim)</span></li>
   <li class="green"><span class="sig">Load(int ByteOffset)</span></li>
-  <li class="yellow"><span class="sig">Load(int ByteOffset, out uint Status)</span> <span class="note">Status always 0</span></li>
-  <li class="red"><span class="sig">Load2(int ByteOffset)</span></li>
-  <li class="red"><span class="sig">Load2(int ByteOffset, out uint Status)</span></li>
-  <li class="red"><span class="sig">Load3(int ByteOffset)</span></li>
-  <li class="red"><span class="sig">Load3(int ByteOffset, out uint Status)</span></li>
-  <li class="red"><span class="sig">Load4(int ByteOffset)</span></li>
-  <li class="red"><span class="sig">Load4(int ByteOffset, out uint Status)</span></li>
+  <li class="green"><span class="sig">Load(int ByteOffset, out uint Status)</span></li>
+  <li class="green"><span class="sig">Load2(int ByteOffset)</span></li>
+  <li class="green"><span class="sig">Load2(int ByteOffset, out uint Status)</span></li>
+  <li class="green"><span class="sig">Load3(int ByteOffset)</span></li>
+  <li class="green"><span class="sig">Load3(int ByteOffset, out uint Status)</span></li>
+  <li class="green"><span class="sig">Load4(int ByteOffset)</span></li>
+  <li class="green"><span class="sig">Load4(int ByteOffset, out uint Status)</span></li>
   <li class="red"><span class="sig">Store(uint ByteOffset, T Value)</span></li>
   <li class="red"><span class="sig">Store2(uint ByteOffset, T Value)</span></li>
   <li class="red"><span class="sig">Store3(uint ByteOffset, T Value)</span></li>
@@ -437,7 +437,7 @@
 <ul>
   <li class="yellow"><span class="sig">GetDimensions(out uint NumStructs, out uint Stride)</span> <span class="note">Stride always reported as 0 (element size not tracked)</span></li>
   <li class="green"><span class="sig">Load(int Location)</span></li>
-  <li class="yellow"><span class="sig">Load(int Location, out uint Status)</span> <span class="note">Status always 0</span></li>
+  <li class="green"><span class="sig">Load(int Location, out uint Status)</span></li>
 </ul>
 
 <!-- ===================== RWStructuredBuffer ===================== -->
@@ -445,7 +445,7 @@
 <ul>
   <li class="yellow"><span class="sig">GetDimensions(out uint NumStructs, out uint Stride)</span> <span class="note">Stride always reported as 0 (element size not tracked)</span></li>
   <li class="green"><span class="sig">Load(int Location)</span></li>
-  <li class="yellow"><span class="sig">Load(int Location, out uint Status)</span> <span class="note">Status always 0</span></li>
+  <li class="green"><span class="sig">Load(int Location, out uint Status)</span></li>
   <li class="red"><span class="sig">IncrementCounter()</span></li>
   <li class="red"><span class="sig">DecrementCounter()</span></li>
 </ul>

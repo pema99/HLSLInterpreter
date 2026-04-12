@@ -46,30 +46,55 @@ namespace UnityShaderParser.Test
                 Add(name, argCount, NotImplementedMethod(name));
 
             // ==================== Load ====================
-            // Universally applicable to all resource types. The Load() implementation
-            // uses rv.Dimension/IsTexture/IsArray to infer which coordinates to extract.
-            //   1 arg  — Load(intN location)
-            //   2 args — Load(intN location, intN offset)       [offset ignored]
-            //          — Load(intN location, out uint status)    [status written as 0]
-            //          — MS: Load(int2 xy, int sampleIndex)      [stub]
-            //   3 args — Load(intN location, intN offset, out uint status)
-            //          — MS: Load(int2 xy, int sampleIndex, int2 offset) [stub]
-            //   4 args — MS: Load(int2 xy, int sampleIndex, int2 offset, out uint status) [stub]
+            // Load(intN location [, intN offset [, out uint status]])
+            //   Non-MS: location encodes (x [,y [,z]] [, arraySlice] [, mipLevel]).
+            //           Mip is the last component for non-RW textures only.
+            //           Optional offset is applied to spatial dimensions only.
+            // MS Load: Load(intN xy [, arraySlice], int sampleIndex [, intN offset [, out status]])
+            //          Sample index is ignored — we don't simulate per-sample MSAA storage.
             AddN("Load", 1, 4, (state, rv, args) =>
             {
-                if (IsMSTexture(rv) && args.Length >= 2 && args[1] is not ReferenceValue)
-                    throw new NotImplementedException($"{rv.Type}.Load (multisample) is not yet implemented.");
-                var result = Load(rv, (NumericValue)args[0]);
+                if (IsMSTexture(rv))
+                {
+                    // args[1] = sampleIndex (ignored), args[2] = offset (optional), last = status (optional)
+                    NumericValue msOffset = args.Length >= 3 && args[2] is not ReferenceValue
+                        ? (NumericValue)args[2] : null;
+                    var msResult = LoadMS(rv, (NumericValue)args[0], msOffset);
+                    if (args.Length > 1 && args[args.Length - 1] is ReferenceValue msStatus)
+                        msStatus.Set((NumericValue)(uint)0);
+                    return msResult;
+                }
+
+                // Standard Load: args[1] is offset (non-ref) or status (ref); args[2] is status (ref).
+                NumericValue offset = args.Length >= 2 && args[1] is not ReferenceValue
+                    ? (NumericValue)args[1] : null;
+                var result = Load(rv, (NumericValue)args[0], offset);
                 if (args.Length > 1 && args[args.Length - 1] is ReferenceValue statusRef)
                     statusRef.Set((NumericValue)(uint)0);
                 return result;
             });
 
             // ==================== Load2 / Load3 / Load4 ====================
-            // ByteAddressBuffer / RWByteAddressBuffer: load 2/3/4 uints from a byte offset.
-            StubN("Load2", 1, 2);
-            StubN("Load3", 1, 2);
-            StubN("Load4", 1, 2);
+            // ByteAddressBuffer / RWByteAddressBuffer: load 2/3/4 consecutive uints from a byte offset.
+            // Each element occupies 4 bytes (DWORD-aligned).
+            AddN("Load2", 1, 2, (state, rv, args) =>
+            {
+                var r = LoadN(rv, (NumericValue)args[0], 2);
+                if (args.Length > 1 && args[1] is ReferenceValue sr) sr.Set((NumericValue)(uint)0);
+                return r;
+            });
+            AddN("Load3", 1, 2, (state, rv, args) =>
+            {
+                var r = LoadN(rv, (NumericValue)args[0], 3);
+                if (args.Length > 1 && args[1] is ReferenceValue sr) sr.Set((NumericValue)(uint)0);
+                return r;
+            });
+            AddN("Load4", 1, 2, (state, rv, args) =>
+            {
+                var r = LoadN(rv, (NumericValue)args[0], 4);
+                if (args.Length > 1 && args[1] is ReferenceValue sr) sr.Set((NumericValue)(uint)0);
+                return r;
+            });
 
             // ==================== Store / Store2 / Store3 / Store4 ====================
             // RWByteAddressBuffer: store value(s) at a byte offset.
@@ -81,23 +106,38 @@ namespace UnityShaderParser.Test
             // ==================== Sample ====================
             // Sample(sampler, uv [, offset [, clamp [, out status]]])
             AddN("Sample", 2, 5, (state, rv, args) =>
-                Sample(state, rv, (SamplerStateValue)args[0], (NumericValue)args[1]));
+            {
+                var offset = args.Length >= 3 ? (NumericValue)args[2] : null;
+                var clamp  = args.Length >= 4 ? (NumericValue)args[3] : null;
+                return Sample(state, rv, (SamplerStateValue)args[0], (NumericValue)args[1], offset, clamp);
+            });
 
             // ==================== SampleLevel ====================
             // SampleLevel(sampler, uv, lod [, offset [, out status]])
             AddN("SampleLevel", 3, 5, (state, rv, args) =>
-                SampleLevel(rv, (SamplerStateValue)args[0], (NumericValue)args[1], (NumericValue)args[2]));
+            {
+                var offset = args.Length >= 4 ? (NumericValue)args[3] : null;
+                return SampleLevel(rv, (SamplerStateValue)args[0], (NumericValue)args[1], (NumericValue)args[2], offset);
+            });
 
             // ==================== SampleGrad ====================
             // SampleGrad(sampler, uv, ddx, ddy [, offset [, clamp [, out status]]])
             AddN("SampleGrad", 4, 7, (state, rv, args) =>
-                SampleGrad(rv, (SamplerStateValue)args[0], (NumericValue)args[1],
-                           (NumericValue)args[2], (NumericValue)args[3]));
+            {
+                var offset = args.Length >= 5 ? (NumericValue)args[4] : null;
+                var clamp  = args.Length >= 6 ? (NumericValue)args[5] : null;
+                return SampleGrad(rv, (SamplerStateValue)args[0], (NumericValue)args[1],
+                                  (NumericValue)args[2], (NumericValue)args[3], offset, clamp);
+            });
 
             // ==================== SampleBias ====================
             // SampleBias(sampler, uv, bias [, offset [, clamp [, out status]]])
             AddN("SampleBias", 3, 6, (state, rv, args) =>
-                SampleBias(state, rv, (SamplerStateValue)args[0], (NumericValue)args[1], (NumericValue)args[2]));
+            {
+                var offset = args.Length >= 4 ? (NumericValue)args[3] : null;
+                var clamp  = args.Length >= 5 ? (NumericValue)args[4] : null;
+                return SampleBias(state, rv, (SamplerStateValue)args[0], (NumericValue)args[1], (NumericValue)args[2], offset, clamp);
+            });
 
             // ==================== SampleCmp family ====================
             // SampleCmp(sampler_cmp, uv, cmpValue [, offset [, clamp [, out status]]])
@@ -196,48 +236,96 @@ namespace UnityShaderParser.Test
             return false;
         }
 
-        public static HLSLValue Load(ResourceValue rv, NumericValue location)
+        // Public entry point for ordinary (non-MS) Load.
+        // Non-RW textures carry a mip level as the last component of their location vector;
+        // RW textures and buffers do not.
+        public static HLSLValue Load(ResourceValue rv, NumericValue location, NumericValue offset = null)
+            => LoadCore(rv, location, offset, hasMip: rv.IsTexture && !rv.IsWriteable);
+
+        // Entry point for multisample Load. The caller strips out the sampleIndex arg;
+        // MS textures never include a mip level in their location vector.
+        public static HLSLValue LoadMS(ResourceValue rv, NumericValue location, NumericValue offset = null)
+            => LoadCore(rv, location, offset, hasMip: false);
+
+        // Load N consecutive uints starting at byteOffset (4 bytes apart).
+        // Used by ByteAddressBuffer.Load2 / Load3 / Load4.
+        private static NumericValue LoadN(ResourceValue rv, NumericValue byteOffset, int count)
         {
-            // Number of int components in the location vector:
-            // dimension + mip level (non-RW textures only) + array slice
-            int coordCount = rv.Dimension + (rv.IsTexture ? 1 : 0) + (rv.IsArray ? 1 : 0);
+            var scalarOff = CastToScalar(byteOffset.Cast(ScalarType.Int));
+            int threadCount = scalarOff.ThreadCount;
+            var results = new HLSLValue[threadCount];
+
+            for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
+            {
+                int baseOff = Convert.ToInt32(scalarOff.GetThreadValue(threadIndex));
+                var components = new ScalarValue[count];
+                for (int i = 0; i < count; i++)
+                {
+                    var elem = (NumericValue)rv.Get(baseOff + i * 4, 0, 0, 0, 0);
+                    components[i] = CastToScalar(elem.Cast(ScalarType.Uint));
+                }
+                results[threadIndex] = count == 1
+                    ? (HLSLValue)components[0]
+                    : VectorValue.FromScalars(components);
+            }
+
+            return (NumericValue)HLSLValueUtils.MergeThreadValues(results);
+        }
+
+        private static HLSLValue LoadCore(ResourceValue rv, NumericValue location, NumericValue offset, bool hasMip)
+        {
+            // Build the full coordinate vector.
+            // Layout of the location vector:
+            //   [x] [,y] [,z]          — spatial (rv.Dimension components)
+            //   [,arraySlice]           — present when rv.IsArray
+            //   [,mipLevel]             — present when hasMip (non-RW, non-MS textures)
+            int coordCount = rv.Dimension + (rv.IsArray ? 1 : 0) + (hasMip ? 1 : 0);
 
             VectorValue vectorLoc = CastToVector(location.Cast(ScalarType.Int), coordCount);
             ScalarValue[] scalarLoc = vectorLoc.ToScalars();
 
-            HLSLValue[] results = new HLSLValue[vectorLoc.ThreadCount];
-            for (int threadIndex = 0; threadIndex < results.Length; threadIndex++)
+            // Spatial offset (applies only to the first rv.Dimension components).
+            VectorValue vectorOff = offset is not null
+                ? CastToVector(offset.Cast(ScalarType.Int), rv.Dimension)
+                : null;
+            ScalarValue[] scalarOff = vectorOff?.ToScalars();
+
+            int threadCount = vectorLoc.ThreadCount;
+            HLSLValue[] results = new HLSLValue[threadCount];
+
+            for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
             {
-                if (coordCount == 1)
+                // Read spatial coordinate i (with optional offset).
+                int S(int i)
                 {
-                    results[threadIndex] = rv.Get(
-                        Convert.ToInt32(scalarLoc[0].GetThreadValue(threadIndex)),
-                        0, 0, 0, 0);
+                    int v = Convert.ToInt32(scalarLoc[i].GetThreadValue(threadIndex));
+                    if (scalarOff != null)
+                        v += Convert.ToInt32(scalarOff[i].GetThreadValue(threadIndex));
+                    return v;
                 }
-                else if (coordCount == 2)
+                // Read a raw (non-offset) coordinate.
+                int R(int i) => Convert.ToInt32(scalarLoc[i].GetThreadValue(threadIndex));
+
+                int x = rv.Dimension >= 1 ? S(0) : 0;
+                int y = rv.Dimension >= 2 ? S(1) : 0;
+                int z = rv.Dimension >= 3 ? S(2) : 0;
+                int mip = 0;
+
+                // Array slice follows the spatial dimensions; no offset applied.
+                if (rv.IsArray)
                 {
-                    results[threadIndex] = rv.Get(
-                        Convert.ToInt32(scalarLoc[0].GetThreadValue(threadIndex)),
-                        0, 0, 0,
-                        Convert.ToInt32(scalarLoc[1].GetThreadValue(threadIndex)));
+                    int slice = R(rv.Dimension);
+                    // 1D arrays: slice goes into the y parameter of Get.
+                    // 2D arrays: slice goes into the z parameter of Get.
+                    if (rv.Dimension == 1) y = slice;
+                    else                   z = slice;
                 }
-                else if (coordCount == 3)
-                {
-                    results[threadIndex] = rv.Get(
-                        Convert.ToInt32(scalarLoc[0].GetThreadValue(threadIndex)),
-                        Convert.ToInt32(scalarLoc[1].GetThreadValue(threadIndex)),
-                        0, 0,
-                        Convert.ToInt32(scalarLoc[2].GetThreadValue(threadIndex)));
-                }
-                else if (coordCount == 4)
-                {
-                    results[threadIndex] = rv.Get(
-                        Convert.ToInt32(scalarLoc[0].GetThreadValue(threadIndex)),
-                        Convert.ToInt32(scalarLoc[1].GetThreadValue(threadIndex)),
-                        Convert.ToInt32(scalarLoc[2].GetThreadValue(threadIndex)),
-                        0,
-                        Convert.ToInt32(scalarLoc[3].GetThreadValue(threadIndex)));
-                }
+
+                // Mip level is the very last component (non-RW textures only).
+                if (hasMip)
+                    mip = R(rv.Dimension + (rv.IsArray ? 1 : 0));
+
+                results[threadIndex] = rv.Get(x, y, z, 0, mip);
             }
 
             return HLSLValueUtils.MergeThreadValues(results);
@@ -245,12 +333,14 @@ namespace UnityShaderParser.Test
 
         // TODO: Texture Arrays
         // TODO: 1D, 3D texture
-        public static NumericValue SampleLevel(ResourceValue rv, SamplerStateValue sampler, NumericValue location, NumericValue lod)
+        public static NumericValue SampleLevel(ResourceValue rv, SamplerStateValue sampler, NumericValue location, NumericValue lod, NumericValue offset = null)
         {
             var scalarLod = CastToScalar(lod);
             var size = VectorValue.FromScalars(rv.SizeX, rv.SizeY, rv.SizeZ).BroadcastToVector(rv.Dimension) / (lod + 1);
 
             var texelPos = CastToVector(location, rv.Dimension) * size - 0.5f;
+            if (offset is not null)
+                texelPos = (VectorValue)(texelPos + CastToVector(offset, rv.Dimension));
 
             var basePos = Floor(texelPos).Cast(ScalarType.Int);
             var frac = (VectorValue)Frac(texelPos);
@@ -306,13 +396,16 @@ namespace UnityShaderParser.Test
             return Log2(rho);
         }
 
-        public static NumericValue Sample(HLSLExecutionState executionState, ResourceValue rv, SamplerStateValue sampler, NumericValue location)
+        public static NumericValue Sample(HLSLExecutionState executionState, ResourceValue rv, SamplerStateValue sampler, NumericValue location, NumericValue offset = null, NumericValue clamp = null)
         {
-            return SampleLevel(rv, sampler, location, CalculateLevelOfDetail(executionState, rv, sampler, location));
+            var lod = CalculateLevelOfDetail(executionState, rv, sampler, location);
+            if (clamp is not null)
+                lod = Min(lod, ToFloatLike(clamp));
+            return SampleLevel(rv, sampler, location, lod, offset);
         }
 
         // TODO: 1D, 3D texture
-        public static NumericValue SampleGrad(ResourceValue rv, SamplerStateValue sampler, NumericValue location, NumericValue ddx, NumericValue ddy)
+        public static NumericValue SampleGrad(ResourceValue rv, SamplerStateValue sampler, NumericValue location, NumericValue ddx, NumericValue ddy, NumericValue offset = null, NumericValue clamp = null)
         {
             var vecDdx = CastToVector(ddx, rv.Dimension);
             var vecDdy = CastToVector(ddy, rv.Dimension);
@@ -326,14 +419,19 @@ namespace UnityShaderParser.Test
             var lengthY = Sqrt(du_dy * du_dy + dv_dy * dv_dy);
             var rho = Max(lengthX, lengthY);
 
-            return SampleLevel(rv, sampler, location, Clamp(Log2(rho), 0.0f, MathF.Log(MathF.Max(rv.SizeX, rv.SizeY)) / MathF.Log(2) + 1));
+            var lod = Clamp(Log2(rho), 0.0f, MathF.Log(MathF.Max(rv.SizeX, rv.SizeY)) / MathF.Log(2) + 1);
+            if (clamp is not null)
+                lod = Min(lod, ToFloatLike(clamp));
+            return SampleLevel(rv, sampler, location, lod, offset);
         }
 
         // TODO: 1D, 3D texture
-        public static NumericValue SampleBias(HLSLExecutionState executionState, ResourceValue rv, SamplerStateValue sampler, NumericValue location, NumericValue bias)
+        public static NumericValue SampleBias(HLSLExecutionState executionState, ResourceValue rv, SamplerStateValue sampler, NumericValue location, NumericValue bias, NumericValue offset = null, NumericValue clamp = null)
         {
             var lod = CalculateLevelOfDetail(executionState, rv, sampler, location) + ToFloatLike(bias);
-            return SampleLevel(rv, sampler, location, lod);
+            if (clamp is not null)
+                lod = Min(lod, ToFloatLike(clamp));
+            return SampleLevel(rv, sampler, location, lod, offset);
         }
 
         private static HLSLValue GetDimensions(ResourceValue rv, HLSLValue[] args)
