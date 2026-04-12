@@ -158,15 +158,11 @@
   <li class="red"><span class="sig">Gather(SamplerState s, float2 uv)</span></li>
   <li class="red"><span class="sig">Gather(SamplerState s, float2 uv, int2 Offset)</span></li>
   <li class="red"><span class="sig">Gather(SamplerState s, float2 uv, int2 Offset, out uint Status)</span></li>
-  <li class="red"><span class="sig">Gather(SamplerState s, float2 uv, int2 O0, int2 O1, int2 O2, int2 O3)</span></li>
-  <li class="red"><span class="sig">Gather(SamplerState s, float2 uv, int2 O0, int2 O1, int2 O2, int2 O3, out uint Status)</span></li>
-  <li class="red"><span class="sig">GatherRed / GatherGreen / GatherBlue / GatherAlpha</span> <span class="note">All overloads (2–7 args each) not implemented</span></li>
+  <li class="red"><span class="sig">GatherRed / GatherGreen / GatherBlue / GatherAlpha</span> <span class="note">All overloads (2–7 args each, including 4-offset variants) not implemented</span></li>
   <li class="red"><span class="sig">GatherCmp(SamplerComparisonState s, float2 uv, float CmpVal)</span></li>
   <li class="red"><span class="sig">GatherCmp(SamplerComparisonState s, float2 uv, float CmpVal, int2 Offset)</span></li>
   <li class="red"><span class="sig">GatherCmp(SamplerComparisonState s, float2 uv, float CmpVal, int2 Offset, out uint Status)</span></li>
-  <li class="red"><span class="sig">GatherCmp(SamplerComparisonState s, float2 uv, float CmpVal, int2 O0, int2 O1, int2 O2, int2 O3)</span></li>
-  <li class="red"><span class="sig">GatherCmp(SamplerComparisonState s, float2 uv, float CmpVal, int2 O0, int2 O1, int2 O2, int2 O3, out uint Status)</span></li>
-  <li class="red"><span class="sig">GatherCmpRed / GatherCmpGreen / GatherCmpBlue / GatherCmpAlpha</span> <span class="note">All overloads (3–8 args each) not implemented</span></li>
+  <li class="red"><span class="sig">GatherCmpRed / GatherCmpGreen / GatherCmpBlue / GatherCmpAlpha</span> <span class="note">All overloads (3–8 args each, including 4-offset variants) not implemented</span></li>
 </ul>
 
 <!-- ===================== Texture2DMS ===================== -->
@@ -269,8 +265,6 @@
   <li class="red"><span class="sig">SampleCmp / SampleCmpLevel / SampleCmpLevelZero / SampleCmpBias / SampleCmpGrad</span> <span class="note">All overloads not implemented</span></li>
   <li class="green"><span class="sig">CalculateLevelOfDetail(SamplerState s, float3 uvw)</span></li>
   <li class="green"><span class="sig">CalculateLevelOfDetailUnclamped(SamplerState s, float3 uvw)</span></li>
-  <li class="red"><span class="sig">Gather / GatherRed / GatherGreen / GatherBlue / GatherAlpha</span> <span class="note">All overloads not implemented</span></li>
-  <li class="red"><span class="sig">GatherCmp / GatherCmpRed / GatherCmpGreen / GatherCmpBlue / GatherCmpAlpha</span> <span class="note">All overloads not implemented</span></li>
 </ul>
 
 <!-- ===================== TextureCUBEArray ===================== -->
@@ -292,8 +286,6 @@
   <li class="red"><span class="sig">SampleCmp / SampleCmpLevel / SampleCmpLevelZero / SampleCmpBias / SampleCmpGrad</span> <span class="note">All overloads not implemented</span></li>
   <li class="green"><span class="sig">CalculateLevelOfDetail(SamplerState s, float4 uvwa)</span></li>
   <li class="green"><span class="sig">CalculateLevelOfDetailUnclamped(SamplerState s, float4 uvwa)</span></li>
-  <li class="red"><span class="sig">Gather / GatherRed / GatherGreen / GatherBlue / GatherAlpha</span> <span class="note">All overloads not implemented</span></li>
-  <li class="red"><span class="sig">GatherCmp / GatherCmpRed / GatherCmpGreen / GatherCmpBlue / GatherCmpAlpha</span> <span class="note">All overloads not implemented</span></li>
 </ul>
 
 <!-- ===================== Buffer ===================== -->
