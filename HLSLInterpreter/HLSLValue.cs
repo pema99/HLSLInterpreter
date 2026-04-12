@@ -865,26 +865,37 @@ namespace UnityShaderParser.Test
     {
         public readonly ResourceGetter Get;
         public readonly ResourceSetter Set;
-        public readonly int SizeX;
-        public readonly int SizeY;
-        public readonly int SizeZ; // Depth or Slice count
-        public readonly int MipCount;
-        public int Counter; // Counter for Append/Consume buffer
 
-        public ResourceValue(PredefinedObjectType type, TypeNode[] templateArguments, int sizeX, int sizeY, int sizeZ, int mipCount, ResourceGetter get, ResourceSetter set)
+        private readonly Func<int> GetSizeX;
+        private readonly Func<int> GetSizeY;
+        private readonly Func<int> GetSizeZ;
+        private readonly Func<int> GetMipCount;
+
+        public int SizeX    => GetSizeX();
+        public int SizeY    => GetSizeY();
+        public int SizeZ    => GetSizeZ();
+        public int MipCount => GetMipCount();
+
+        // For Append/Consume buffer
+        public int Counter;
+
+        public ResourceValue(PredefinedObjectType type, TypeNode[] templateArguments, Func<int> getSizeX, Func<int> getSizeY, Func<int> getSizeZ, Func<int> getMipCount, ResourceGetter get, ResourceSetter set)
             : base(type, templateArguments)
         {
-            SizeX = sizeX;
-            SizeY = sizeY;
-            SizeZ = sizeZ;
-            MipCount = mipCount;
+            GetSizeX = getSizeX;
+            GetSizeY = getSizeY;
+            GetSizeZ = getSizeZ;
+            GetMipCount = getMipCount;
             Get = get;
             Set = set;
         }
 
+        public ResourceValue(PredefinedObjectType type, TypeNode[] templateArguments, int sizeX, int sizeY, int sizeZ, int mipCount, ResourceGetter get, ResourceSetter set)
+            : this(type, templateArguments, () => sizeX, () => sizeY, () => sizeZ, () => mipCount, get, set) { }
+
         public override HLSLValue Copy()
         {
-            return new ResourceValue(Type, TemplateArguments, SizeX, SizeY, SizeZ, MipCount, Get, Set);
+            return new ResourceValue(Type, TemplateArguments, GetSizeX, GetSizeY, GetSizeZ, GetMipCount, Get, Set);
         }
 
         public bool IsWriteable => HLSLSyntaxFacts.IsWriteable(Type);
