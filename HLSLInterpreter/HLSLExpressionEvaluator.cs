@@ -833,8 +833,12 @@ namespace UnityShaderParser.Test
                                 newVal =>
                                 {
                                     if (newVal is StructValue newStruct)
+                                    {
                                         foreach (var kvp in newStruct.Members)
+                                        {
                                             str.Members[kvp.Key] = kvp.Value;
+                                        }
+                                    }
                                 }));
                         }
 
