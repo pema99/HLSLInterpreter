@@ -184,6 +184,7 @@ public class Program
 
     public static void Main()
     {
-        RunShaderToy();
+        while (true)
+            RunShaderToy();
     }
 }
