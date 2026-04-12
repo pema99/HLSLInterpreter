@@ -241,6 +241,16 @@ namespace UnityShaderParser.Test
             {
                 if (!TryGetLValueReference(elementAccess.Target, out var parentRef, out isGroupshared))
                     return false;
+
+                if (parentRef.Get() is ResourceValue rv)
+                {
+                    var coord = EvaluateNumeric(elementAccess.Index);
+                    reference = new ReferenceValue(
+                        () => HLSLIntrinsics.ResourceSubscriptRead(rv, coord),
+                        val => HLSLIntrinsics.ResourceSubscriptWrite(rv, coord, (NumericValue)val));
+                    return true;
+                }
+
                 var indexVal = EvaluateScalar(elementAccess.Index);
                 if (parentRef.Get() is ArrayValue)  { reference = GetArrayElementLValue(parentRef, indexVal, isGroupshared);  return true; }
                 if (parentRef.Get() is VectorValue) { reference = GetVectorElementLValue(parentRef, indexVal, isGroupshared); return true; }
@@ -1042,6 +1052,10 @@ namespace UnityShaderParser.Test
                         rowVec[i] = mat[Convert.ToInt32(target.Value.UniformValue), i];
                     return VectorValue.FromScalars(rowVec);
                 }
+            }
+            else if (arr is ResourceValue rv)
+            {
+                return HLSLIntrinsics.ResourceSubscriptRead(rv, EvaluateNumeric(node.Index));
             }
             throw Error(node, "Invalid element access.");
         }
