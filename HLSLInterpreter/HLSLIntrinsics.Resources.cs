@@ -243,23 +243,49 @@ namespace UnityShaderParser.Test
 
         public static bool IsResourceMethodInoutParameter(ResourceValue rv, string methodName, int argCount, int paramIndex)
         {
+            if (methodName == "GetDimensions")
+                return true;
+
+            if (paramIndex == argCount - 1)
+            {
+                switch (methodName)
+                {
+                    case "Load":
+                        return argCount >= 2;
+                    case "Load2":
+                    case "Load3":
+                    case "Load4":
+                        return argCount == 2;
+                    case "Sample":
+                    case "SampleLevel":
+                    case "SampleCmpLevelZero":
+                        return argCount == 5;
+                    case "SampleBias":
+                    case "SampleCmp":
+                    case "SampleCmpLevel":
+                        return argCount == 6;
+                    case "SampleGrad":
+                    case "SampleCmpBias":
+                        return argCount == 7;
+                    case "SampleCmpGrad":
+                        return argCount == 8;
+                    case "Gather":
+                    case "GatherRed":
+                    case "GatherGreen":
+                    case "GatherBlue":
+                    case "GatherAlpha":
+                        return argCount == 4 || argCount == 7 || (argCount == 3 && rv.IsCube);
+                    case "GatherCmp":
+                    case "GatherCmpRed":
+                    case "GatherCmpGreen":
+                    case "GatherCmpBlue":
+                    case "GatherCmpAlpha":
+                        return argCount == 5 || argCount == 8 || (argCount == 4 && rv.IsCube);
+                }
+            }
+
             switch (methodName)
             {
-                // Every is out param
-                case "GetDimensions":
-                    return true;
-
-                // Status flag
-                case "Load":
-                    return argCount >= 2 && paramIndex == argCount - 1;
-
-                // Status flag
-                case "Load2":
-                case "Load3":
-                case "Load4":
-                    return paramIndex == 1;
-
-                // Last value
                 case "InterlockedAdd":
                 case "InterlockedMin":
                 case "InterlockedMax":
@@ -276,16 +302,13 @@ namespace UnityShaderParser.Test
                 case "InterlockedExchange64":
                 case "InterlockedExchangeFloat":
                     return paramIndex == 2;
-
-                // Last value
                 case "InterlockedCompareExchange":
                 case "InterlockedCompareExchange64":
                 case "InterlockedCompareExchangeFloatBitwise":
                     return paramIndex == 3;
-
-                default:
-                    return false;
             }
+
+            return false;
         }
 
         public static bool TryInvokeResourceMethod(HLSLExecutionState executionState, ResourceValue rv, string name, HLSLValue[] args, out HLSLValue result)
