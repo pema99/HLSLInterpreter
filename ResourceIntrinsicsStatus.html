@@ -61,13 +61,13 @@
   <li class="green"><span class="sig">SampleGrad(SamplerState s, float u, float Ddx, float Ddy, int Offset)</span></li>
   <li class="green"><span class="sig">SampleGrad(SamplerState s, float u, float Ddx, float Ddy, int Offset, float Clamp)</span></li>
   <li class="green"><span class="sig">SampleGrad(SamplerState s, float u, float Ddx, float Ddy, int Offset, float Clamp, out uint Status)</span></li>
-  <li class="red"><span class="sig">SampleCmp(SamplerComparisonState s, float u, float CmpVal)</span></li>
-  <li class="red"><span class="sig">SampleCmp(SamplerComparisonState s, float u, float CmpVal, int Offset)</span></li>
-  <li class="red"><span class="sig">SampleCmp(SamplerComparisonState s, float u, float CmpVal, int Offset, float Clamp)</span></li>
-  <li class="red"><span class="sig">SampleCmp(SamplerComparisonState s, float u, float CmpVal, int Offset, float Clamp, out uint Status)</span></li>
-  <li class="red"><span class="sig">SampleCmpLevelZero(SamplerComparisonState s, float u, float CmpVal)</span></li>
-  <li class="red"><span class="sig">SampleCmpLevelZero(SamplerComparisonState s, float u, float CmpVal, int Offset)</span></li>
-  <li class="red"><span class="sig">SampleCmpLevelZero(SamplerComparisonState s, float u, float CmpVal, int Offset, out uint Status)</span></li>
+  <li class="green"><span class="sig">SampleCmp(SamplerComparisonState s, float u, float CmpVal)</span></li>
+  <li class="green"><span class="sig">SampleCmp(SamplerComparisonState s, float u, float CmpVal, int Offset)</span></li>
+  <li class="green"><span class="sig">SampleCmp(SamplerComparisonState s, float u, float CmpVal, int Offset, float Clamp)</span></li>
+  <li class="green"><span class="sig">SampleCmp(SamplerComparisonState s, float u, float CmpVal, int Offset, float Clamp, out uint Status)</span></li>
+  <li class="green"><span class="sig">SampleCmpLevelZero(SamplerComparisonState s, float u, float CmpVal)</span></li>
+  <li class="green"><span class="sig">SampleCmpLevelZero(SamplerComparisonState s, float u, float CmpVal, int Offset)</span></li>
+  <li class="green"><span class="sig">SampleCmpLevelZero(SamplerComparisonState s, float u, float CmpVal, int Offset, out uint Status)</span></li>
   <li class="green"><span class="sig">CalculateLevelOfDetail(SamplerState s, float u)</span></li>
   <li class="green"><span class="sig">CalculateLevelOfDetailUnclamped(SamplerState s, float u)</span></li>
   <li class="red"><span class="sig">Gather(SamplerState s, float u)</span></li>
@@ -98,13 +98,13 @@
   <li class="green"><span class="sig">SampleGrad(SamplerState s, float2 uv, float Ddx, float Ddy, int Offset)</span></li>
   <li class="green"><span class="sig">SampleGrad(SamplerState s, float2 uv, float Ddx, float Ddy, int Offset, float Clamp)</span></li>
   <li class="green"><span class="sig">SampleGrad(SamplerState s, float2 uv, float Ddx, float Ddy, int Offset, float Clamp, out uint Status)</span></li>
-  <li class="red"><span class="sig">SampleCmp(SamplerComparisonState s, float2 uv, float CmpVal)</span></li>
-  <li class="red"><span class="sig">SampleCmp(SamplerComparisonState s, float2 uv, float CmpVal, int Offset)</span></li>
-  <li class="red"><span class="sig">SampleCmp(SamplerComparisonState s, float2 uv, float CmpVal, int Offset, float Clamp)</span></li>
-  <li class="red"><span class="sig">SampleCmp(SamplerComparisonState s, float2 uv, float CmpVal, int Offset, float Clamp, out uint Status)</span></li>
-  <li class="red"><span class="sig">SampleCmpLevelZero(SamplerComparisonState s, float2 uv, float CmpVal)</span></li>
-  <li class="red"><span class="sig">SampleCmpLevelZero(SamplerComparisonState s, float2 uv, float CmpVal, int Offset)</span></li>
-  <li class="red"><span class="sig">SampleCmpLevelZero(SamplerComparisonState s, float2 uv, float CmpVal, int Offset, out uint Status)</span></li>
+  <li class="green"><span class="sig">SampleCmp(SamplerComparisonState s, float2 uv, float CmpVal)</span></li>
+  <li class="green"><span class="sig">SampleCmp(SamplerComparisonState s, float2 uv, float CmpVal, int Offset)</span></li>
+  <li class="green"><span class="sig">SampleCmp(SamplerComparisonState s, float2 uv, float CmpVal, int Offset, float Clamp)</span></li>
+  <li class="green"><span class="sig">SampleCmp(SamplerComparisonState s, float2 uv, float CmpVal, int Offset, float Clamp, out uint Status)</span></li>
+  <li class="green"><span class="sig">SampleCmpLevelZero(SamplerComparisonState s, float2 uv, float CmpVal)</span></li>
+  <li class="green"><span class="sig">SampleCmpLevelZero(SamplerComparisonState s, float2 uv, float CmpVal, int Offset)</span></li>
+  <li class="green"><span class="sig">SampleCmpLevelZero(SamplerComparisonState s, float2 uv, float CmpVal, int Offset, out uint Status)</span></li>
   <li class="green"><span class="sig">CalculateLevelOfDetail(SamplerState s, float2 uv)</span></li>
   <li class="green"><span class="sig">CalculateLevelOfDetailUnclamped(SamplerState s, float2 uv)</span></li>
   <li class="red"><span class="sig">Gather(SamplerState s, float2 uv)</span></li>
@@ -135,24 +135,24 @@
   <li class="green"><span class="sig">SampleGrad(SamplerState s, float2 uv, float2 Ddx, float2 Ddy, int2 Offset)</span></li>
   <li class="green"><span class="sig">SampleGrad(SamplerState s, float2 uv, float2 Ddx, float2 Ddy, int2 Offset, float Clamp)</span></li>
   <li class="green"><span class="sig">SampleGrad(SamplerState s, float2 uv, float2 Ddx, float2 Ddy, int2 Offset, float Clamp, out uint Status)</span></li>
-  <li class="red"><span class="sig">SampleCmp(SamplerComparisonState s, float2 uv, float CmpVal)</span></li>
-  <li class="red"><span class="sig">SampleCmp(SamplerComparisonState s, float2 uv, float CmpVal, int2 Offset)</span></li>
-  <li class="red"><span class="sig">SampleCmp(SamplerComparisonState s, float2 uv, float CmpVal, int2 Offset, float Clamp)</span></li>
-  <li class="red"><span class="sig">SampleCmp(SamplerComparisonState s, float2 uv, float CmpVal, int2 Offset, float Clamp, out uint Status)</span></li>
-  <li class="red"><span class="sig">SampleCmpLevel(SamplerComparisonState s, float2 uv, float CmpVal, float Lod)</span></li>
-  <li class="red"><span class="sig">SampleCmpLevel(SamplerComparisonState s, float2 uv, float CmpVal, float Lod, int2 Offset)</span></li>
-  <li class="red"><span class="sig">SampleCmpLevel(SamplerComparisonState s, float2 uv, float CmpVal, float Lod, int2 Offset, out uint Status)</span></li>
-  <li class="red"><span class="sig">SampleCmpLevelZero(SamplerComparisonState s, float2 uv, float CmpVal)</span></li>
-  <li class="red"><span class="sig">SampleCmpLevelZero(SamplerComparisonState s, float2 uv, float CmpVal, int2 Offset)</span></li>
-  <li class="red"><span class="sig">SampleCmpLevelZero(SamplerComparisonState s, float2 uv, float CmpVal, int2 Offset, out uint Status)</span></li>
-  <li class="red"><span class="sig">SampleCmpBias(SamplerComparisonState s, float2 uv, float CmpVal, float Bias)</span></li>
-  <li class="red"><span class="sig">SampleCmpBias(SamplerComparisonState s, float2 uv, float CmpVal, float Bias, int2 Offset)</span></li>
-  <li class="red"><span class="sig">SampleCmpBias(SamplerComparisonState s, float2 uv, float CmpVal, float Bias, int2 Offset, float Clamp)</span></li>
-  <li class="red"><span class="sig">SampleCmpBias(SamplerComparisonState s, float2 uv, float CmpVal, float Bias, int2 Offset, float Clamp, out uint Status)</span></li>
-  <li class="red"><span class="sig">SampleCmpGrad(SamplerComparisonState s, float2 uv, float CmpVal, float2 Ddx, float2 Ddy)</span></li>
-  <li class="red"><span class="sig">SampleCmpGrad(SamplerComparisonState s, float2 uv, float CmpVal, float2 Ddx, float2 Ddy, int2 Offset)</span></li>
-  <li class="red"><span class="sig">SampleCmpGrad(SamplerComparisonState s, float2 uv, float CmpVal, float2 Ddx, float2 Ddy, int2 Offset, float Clamp)</span></li>
-  <li class="red"><span class="sig">SampleCmpGrad(SamplerComparisonState s, float2 uv, float CmpVal, float2 Ddx, float2 Ddy, int2 Offset, float Clamp, out uint Status)</span></li>
+  <li class="green"><span class="sig">SampleCmp(SamplerComparisonState s, float2 uv, float CmpVal)</span></li>
+  <li class="green"><span class="sig">SampleCmp(SamplerComparisonState s, float2 uv, float CmpVal, int2 Offset)</span></li>
+  <li class="green"><span class="sig">SampleCmp(SamplerComparisonState s, float2 uv, float CmpVal, int2 Offset, float Clamp)</span></li>
+  <li class="green"><span class="sig">SampleCmp(SamplerComparisonState s, float2 uv, float CmpVal, int2 Offset, float Clamp, out uint Status)</span></li>
+  <li class="green"><span class="sig">SampleCmpLevel(SamplerComparisonState s, float2 uv, float CmpVal, float Lod)</span></li>
+  <li class="green"><span class="sig">SampleCmpLevel(SamplerComparisonState s, float2 uv, float CmpVal, float Lod, int2 Offset)</span></li>
+  <li class="green"><span class="sig">SampleCmpLevel(SamplerComparisonState s, float2 uv, float CmpVal, float Lod, int2 Offset, out uint Status)</span></li>
+  <li class="green"><span class="sig">SampleCmpLevelZero(SamplerComparisonState s, float2 uv, float CmpVal)</span></li>
+  <li class="green"><span class="sig">SampleCmpLevelZero(SamplerComparisonState s, float2 uv, float CmpVal, int2 Offset)</span></li>
+  <li class="green"><span class="sig">SampleCmpLevelZero(SamplerComparisonState s, float2 uv, float CmpVal, int2 Offset, out uint Status)</span></li>
+  <li class="green"><span class="sig">SampleCmpBias(SamplerComparisonState s, float2 uv, float CmpVal, float Bias)</span></li>
+  <li class="green"><span class="sig">SampleCmpBias(SamplerComparisonState s, float2 uv, float CmpVal, float Bias, int2 Offset)</span></li>
+  <li class="green"><span class="sig">SampleCmpBias(SamplerComparisonState s, float2 uv, float CmpVal, float Bias, int2 Offset, float Clamp)</span></li>
+  <li class="green"><span class="sig">SampleCmpBias(SamplerComparisonState s, float2 uv, float CmpVal, float Bias, int2 Offset, float Clamp, out uint Status)</span></li>
+  <li class="green"><span class="sig">SampleCmpGrad(SamplerComparisonState s, float2 uv, float CmpVal, float2 Ddx, float2 Ddy)</span></li>
+  <li class="green"><span class="sig">SampleCmpGrad(SamplerComparisonState s, float2 uv, float CmpVal, float2 Ddx, float2 Ddy, int2 Offset)</span></li>
+  <li class="green"><span class="sig">SampleCmpGrad(SamplerComparisonState s, float2 uv, float CmpVal, float2 Ddx, float2 Ddy, int2 Offset, float Clamp)</span></li>
+  <li class="green"><span class="sig">SampleCmpGrad(SamplerComparisonState s, float2 uv, float CmpVal, float2 Ddx, float2 Ddy, int2 Offset, float Clamp, out uint Status)</span></li>
   <li class="green"><span class="sig">CalculateLevelOfDetail(SamplerState s, float2 uv)</span></li>
   <li class="green"><span class="sig">CalculateLevelOfDetailUnclamped(SamplerState s, float2 uv)</span></li>
   <li class="red"><span class="sig">Gather(SamplerState s, float2 uv)</span></li>
@@ -198,11 +198,11 @@
   <li class="green"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float2 Ddx, float2 Ddy, int2 Offset)</span></li>
   <li class="green"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float2 Ddx, float2 Ddy, int2 Offset, float Clamp)</span></li>
   <li class="green"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float2 Ddx, float2 Ddy, int2 Offset, float Clamp, out uint Status)</span></li>
-  <li class="red"><span class="sig">SampleCmp(SamplerComparisonState s, float3 uvw, float CmpVal [, ...])</span> <span class="note">All overloads (3–6 args) not implemented</span></li>
-  <li class="red"><span class="sig">SampleCmpLevel(SamplerComparisonState s, float3 uvw, float CmpVal, float Lod [, ...])</span> <span class="note">All overloads (4–6 args) not implemented</span></li>
-  <li class="red"><span class="sig">SampleCmpLevelZero(SamplerComparisonState s, float3 uvw, float CmpVal [, ...])</span> <span class="note">All overloads (3–5 args) not implemented</span></li>
-  <li class="red"><span class="sig">SampleCmpBias(SamplerComparisonState s, float3 uvw, float CmpVal, float Bias [, ...])</span> <span class="note">All overloads (4–7 args) not implemented</span></li>
-  <li class="red"><span class="sig">SampleCmpGrad(SamplerComparisonState s, float3 uvw, float CmpVal, float2 Ddx, float2 Ddy [, ...])</span> <span class="note">All overloads (5–8 args) not implemented</span></li>
+  <li class="green"><span class="sig">SampleCmp(SamplerComparisonState s, float3 uvw, float CmpVal [, ...])</span></li>
+  <li class="green"><span class="sig">SampleCmpLevel(SamplerComparisonState s, float3 uvw, float CmpVal, float Lod [, ...])</span></li>
+  <li class="green"><span class="sig">SampleCmpLevelZero(SamplerComparisonState s, float3 uvw, float CmpVal [, ...])</span></li>
+  <li class="green"><span class="sig">SampleCmpBias(SamplerComparisonState s, float3 uvw, float CmpVal, float Bias [, ...])</span></li>
+  <li class="green"><span class="sig">SampleCmpGrad(SamplerComparisonState s, float3 uvw, float CmpVal, float2 Ddx, float2 Ddy [, ...])</span></li>
   <li class="green"><span class="sig">CalculateLevelOfDetail(SamplerState s, float3 uvw)</span></li>
   <li class="green"><span class="sig">CalculateLevelOfDetailUnclamped(SamplerState s, float3 uvw)</span></li>
   <li class="red"><span class="sig">Gather / GatherRed / GatherGreen / GatherBlue / GatherAlpha</span> <span class="note">All overloads not implemented</span></li>
@@ -262,7 +262,7 @@
   <li class="green"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float3 Ddx, float3 Ddy)</span></li>
   <li class="green"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float3 Ddx, float3 Ddy, float Clamp)</span></li>
   <li class="green"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float3 Ddx, float3 Ddy, float Clamp, out uint Status)</span></li>
-  <li class="red"><span class="sig">SampleCmp / SampleCmpLevel / SampleCmpLevelZero / SampleCmpBias / SampleCmpGrad</span> <span class="note">All overloads not implemented</span></li>
+  <li class="green"><span class="sig">SampleCmp / SampleCmpLevel / SampleCmpLevelZero / SampleCmpBias / SampleCmpGrad</span></li>
   <li class="green"><span class="sig">CalculateLevelOfDetail(SamplerState s, float3 uvw)</span></li>
   <li class="green"><span class="sig">CalculateLevelOfDetailUnclamped(SamplerState s, float3 uvw)</span></li>
 </ul>
@@ -283,7 +283,7 @@
   <li class="green"><span class="sig">SampleGrad(SamplerState s, float4 uvwa, float4 Ddx, float4 Ddy)</span></li>
   <li class="green"><span class="sig">SampleGrad(SamplerState s, float4 uvwa, float4 Ddx, float4 Ddy, float Clamp)</span></li>
   <li class="green"><span class="sig">SampleGrad(SamplerState s, float4 uvwa, float4 Ddx, float4 Ddy, float Clamp, out uint Status)</span></li>
-  <li class="red"><span class="sig">SampleCmp / SampleCmpLevel / SampleCmpLevelZero / SampleCmpBias / SampleCmpGrad</span> <span class="note">All overloads not implemented</span></li>
+  <li class="green"><span class="sig">SampleCmp / SampleCmpLevel / SampleCmpLevelZero / SampleCmpBias / SampleCmpGrad</span></li>
   <li class="green"><span class="sig">CalculateLevelOfDetail(SamplerState s, float4 uvwa)</span></li>
   <li class="green"><span class="sig">CalculateLevelOfDetailUnclamped(SamplerState s, float4 uvwa)</span></li>
 </ul>

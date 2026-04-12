@@ -141,15 +141,39 @@ namespace UnityShaderParser.Test
 
             // ==================== SampleCmp family ====================
             // SampleCmp(sampler_cmp, uv, cmpValue [, offset [, clamp [, out status]]])
-            StubN("SampleCmp",          3, 6);
+            AddN("SampleCmp", 3, 6, (state, rv, args) =>
+            {
+                var offset = args.Length >= 4 ? (NumericValue)args[3] : null;
+                var clamp  = args.Length >= 5 ? (NumericValue)args[4] : null;
+                return SampleCmp(state, rv, (SamplerStateValue)args[0], (NumericValue)args[1], (NumericValue)args[2], offset, clamp);
+            });
             // SampleCmpLevel(sampler_cmp, uv, cmpValue, lod [, offset [, out status]])
-            StubN("SampleCmpLevel",     4, 6);
+            AddN("SampleCmpLevel", 4, 6, (state, rv, args) =>
+            {
+                var offset = args.Length >= 5 ? (NumericValue)args[4] : null;
+                return SampleCmpLevel(rv, (SamplerStateValue)args[0], (NumericValue)args[1], (NumericValue)args[2], (NumericValue)args[3], offset);
+            });
             // SampleCmpLevelZero(sampler_cmp, uv, cmpValue [, offset [, out status]])
-            StubN("SampleCmpLevelZero", 3, 5);
+            AddN("SampleCmpLevelZero", 3, 5, (state, rv, args) =>
+            {
+                var offset = args.Length >= 4 ? (NumericValue)args[3] : null;
+                return SampleCmpLevel(rv, (SamplerStateValue)args[0], (NumericValue)args[1], (NumericValue)args[2], (ScalarValue)0.0f, offset);
+            });
             // SampleCmpBias(sampler_cmp, uv, cmpValue, bias [, offset [, clamp [, out status]]])
-            StubN("SampleCmpBias",      4, 7);
+            AddN("SampleCmpBias", 4, 7, (state, rv, args) =>
+            {
+                var offset = args.Length >= 5 ? (NumericValue)args[4] : null;
+                var clamp  = args.Length >= 6 ? (NumericValue)args[5] : null;
+                return SampleCmpBias(state, rv, (SamplerStateValue)args[0], (NumericValue)args[1], (NumericValue)args[2], (NumericValue)args[3], offset, clamp);
+            });
             // SampleCmpGrad(sampler_cmp, uv, cmpValue, ddx, ddy [, offset [, clamp [, out status]]])
-            StubN("SampleCmpGrad",      5, 8);
+            AddN("SampleCmpGrad", 5, 8, (state, rv, args) =>
+            {
+                var offset = args.Length >= 6 ? (NumericValue)args[5] : null;
+                var clamp  = args.Length >= 7 ? (NumericValue)args[6] : null;
+                return SampleCmpGrad(rv, (SamplerStateValue)args[0], (NumericValue)args[1], (NumericValue)args[2],
+                                     (NumericValue)args[3], (NumericValue)args[4], offset, clamp);
+            });
 
             // ==================== CalculateLevelOfDetail ====================
             // CalculateLevelOfDetail(sampler, uv)
@@ -341,11 +365,13 @@ namespace UnityShaderParser.Test
         }
 
         // TODO: Texture Arrays
-        public static NumericValue SampleLevel(ResourceValue rv, SamplerStateValue sampler, NumericValue location, NumericValue lod, NumericValue offset = null)
+        // perTexel, if provided, is applied to each raw texel value before interpolation.
+        // Used by SampleCmp* to compare each texel against the reference before blending (PCF).
+        public static NumericValue SampleLevel(ResourceValue rv, SamplerStateValue sampler, NumericValue location, NumericValue lod, NumericValue offset = null, Func<NumericValue, NumericValue> perTexel = null)
         {
             // Cube maps use face selection + per-face bilinear sampling; offset is not applicable.
             if (rv.IsCube)
-                return SampleLevelCube(rv, location, lod);
+                return SampleLevelCube(rv, location, lod, perTexel);
 
             int dim = rv.Dimension;
             var scalarLod = CastToScalar(lod);
@@ -358,14 +384,20 @@ namespace UnityShaderParser.Test
             var basePos = Floor(texelPos).Cast(ScalarType.Int);
             var frac = (VectorValue)Frac(texelPos);
 
+            NumericValue Fetch(NumericValue loadArgs)
+            {
+                var v = (NumericValue)Load(rv, loadArgs);
+                return perTexel != null ? perTexel(v) : v;
+            }
+
             if (dim == 1)
             {
                 // Linear interpolation
                 var p0 = (VectorValue)Clamp(basePos,                             0, size - 1);
                 var p1 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(1), 0, size - 1);
 
-                var c0 = (NumericValue)Load(rv, VectorValue.FromScalars(p0.x, scalarLod));
-                var c1 = (NumericValue)Load(rv, VectorValue.FromScalars(p1.x, scalarLod));
+                var c0 = Fetch(VectorValue.FromScalars(p0.x, scalarLod));
+                var c1 = Fetch(VectorValue.FromScalars(p1.x, scalarLod));
 
                 return Lerp(c0, c1, frac.x);
             }
@@ -377,10 +409,10 @@ namespace UnityShaderParser.Test
                 var p01 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(0, 1), 0, size - 1);
                 var p11 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(1, 1), 0, size - 1);
 
-                var c00 = (NumericValue)Load(rv, VectorValue.FromScalars(p00.x, p00.y, scalarLod));
-                var c10 = (NumericValue)Load(rv, VectorValue.FromScalars(p10.x, p10.y, scalarLod));
-                var c01 = (NumericValue)Load(rv, VectorValue.FromScalars(p01.x, p01.y, scalarLod));
-                var c11 = (NumericValue)Load(rv, VectorValue.FromScalars(p11.x, p11.y, scalarLod));
+                var c00 = Fetch(VectorValue.FromScalars(p00.x, p00.y, scalarLod));
+                var c10 = Fetch(VectorValue.FromScalars(p10.x, p10.y, scalarLod));
+                var c01 = Fetch(VectorValue.FromScalars(p01.x, p01.y, scalarLod));
+                var c11 = Fetch(VectorValue.FromScalars(p11.x, p11.y, scalarLod));
 
                 var cx0 = Lerp(c00, c10, frac.x);
                 var cx1 = Lerp(c01, c11, frac.x);
@@ -398,14 +430,14 @@ namespace UnityShaderParser.Test
                 var p011 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(0, 1, 1), 0, size - 1);
                 var p111 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(1, 1, 1), 0, size - 1);
 
-                var c000 = (NumericValue)Load(rv, VectorValue.FromScalars(p000.x, p000.y, p000.z, scalarLod));
-                var c100 = (NumericValue)Load(rv, VectorValue.FromScalars(p100.x, p100.y, p100.z, scalarLod));
-                var c010 = (NumericValue)Load(rv, VectorValue.FromScalars(p010.x, p010.y, p010.z, scalarLod));
-                var c110 = (NumericValue)Load(rv, VectorValue.FromScalars(p110.x, p110.y, p110.z, scalarLod));
-                var c001 = (NumericValue)Load(rv, VectorValue.FromScalars(p001.x, p001.y, p001.z, scalarLod));
-                var c101 = (NumericValue)Load(rv, VectorValue.FromScalars(p101.x, p101.y, p101.z, scalarLod));
-                var c011 = (NumericValue)Load(rv, VectorValue.FromScalars(p011.x, p011.y, p011.z, scalarLod));
-                var c111 = (NumericValue)Load(rv, VectorValue.FromScalars(p111.x, p111.y, p111.z, scalarLod));
+                var c000 = Fetch(VectorValue.FromScalars(p000.x, p000.y, p000.z, scalarLod));
+                var c100 = Fetch(VectorValue.FromScalars(p100.x, p100.y, p100.z, scalarLod));
+                var c010 = Fetch(VectorValue.FromScalars(p010.x, p010.y, p010.z, scalarLod));
+                var c110 = Fetch(VectorValue.FromScalars(p110.x, p110.y, p110.z, scalarLod));
+                var c001 = Fetch(VectorValue.FromScalars(p001.x, p001.y, p001.z, scalarLod));
+                var c101 = Fetch(VectorValue.FromScalars(p101.x, p101.y, p101.z, scalarLod));
+                var c011 = Fetch(VectorValue.FromScalars(p011.x, p011.y, p011.z, scalarLod));
+                var c111 = Fetch(VectorValue.FromScalars(p111.x, p111.y, p111.z, scalarLod));
 
                 var cx00 = Lerp(c000, c100, frac.x);
                 var cx10 = Lerp(c010, c110, frac.x);
@@ -449,7 +481,8 @@ namespace UnityShaderParser.Test
 
         // Samples a cube map or cube map array using face selection and per-face bilinear interpolation.
         // rv.Get(x, y, face, arraySlice, mip) — z encodes face (0–5), w encodes array slice.
-        private static NumericValue SampleLevelCube(ResourceValue rv, NumericValue location, NumericValue lod)
+        // perTexel, if provided, is applied to each raw texel before interpolation (used for PCF comparison).
+        private static NumericValue SampleLevelCube(ResourceValue rv, NumericValue location, NumericValue lod, Func<NumericValue, NumericValue> perTexel = null)
         {
             var dir = CastToVector(location, rv.IsArray ? 4 : 3);
             var scalarLod = CastToScalar(lod);
@@ -478,10 +511,16 @@ namespace UnityShaderParser.Test
                 int x0 = Math.Clamp(baseX,     0, maxC), x1 = Math.Clamp(baseX + 1, 0, maxC);
                 int y0 = Math.Clamp(baseY,     0, maxC), y1 = Math.Clamp(baseY + 1, 0, maxC);
 
-                var c00 = (NumericValue)rv.Get(x0, y0, face, arraySlice, mip);
-                var c10 = (NumericValue)rv.Get(x1, y0, face, arraySlice, mip);
-                var c01 = (NumericValue)rv.Get(x0, y1, face, arraySlice, mip);
-                var c11 = (NumericValue)rv.Get(x1, y1, face, arraySlice, mip);
+                NumericValue Fetch(int x, int y)
+                {
+                    var raw = (NumericValue)rv.Get(x, y, face, arraySlice, mip);
+                    return perTexel != null ? perTexel(raw) : raw;
+                }
+
+                var c00 = Fetch(x0, y0);
+                var c10 = Fetch(x1, y0);
+                var c01 = Fetch(x0, y1);
+                var c11 = Fetch(x1, y1);
 
                 var cx0 = Lerp(c00, c10, (ScalarValue)fracU);
                 var cx1 = Lerp(c01, c11, (ScalarValue)fracU);
@@ -593,6 +632,73 @@ namespace UnityShaderParser.Test
             if (clamp is not null)
                 lod = Min(lod, ToFloatLike(clamp));
             return SampleLevel(rv, sampler, location, lod, offset);
+        }
+
+        // Applies the sampler's comparison function to a sampled depth value vs a reference value.
+        // Returns float 1.0 where the comparison passes and 0.0 where it fails, per-thread.
+        private static NumericValue ApplyComparison(SamplerStateValue sampler, NumericValue sampledValue, NumericValue cmpVal)
+        {
+            var depth = ToFloatLike(CastToScalar(sampledValue));
+            var cmp   = ToFloatLike(CastToScalar(cmpVal));
+            (depth, cmp) = HLSLValueUtils.Promote(depth, cmp, false);
+            return HLSLValueUtils.Map2(depth, cmp, (a, b) =>
+            {
+                float d = Convert.ToSingle(a), c = Convert.ToSingle(b);
+                bool pass = sampler.Comparison switch
+                {
+                    SamplerStateValue.ComparisonMode.Never        => false,
+                    SamplerStateValue.ComparisonMode.Less         => d <  c,
+                    SamplerStateValue.ComparisonMode.Equal        => d == c,
+                    SamplerStateValue.ComparisonMode.LessEqual    => d <= c,
+                    SamplerStateValue.ComparisonMode.Greater      => d >  c,
+                    SamplerStateValue.ComparisonMode.NotEqual     => d != c,
+                    SamplerStateValue.ComparisonMode.GreaterEqual => d >= c,
+                    SamplerStateValue.ComparisonMode.Always       => true,
+                    _ => throw new NotImplementedException($"Unknown comparison mode: {sampler.Comparison}")
+                };
+                return (object)(pass ? 1.0f : 0.0f);
+            });
+        }
+
+        // The SampleCmp* family performs PCF: comparison is applied per-texel before blending,
+        // not after. Each raw texel is compared against cmpVal → 0.0/1.0, then those results
+        // are blended with normal filter weights, yielding a [0..1] shadow coverage value.
+        private static NumericValue SampleCmp(HLSLExecutionState state, ResourceValue rv, SamplerStateValue sampler,
+            NumericValue location, NumericValue cmpVal, NumericValue offset = null, NumericValue clamp = null)
+        {
+            var lod = CalculateLevelOfDetail(state, rv, sampler, location);
+            if (clamp is not null)
+                lod = Min(lod, ToFloatLike(clamp));
+            return SampleLevel(rv, sampler, location, lod, offset, v => ApplyComparison(sampler, v, cmpVal));
+        }
+
+        private static NumericValue SampleCmpLevel(ResourceValue rv, SamplerStateValue sampler,
+            NumericValue location, NumericValue cmpVal, NumericValue lod, NumericValue offset = null)
+        {
+            return SampleLevel(rv, sampler, location, lod, offset, v => ApplyComparison(sampler, v, cmpVal));
+        }
+
+        private static NumericValue SampleCmpBias(HLSLExecutionState state, ResourceValue rv, SamplerStateValue sampler,
+            NumericValue location, NumericValue cmpVal, NumericValue bias, NumericValue offset = null, NumericValue clamp = null)
+        {
+            var lod = CalculateLevelOfDetail(state, rv, sampler, location) + ToFloatLike(bias);
+            if (clamp is not null)
+                lod = Min(lod, ToFloatLike(clamp));
+            return SampleLevel(rv, sampler, location, lod, offset, v => ApplyComparison(sampler, v, cmpVal));
+        }
+
+        private static NumericValue SampleCmpGrad(ResourceValue rv, SamplerStateValue sampler,
+            NumericValue location, NumericValue cmpVal, NumericValue ddx, NumericValue ddy,
+            NumericValue offset = null, NumericValue clamp = null)
+        {
+            var sizeVec = VectorValue.FromScalars(rv.SizeX, rv.SizeY, rv.SizeZ).BroadcastToVector(rv.Dimension);
+            var gradX = (VectorValue)(CastToVector(ddx, rv.Dimension) * sizeVec);
+            var gradY = (VectorValue)(CastToVector(ddy, rv.Dimension) * sizeVec);
+            float maxDim = MathF.Max(rv.SizeX, MathF.Max(rv.SizeY, rv.SizeZ));
+            var lod = Clamp(Log2(RhoFromGradients(gradX, gradY)), 0.0f, MathF.Log(maxDim) / MathF.Log(2) + 1);
+            if (clamp is not null)
+                lod = Min(lod, ToFloatLike(clamp));
+            return SampleLevel(rv, sampler, location, lod, offset, v => ApplyComparison(sampler, v, cmpVal));
         }
 
         private static HLSLValue GetDimensions(ResourceValue rv, HLSLValue[] args)
