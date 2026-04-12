@@ -86,6 +86,61 @@ namespace UnityShaderParser.Test
 
         public HLSLValue EvaluateExpression(ExpressionNode node) => expressionEvaluator.Visit(node);
 
+        public ResourceValue CreateMockResource(string structName, PredefinedObjectType resourceType, TypeNode[] templateArgs)
+        {
+            var structDef = context.GetStruct(structName) ?? throw Error($"Unknown type '{structName}'.");
+            var mockStruct = CreateStructValue(structDef);
+
+            bool HasMethod(string name)
+            {
+                return structDef.Methods
+                    .OfType<FunctionDefinitionNode>()
+                    .Any(m => m.Name.GetName() == name);
+            }
+
+            Func<int> MakeSizeDelegate(string methodName, int defaultValue)
+            {
+                if (!HasMethod(methodName)) return () => defaultValue;
+                return () =>
+                {
+                    var res = expressionEvaluator.CallMethod(mockStruct, methodName, Array.Empty<HLSLValue>());
+                    return res is ScalarValue sv ? Convert.ToInt32(sv.GetThreadValue(0)) : defaultValue;
+                };
+            }
+
+            expressionEvaluator.CallMethod(mockStruct, "Initialize", Array.Empty<HLSLValue>());
+
+            ResourceValue resource = null;
+
+            ResourceGetter getter = (x, y, z, w, mip) => (NumericValue)0;
+            ResourceSetter setter = (x, y, z, w, mip, val) => { };
+            if (HasMethod("Read"))
+            {
+                getter = (x, y, z, w, mip) =>
+                {
+                    var args = new HLSLValue[] { resource, (NumericValue)x, (NumericValue)y, (NumericValue)z, (NumericValue)w, (NumericValue)mip };
+                    var res = expressionEvaluator.CallMethod(mockStruct, "Read", args);
+                    return res;
+                };
+            }
+            if (HasMethod("Write"))
+            {
+                setter = (x, y, z, w, mip, val) =>
+                {
+                    var args = new HLSLValue[] { resource, (NumericValue)x, (NumericValue)y, (NumericValue)z, (NumericValue)w, (NumericValue)mip, val };
+                    expressionEvaluator.CallMethod(mockStruct, "Write", args);
+                };
+            }
+
+            return new ResourceValue(
+                resourceType, templateArgs,
+                MakeSizeDelegate("SizeX", 2),
+                MakeSizeDelegate("SizeY", 2),
+                MakeSizeDelegate("SizeZ", 2),
+                MakeSizeDelegate("MipCount", 1),
+                getter, setter);
+        }
+
         // Helpers
         private Exception Error(HLSLSyntaxNode node, string message)
         {
