@@ -304,6 +304,92 @@
                         'abort','PASS_TEST','FAIL_TEST',
                     ]);
                     const intrinsicSet = new Set(intrinsics);
+
+                    const controlKeywords = [
+                        'if', 'else', 'for', 'while', 'do', 'switch', 'case', 'default',
+                        'break', 'continue', 'return', 'discard',
+                    ];
+                    const modifierKeywords = [
+                        'static', 'const', 'uniform', 'in', 'out', 'inout', 'inline',
+                        'extern', 'shared', 'groupshared', 'globallycoherent', 'volatile',
+                        'precise', 'nointerpolation', 'noperspective', 'centroid', 'linear',
+                        'row_major', 'column_major', 'snorm', 'unorm', 'unsigned',
+                        'export', 'indices', 'vertices', 'primitives', 'payload',
+                    ];
+                    const typeKeywords = [
+                        'void', 'bool', 'int', 'uint', 'dword', 'half', 'float', 'double',
+                        'string', 'vector', 'matrix',
+                        'bool1','bool2','bool3','bool4',
+                        'int1','int2','int3','int4',
+                        'uint1','uint2','uint3','uint4',
+                        'half1','half2','half3','half4',
+                        'float1','float2','float3','float4',
+                        'double1','double2','double3','double4',
+                        'bool1x1','bool1x2','bool1x3','bool1x4',
+                        'bool2x1','bool2x2','bool2x3','bool2x4',
+                        'bool3x1','bool3x2','bool3x3','bool3x4',
+                        'bool4x1','bool4x2','bool4x3','bool4x4',
+                        'int1x1','int1x2','int1x3','int1x4',
+                        'int2x1','int2x2','int2x3','int2x4',
+                        'int3x1','int3x2','int3x3','int3x4',
+                        'int4x1','int4x2','int4x3','int4x4',
+                        'uint1x1','uint1x2','uint1x3','uint1x4',
+                        'uint2x1','uint2x2','uint2x3','uint2x4',
+                        'uint3x1','uint3x2','uint3x3','uint3x4',
+                        'uint4x1','uint4x2','uint4x3','uint4x4',
+                        'half1x1','half1x2','half1x3','half1x4',
+                        'half2x1','half2x2','half2x3','half2x4',
+                        'half3x1','half3x2','half3x3','half3x4',
+                        'half4x1','half4x2','half4x3','half4x4',
+                        'float1x1','float1x2','float1x3','float1x4',
+                        'float2x1','float2x2','float2x3','float2x4',
+                        'float3x1','float3x2','float3x3','float3x4',
+                        'float4x1','float4x2','float4x3','float4x4',
+                        'double1x1','double1x2','double1x3','double1x4',
+                        'double2x1','double2x2','double2x3','double2x4',
+                        'double3x1','double3x2','double3x3','double3x4',
+                        'double4x1','double4x2','double4x3','double4x4',
+                        'min16float','min16float1','min16float2','min16float3','min16float4',
+                        'min16int','min16int1','min16int2','min16int3','min16int4',
+                        'min16uint','min16uint1','min16uint2','min16uint3','min16uint4',
+                        'min12int','min12int1','min12int2','min12int3','min12int4',
+                        'min10float','min10float1','min10float2','min10float3','min10float4',
+                    ];
+                    const objectKeywords = [
+                        'struct', 'class', 'interface', 'typedef', 'namespace',
+                        'cbuffer', 'tbuffer', 'technique', 'technique10', 'technique11', 'pass',
+                        'SamplerState', 'SamplerComparisonState',
+                        'sampler', 'sampler1D', 'sampler2D', 'sampler3D', 'samplerCUBE',
+                        'Texture', 'Texture2DLegacy', 'TextureCubeLegacy',
+                        'Texture1D', 'Texture1DArray',
+                        'Texture2D', 'Texture2DArray', 'Texture2DMS', 'Texture2DMSArray',
+                        'Texture3D', 'TextureCube', 'TextureCubeArray',
+                        'RWTexture1D', 'RWTexture1DArray',
+                        'RWTexture2D', 'RWTexture2DArray',
+                        'RWTexture3D',
+                        'Buffer', 'ByteAddressBuffer', 'StructuredBuffer',
+                        'RWBuffer', 'RWByteAddressBuffer', 'RWStructuredBuffer',
+                        'AppendStructuredBuffer', 'ConsumeStructuredBuffer',
+                        'RasterizerOrderedBuffer', 'RasterizerOrderedByteAddressBuffer',
+                        'RasterizerOrderedStructuredBuffer',
+                        'RasterizerOrderedTexture1D', 'RasterizerOrderedTexture1DArray',
+                        'RasterizerOrderedTexture2D', 'RasterizerOrderedTexture2DArray',
+                        'RasterizerOrderedTexture3D',
+                        'InputPatch', 'OutputPatch',
+                        'LineStream', 'TriangleStream', 'PointStream',
+                        'BlendState', 'DepthStencilState', 'RasterizerState',
+                    ];
+                    const literalKeywords = ['true', 'false', 'NULL'];
+
+                    const allKeywords = [
+                        ...controlKeywords,
+                        ...modifierKeywords,
+                        ...typeKeywords,
+                        ...objectKeywords,
+                        ...literalKeywords,
+                    ];
+                    const keywordSet = new Set(allKeywords);
+
                     monaco.languages.registerCompletionItemProvider('hlsl', {
                         provideCompletionItems: function (model, position) {
                             const word = model.getWordUntilPosition(position);
@@ -317,7 +403,7 @@
                             // Collect unique words from the document as identifier suggestions
                             const content = model.getValue();
                             const wordRegex = /[a-zA-Z_]\w*/g;
-                            const seen = new Set(intrinsicSet);
+                            const seen = new Set([...intrinsicSet, ...keywordSet]);
                             const wordSuggestions = [];
                             let m;
                             while ((m = wordRegex.exec(content)) !== null) {
@@ -340,7 +426,14 @@
                                 range: range,
                             }));
 
-                            return { suggestions: [...intrinsicSuggestions, ...wordSuggestions] };
+                            const keywordSuggestions = allKeywords.map(name => ({
+                                label: name,
+                                kind: monaco.languages.CompletionItemKind.Keyword,
+                                insertText: name,
+                                range: range,
+                            }));
+
+                            return { suggestions: [...keywordSuggestions, ...intrinsicSuggestions, ...wordSuggestions] };
                         },
                     });
                 })();
