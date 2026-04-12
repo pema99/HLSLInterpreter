@@ -263,7 +263,6 @@ namespace UnityShaderParser.Test
                            new HLSLRegister<object[]>(Enumerable.Repeat(HLSLValueUtils.GetZeroValue(genMatrixType.Kind), rows * cols).ToArray()));
                         break;
                     case PredefinedObjectTypeNode predefinedObjectType:
-                        // TODO: More types
                         switch (predefinedObjectType.Kind)
                         {
                             case PredefinedObjectType.Sampler:
