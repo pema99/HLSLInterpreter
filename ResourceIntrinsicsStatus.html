@@ -70,9 +70,6 @@
   <li class="green"><span class="sig">SampleCmpLevelZero(SamplerComparisonState s, float u, float CmpVal, int Offset, out uint Status)</span></li>
   <li class="green"><span class="sig">CalculateLevelOfDetail(SamplerState s, float u)</span></li>
   <li class="green"><span class="sig">CalculateLevelOfDetailUnclamped(SamplerState s, float u)</span></li>
-  <li class="red"><span class="sig">Gather(SamplerState s, float u)</span></li>
-  <li class="red"><span class="sig">Gather(SamplerState s, float u, int Offset)</span></li>
-  <li class="red"><span class="sig">Gather(SamplerState s, float u, int Offset, out uint Status)</span></li>
 </ul>
 
 <!-- ===================== Texture1DArray ===================== -->
@@ -107,9 +104,6 @@
   <li class="green"><span class="sig">SampleCmpLevelZero(SamplerComparisonState s, float2 uv, float CmpVal, int Offset, out uint Status)</span></li>
   <li class="green"><span class="sig">CalculateLevelOfDetail(SamplerState s, float2 uv)</span></li>
   <li class="green"><span class="sig">CalculateLevelOfDetailUnclamped(SamplerState s, float2 uv)</span></li>
-  <li class="red"><span class="sig">Gather(SamplerState s, float2 uv)</span></li>
-  <li class="red"><span class="sig">Gather(SamplerState s, float2 uv, int Offset)</span></li>
-  <li class="red"><span class="sig">Gather(SamplerState s, float2 uv, int Offset, out uint Status)</span></li>
 </ul>
 
 <!-- ===================== Texture2D ===================== -->
@@ -155,14 +149,14 @@
   <li class="green"><span class="sig">SampleCmpGrad(SamplerComparisonState s, float2 uv, float CmpVal, float2 Ddx, float2 Ddy, int2 Offset, float Clamp, out uint Status)</span></li>
   <li class="green"><span class="sig">CalculateLevelOfDetail(SamplerState s, float2 uv)</span></li>
   <li class="green"><span class="sig">CalculateLevelOfDetailUnclamped(SamplerState s, float2 uv)</span></li>
-  <li class="red"><span class="sig">Gather(SamplerState s, float2 uv)</span></li>
-  <li class="red"><span class="sig">Gather(SamplerState s, float2 uv, int2 Offset)</span></li>
-  <li class="red"><span class="sig">Gather(SamplerState s, float2 uv, int2 Offset, out uint Status)</span></li>
-  <li class="red"><span class="sig">GatherRed / GatherGreen / GatherBlue / GatherAlpha</span> <span class="note">All overloads (2–7 args each, including 4-offset variants) not implemented</span></li>
-  <li class="red"><span class="sig">GatherCmp(SamplerComparisonState s, float2 uv, float CmpVal)</span></li>
-  <li class="red"><span class="sig">GatherCmp(SamplerComparisonState s, float2 uv, float CmpVal, int2 Offset)</span></li>
-  <li class="red"><span class="sig">GatherCmp(SamplerComparisonState s, float2 uv, float CmpVal, int2 Offset, out uint Status)</span></li>
-  <li class="red"><span class="sig">GatherCmpRed / GatherCmpGreen / GatherCmpBlue / GatherCmpAlpha</span> <span class="note">All overloads (3–8 args each, including 4-offset variants) not implemented</span></li>
+  <li class="green"><span class="sig">Gather(SamplerState s, float2 uv)</span></li>
+  <li class="green"><span class="sig">Gather(SamplerState s, float2 uv, int2 Offset)</span></li>
+  <li class="green"><span class="sig">Gather(SamplerState s, float2 uv, int2 Offset, out uint Status)</span></li>
+  <li class="green"><span class="sig">GatherRed / GatherGreen / GatherBlue / GatherAlpha</span></li>
+  <li class="green"><span class="sig">GatherCmp(SamplerComparisonState s, float2 uv, float CmpVal)</span></li>
+  <li class="green"><span class="sig">GatherCmp(SamplerComparisonState s, float2 uv, float CmpVal, int2 Offset)</span></li>
+  <li class="green"><span class="sig">GatherCmp(SamplerComparisonState s, float2 uv, float CmpVal, int2 Offset, out uint Status)</span></li>
+  <li class="green"><span class="sig">GatherCmpRed / GatherCmpGreen / GatherCmpBlue / GatherCmpAlpha</span></li>
 </ul>
 
 <!-- ===================== Texture2DMS ===================== -->
@@ -205,8 +199,8 @@
   <li class="green"><span class="sig">SampleCmpGrad(SamplerComparisonState s, float3 uvw, float CmpVal, float2 Ddx, float2 Ddy [, ...])</span></li>
   <li class="green"><span class="sig">CalculateLevelOfDetail(SamplerState s, float3 uvw)</span></li>
   <li class="green"><span class="sig">CalculateLevelOfDetailUnclamped(SamplerState s, float3 uvw)</span></li>
-  <li class="red"><span class="sig">Gather / GatherRed / GatherGreen / GatherBlue / GatherAlpha</span> <span class="note">All overloads not implemented</span></li>
-  <li class="red"><span class="sig">GatherCmp / GatherCmpRed / GatherCmpGreen / GatherCmpBlue / GatherCmpAlpha</span> <span class="note">All overloads not implemented</span></li>
+  <li class="green"><span class="sig">Gather / GatherRed / GatherGreen / GatherBlue / GatherAlpha</span></li>
+  <li class="green"><span class="sig">GatherCmp / GatherCmpRed / GatherCmpGreen / GatherCmpBlue / GatherCmpAlpha</span></li>
 </ul>
 
 <!-- ===================== Texture2DMSArray ===================== -->

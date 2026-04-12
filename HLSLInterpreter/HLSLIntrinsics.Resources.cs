@@ -143,36 +143,45 @@ namespace UnityShaderParser.Test
             // SampleCmp(sampler_cmp, uv, cmpValue [, offset [, clamp [, out status]]])
             AddN("SampleCmp", 3, 6, (state, rv, args) =>
             {
-                var offset = args.Length >= 4 ? (NumericValue)args[3] : null;
-                var clamp  = args.Length >= 5 ? (NumericValue)args[4] : null;
-                return SampleCmp(state, rv, (SamplerStateValue)args[0], (NumericValue)args[1], (NumericValue)args[2], offset, clamp);
+                var sampler = (SamplerStateValue)args[0];
+                var cmpVal  = (NumericValue)args[2];
+                var offset  = args.Length >= 4 ? (NumericValue)args[3] : null;
+                var clamp   = args.Length >= 5 ? (NumericValue)args[4] : null;
+                return Sample(state, rv, sampler, (NumericValue)args[1], offset, clamp, v => ApplyComparison(sampler, v, cmpVal));
             });
             // SampleCmpLevel(sampler_cmp, uv, cmpValue, lod [, offset [, out status]])
             AddN("SampleCmpLevel", 4, 6, (state, rv, args) =>
             {
-                var offset = args.Length >= 5 ? (NumericValue)args[4] : null;
-                return SampleCmpLevel(rv, (SamplerStateValue)args[0], (NumericValue)args[1], (NumericValue)args[2], (NumericValue)args[3], offset);
+                var sampler = (SamplerStateValue)args[0];
+                var cmpVal  = (NumericValue)args[2];
+                var offset  = args.Length >= 5 ? (NumericValue)args[4] : null;
+                return SampleLevel(rv, sampler, (NumericValue)args[1], (NumericValue)args[3], offset, v => ApplyComparison(sampler, v, cmpVal));
             });
             // SampleCmpLevelZero(sampler_cmp, uv, cmpValue [, offset [, out status]])
             AddN("SampleCmpLevelZero", 3, 5, (state, rv, args) =>
             {
-                var offset = args.Length >= 4 ? (NumericValue)args[3] : null;
-                return SampleCmpLevel(rv, (SamplerStateValue)args[0], (NumericValue)args[1], (NumericValue)args[2], (ScalarValue)0.0f, offset);
+                var sampler = (SamplerStateValue)args[0];
+                var cmpVal  = (NumericValue)args[2];
+                var offset  = args.Length >= 4 ? (NumericValue)args[3] : null;
+                return SampleLevel(rv, sampler, (NumericValue)args[1], (ScalarValue)0.0f, offset, v => ApplyComparison(sampler, v, cmpVal));
             });
             // SampleCmpBias(sampler_cmp, uv, cmpValue, bias [, offset [, clamp [, out status]]])
             AddN("SampleCmpBias", 4, 7, (state, rv, args) =>
             {
-                var offset = args.Length >= 5 ? (NumericValue)args[4] : null;
-                var clamp  = args.Length >= 6 ? (NumericValue)args[5] : null;
-                return SampleCmpBias(state, rv, (SamplerStateValue)args[0], (NumericValue)args[1], (NumericValue)args[2], (NumericValue)args[3], offset, clamp);
+                var sampler = (SamplerStateValue)args[0];
+                var cmpVal  = (NumericValue)args[2];
+                var offset  = args.Length >= 5 ? (NumericValue)args[4] : null;
+                var clamp   = args.Length >= 6 ? (NumericValue)args[5] : null;
+                return SampleBias(state, rv, sampler, (NumericValue)args[1], (NumericValue)args[3], offset, clamp, v => ApplyComparison(sampler, v, cmpVal));
             });
             // SampleCmpGrad(sampler_cmp, uv, cmpValue, ddx, ddy [, offset [, clamp [, out status]]])
             AddN("SampleCmpGrad", 5, 8, (state, rv, args) =>
             {
-                var offset = args.Length >= 6 ? (NumericValue)args[5] : null;
-                var clamp  = args.Length >= 7 ? (NumericValue)args[6] : null;
-                return SampleCmpGrad(rv, (SamplerStateValue)args[0], (NumericValue)args[1], (NumericValue)args[2],
-                                     (NumericValue)args[3], (NumericValue)args[4], offset, clamp);
+                var sampler = (SamplerStateValue)args[0];
+                var cmpVal  = (NumericValue)args[2];
+                var offset  = args.Length >= 6 ? (NumericValue)args[5] : null;
+                var clamp   = args.Length >= 7 ? (NumericValue)args[6] : null;
+                return SampleGrad(rv, sampler, (NumericValue)args[1], (NumericValue)args[3], (NumericValue)args[4], offset, clamp, v => ApplyComparison(sampler, v, cmpVal));
             });
 
             // ==================== CalculateLevelOfDetail ====================
@@ -184,13 +193,63 @@ namespace UnityShaderParser.Test
                 CalculateLevelOfDetailUnclamped(state, rv, (SamplerStateValue)args[0], (NumericValue)args[1]));
 
             // ==================== Gather family ====================
-            // Basic:      Gather(sampler, uv [, offset [, out status]])          — 2..4 args
-            // 4-offsets:  Gather(sampler, uv, o0, o1, o2, o3 [, out status])    — 6..7 args
-            // Comparison variants shift all counts up by 1 (adds compareValue).
-            foreach (string gatherName in new[] { "Gather", "GatherRed", "GatherGreen", "GatherBlue", "GatherAlpha", "GatherRaw" })
-                StubN(gatherName, 2, 7);
-            foreach (string gatherName in new[] { "GatherCmp", "GatherCmpRed", "GatherCmpGreen", "GatherCmpBlue", "GatherCmpAlpha" })
-                StubN(gatherName, 3, 8);
+            // Always samples at mip 0. Returns one channel from each of the four bilinear-footprint
+            // texels as float4. Output: .x=(u0,v1), .y=(u1,v1), .z=(u1,v0), .w=(u0,v0).
+
+            // Gather: 2–4 args — returns channel 0 (red/first).
+            AddN("Gather", 2, 4, (state, rv, args) =>
+            {
+                var offset = args.Length >= 3 && args[2] is not ReferenceValue ? (NumericValue)args[2] : null;
+                return GatherCore(rv, (NumericValue)args[1], 0, uniformOffset: offset);
+            });
+
+            // GatherRed/Green/Blue/Alpha: 2–4 args (basic) or 6–7 args (4-offset variant).
+            foreach ((string gName, int gCh) in new (string, int)[]
+                { ("GatherRed", 0), ("GatherGreen", 1), ("GatherBlue", 2), ("GatherAlpha", 3) })
+            {
+                int ch = gCh;
+                AddN(gName, 2, 4, (state, rv, args) =>
+                {
+                    var offset = args.Length >= 3 && args[2] is not ReferenceValue ? (NumericValue)args[2] : null;
+                    return GatherCore(rv, (NumericValue)args[1], ch, uniformOffset: offset);
+                });
+                // 4-offset: each corner gets its own offset (o0→.x, o1→.y, o2→.z, o3→.w).
+                AddN(gName, 6, 7, (state, rv, args) =>
+                    GatherCore(rv, (NumericValue)args[1], ch,
+                        cornerOffsets: new[] { (NumericValue)args[2], (NumericValue)args[3],
+                                               (NumericValue)args[4], (NumericValue)args[5] }));
+                Add(gName, 5, NotImplementedMethod(gName)); // not a valid HLSL overload
+            }
+
+            // GatherRaw: not a standard HLSL intrinsic — keep as stub.
+            StubN("GatherRaw", 2, 7);
+
+            // GatherCmp: 3–5 args — compares channel 0 of each texel against the reference value.
+            AddN("GatherCmp", 3, 5, (state, rv, args) =>
+            {
+                var offset = args.Length >= 4 && args[3] is not ReferenceValue ? (NumericValue)args[3] : null;
+                return GatherCore(rv, (NumericValue)args[1], 0, uniformOffset: offset,
+                    comparisonSampler: (SamplerStateValue)args[0], comparisonValue: (NumericValue)args[2]);
+            });
+
+            // GatherCmpRed/Green/Blue/Alpha: 3–5 args (basic) or 7–8 args (4-offset variant).
+            foreach ((string gName, int gCh) in new (string, int)[]
+                { ("GatherCmpRed", 0), ("GatherCmpGreen", 1), ("GatherCmpBlue", 2), ("GatherCmpAlpha", 3) })
+            {
+                int ch = gCh;
+                AddN(gName, 3, 5, (state, rv, args) =>
+                {
+                    var offset = args.Length >= 4 && args[3] is not ReferenceValue ? (NumericValue)args[3] : null;
+                    return GatherCore(rv, (NumericValue)args[1], ch, uniformOffset: offset,
+                        comparisonSampler: (SamplerStateValue)args[0], comparisonValue: (NumericValue)args[2]);
+                });
+                AddN(gName, 7, 8, (state, rv, args) =>
+                    GatherCore(rv, (NumericValue)args[1], ch,
+                        cornerOffsets: new[] { (NumericValue)args[3], (NumericValue)args[4],
+                                               (NumericValue)args[5], (NumericValue)args[6] },
+                        comparisonSampler: (SamplerStateValue)args[0], comparisonValue: (NumericValue)args[2]));
+                Add(gName, 6, NotImplementedMethod(gName)); // not a valid HLSL overload
+            }
 
             // ==================== GetDimensions ====================
             // Arg count varies by resource type (1–5 args); resolved at runtime by rv type.
@@ -605,15 +664,15 @@ namespace UnityShaderParser.Test
             return RhoFromGradients(gradX, gradY);
         }
 
-        public static NumericValue Sample(HLSLExecutionState executionState, ResourceValue rv, SamplerStateValue sampler, NumericValue location, NumericValue offset = null, NumericValue clamp = null)
+        public static NumericValue Sample(HLSLExecutionState executionState, ResourceValue rv, SamplerStateValue sampler, NumericValue location, NumericValue offset = null, NumericValue clamp = null, Func<NumericValue, NumericValue> perTexel = null)
         {
             var lod = CalculateLevelOfDetail(executionState, rv, sampler, location);
             if (clamp is not null)
                 lod = Min(lod, ToFloatLike(clamp));
-            return SampleLevel(rv, sampler, location, lod, offset);
+            return SampleLevel(rv, sampler, location, lod, offset, perTexel);
         }
 
-        public static NumericValue SampleGrad(ResourceValue rv, SamplerStateValue sampler, NumericValue location, NumericValue ddx, NumericValue ddy, NumericValue offset = null, NumericValue clamp = null)
+        public static NumericValue SampleGrad(ResourceValue rv, SamplerStateValue sampler, NumericValue location, NumericValue ddx, NumericValue ddy, NumericValue offset = null, NumericValue clamp = null, Func<NumericValue, NumericValue> perTexel = null)
         {
             var sizeVec = VectorValue.FromScalars(rv.SizeX, rv.SizeY, rv.SizeZ).BroadcastToVector(rv.Dimension);
             var gradX = (VectorValue)(CastToVector(ddx, rv.Dimension) * sizeVec);
@@ -623,15 +682,33 @@ namespace UnityShaderParser.Test
             var lod = Clamp(Log2(RhoFromGradients(gradX, gradY)), 0.0f, MathF.Log(maxDim) / MathF.Log(2) + 1);
             if (clamp is not null)
                 lod = Min(lod, ToFloatLike(clamp));
-            return SampleLevel(rv, sampler, location, lod, offset);
+            return SampleLevel(rv, sampler, location, lod, offset, perTexel);
         }
 
-        public static NumericValue SampleBias(HLSLExecutionState executionState, ResourceValue rv, SamplerStateValue sampler, NumericValue location, NumericValue bias, NumericValue offset = null, NumericValue clamp = null)
+        public static NumericValue SampleBias(HLSLExecutionState executionState, ResourceValue rv, SamplerStateValue sampler, NumericValue location, NumericValue bias, NumericValue offset = null, NumericValue clamp = null, Func<NumericValue, NumericValue> perTexel = null)
         {
             var lod = CalculateLevelOfDetail(executionState, rv, sampler, location) + ToFloatLike(bias);
             if (clamp is not null)
                 lod = Min(lod, ToFloatLike(clamp));
-            return SampleLevel(rv, sampler, location, lod, offset);
+            return SampleLevel(rv, sampler, location, lod, offset, perTexel);
+        }
+
+        // Core comparison: returns 1.0 if texelValue passes the sampler's comparison against cmpValue, else 0.0.
+        private static float CompareScalars(SamplerStateValue sampler, float texelValue, float cmpValue)
+        {
+            bool pass = sampler.Comparison switch
+            {
+                SamplerStateValue.ComparisonMode.Never        => false,
+                SamplerStateValue.ComparisonMode.Less         => texelValue <  cmpValue,
+                SamplerStateValue.ComparisonMode.Equal        => texelValue == cmpValue,
+                SamplerStateValue.ComparisonMode.LessEqual    => texelValue <= cmpValue,
+                SamplerStateValue.ComparisonMode.Greater      => texelValue >  cmpValue,
+                SamplerStateValue.ComparisonMode.NotEqual     => texelValue != cmpValue,
+                SamplerStateValue.ComparisonMode.GreaterEqual => texelValue >= cmpValue,
+                SamplerStateValue.ComparisonMode.Always       => true,
+                _ => throw new NotImplementedException($"Unknown comparison mode: {sampler.Comparison}")
+            };
+            return pass ? 1.0f : 0.0f;
         }
 
         // Applies the sampler's comparison function to a sampled depth value vs a reference value.
@@ -642,63 +719,98 @@ namespace UnityShaderParser.Test
             var cmp   = ToFloatLike(CastToScalar(cmpVal));
             (depth, cmp) = HLSLValueUtils.Promote(depth, cmp, false);
             return HLSLValueUtils.Map2(depth, cmp, (a, b) =>
+                (object)CompareScalars(sampler, Convert.ToSingle(a), Convert.ToSingle(b)));
+        }
+
+        // Collects one channel from each of the four bilinear-footprint texels at mip 0.
+        // Output layout: .x=(u0,v1), .y=(u1,v1), .z=(u1,v0), .w=(u0,v0)
+        // uniformOffset: applied to all four corners.
+        // cornerOffsets: 4-element array for the 4-offset variant (o0→.x, o1→.y, o2→.z, o3→.w).
+        // comparisonSampler/comparisonValue: when set, each texel channel is compared against the
+        //   reference value using the sampler's ComparisonMode before being placed in the output.
+        private static VectorValue GatherCore(
+            ResourceValue rv, NumericValue location, int channelIndex,
+            NumericValue uniformOffset = null,
+            NumericValue[] cornerOffsets = null,
+            SamplerStateValue comparisonSampler = null,
+            NumericValue comparisonValue = null)
+        {
+            int spatialDim = rv.Dimension;
+            int locComponents = spatialDim + (rv.IsArray ? 1 : 0);
+            var loc = CastToVector(location.Cast(ScalarType.Float), locComponents);
+            var scalarCmp = comparisonValue is not null ? CastToScalar(ToFloatLike(comparisonValue)) : null;
+
+            int threadCount = loc.ThreadCount;
+            HLSLValue[] results = new HLSLValue[threadCount];
+
+            for (int t = 0; t < threadCount; t++)
             {
-                float d = Convert.ToSingle(a), c = Convert.ToSingle(b);
-                bool pass = sampler.Comparison switch
+                float u = Convert.ToSingle(loc[0].GetThreadValue(t));
+                float v = spatialDim >= 2 ? Convert.ToSingle(loc[1].GetThreadValue(t)) : 0f;
+                int arraySlice = rv.IsArray ? Convert.ToInt32(loc[spatialDim].GetThreadValue(t)) : 0;
+
+                // Bilinear footprint base coordinates (mip 0, no LOD scaling).
+                int baseX = (int)MathF.Floor(u * rv.SizeX - 0.5f);
+                int baseY = (int)MathF.Floor(v * rv.SizeY - 0.5f);
+
+                // HLSL Gather output order: .x=(u0,v1), .y=(u1,v1), .z=(u1,v0), .w=(u0,v0)
+                int[] cornerX = { baseX,     baseX + 1, baseX + 1, baseX     };
+                int[] cornerY = { baseY + 1, baseY + 1, baseY,     baseY     };
+
+                float cmpV = scalarCmp is not null ? Convert.ToSingle(scalarCmp.GetThreadValue(t)) : 0f;
+
+                float[] components = new float[4];
+                for (int i = 0; i < 4; i++)
                 {
-                    SamplerStateValue.ComparisonMode.Never        => false,
-                    SamplerStateValue.ComparisonMode.Less         => d <  c,
-                    SamplerStateValue.ComparisonMode.Equal        => d == c,
-                    SamplerStateValue.ComparisonMode.LessEqual    => d <= c,
-                    SamplerStateValue.ComparisonMode.Greater      => d >  c,
-                    SamplerStateValue.ComparisonMode.NotEqual     => d != c,
-                    SamplerStateValue.ComparisonMode.GreaterEqual => d >= c,
-                    SamplerStateValue.ComparisonMode.Always       => true,
-                    _ => throw new NotImplementedException($"Unknown comparison mode: {sampler.Comparison}")
-                };
-                return (object)(pass ? 1.0f : 0.0f);
-            });
-        }
+                    // Resolve offset for this corner (per-corner or uniform).
+                    NumericValue offSrc = cornerOffsets is not null ? cornerOffsets[i] : uniformOffset;
+                    int ox = 0, oy = 0;
+                    if (offSrc is not null)
+                    {
+                        if (spatialDim >= 2)
+                        {
+                            var ov = CastToVector(offSrc.Cast(ScalarType.Int), 2);
+                            ox = Convert.ToInt32(ov.x.GetThreadValue(t));
+                            oy = Convert.ToInt32(ov.y.GetThreadValue(t));
+                        }
+                        else
+                        {
+                            ox = Convert.ToInt32(CastToScalar(offSrc.Cast(ScalarType.Int)).GetThreadValue(t));
+                        }
+                    }
 
-        // The SampleCmp* family performs PCF: comparison is applied per-texel before blending,
-        // not after. Each raw texel is compared against cmpVal → 0.0/1.0, then those results
-        // are blended with normal filter weights, yielding a [0..1] shadow coverage value.
-        private static NumericValue SampleCmp(HLSLExecutionState state, ResourceValue rv, SamplerStateValue sampler,
-            NumericValue location, NumericValue cmpVal, NumericValue offset = null, NumericValue clamp = null)
-        {
-            var lod = CalculateLevelOfDetail(state, rv, sampler, location);
-            if (clamp is not null)
-                lod = Min(lod, ToFloatLike(clamp));
-            return SampleLevel(rv, sampler, location, lod, offset, v => ApplyComparison(sampler, v, cmpVal));
-        }
+                    // Clamp to texture bounds (clamp addressing mode).
+                    int x = Math.Clamp(cornerX[i] + ox, 0, (int)rv.SizeX - 1);
+                    int y, z;
+                    if (rv.IsArray && spatialDim == 1) { y = arraySlice; z = 0; }
+                    else { y = Math.Clamp(cornerY[i] + oy, 0, (int)rv.SizeY - 1); z = rv.IsArray ? arraySlice : 0; }
 
-        private static NumericValue SampleCmpLevel(ResourceValue rv, SamplerStateValue sampler,
-            NumericValue location, NumericValue cmpVal, NumericValue lod, NumericValue offset = null)
-        {
-            return SampleLevel(rv, sampler, location, lod, offset, v => ApplyComparison(sampler, v, cmpVal));
-        }
+                    // Fetch the texel and extract the requested channel.
+                    var texel = rv.Get(x, y, z, 0, 0);
+                    float texelCh;
+                    if (texel is VectorValue vv)
+                    {
+                        int idx = Math.Min(channelIndex, vv.Size - 1);
+                        texelCh = Convert.ToSingle(vv[idx].GetThreadValue(0));
+                    }
+                    else
+                    {
+                        texelCh = Convert.ToSingle(CastToScalar((NumericValue)texel).GetThreadValue(0));
+                    }
 
-        private static NumericValue SampleCmpBias(HLSLExecutionState state, ResourceValue rv, SamplerStateValue sampler,
-            NumericValue location, NumericValue cmpVal, NumericValue bias, NumericValue offset = null, NumericValue clamp = null)
-        {
-            var lod = CalculateLevelOfDetail(state, rv, sampler, location) + ToFloatLike(bias);
-            if (clamp is not null)
-                lod = Min(lod, ToFloatLike(clamp));
-            return SampleLevel(rv, sampler, location, lod, offset, v => ApplyComparison(sampler, v, cmpVal));
-        }
+                    // Apply comparison for GatherCmp* (returns 1.0 if passes, 0.0 if fails).
+                    if (comparisonSampler != null)
+                        texelCh = CompareScalars(comparisonSampler, texelCh, cmpV);
 
-        private static NumericValue SampleCmpGrad(ResourceValue rv, SamplerStateValue sampler,
-            NumericValue location, NumericValue cmpVal, NumericValue ddx, NumericValue ddy,
-            NumericValue offset = null, NumericValue clamp = null)
-        {
-            var sizeVec = VectorValue.FromScalars(rv.SizeX, rv.SizeY, rv.SizeZ).BroadcastToVector(rv.Dimension);
-            var gradX = (VectorValue)(CastToVector(ddx, rv.Dimension) * sizeVec);
-            var gradY = (VectorValue)(CastToVector(ddy, rv.Dimension) * sizeVec);
-            float maxDim = MathF.Max(rv.SizeX, MathF.Max(rv.SizeY, rv.SizeZ));
-            var lod = Clamp(Log2(RhoFromGradients(gradX, gradY)), 0.0f, MathF.Log(maxDim) / MathF.Log(2) + 1);
-            if (clamp is not null)
-                lod = Min(lod, ToFloatLike(clamp));
-            return SampleLevel(rv, sampler, location, lod, offset, v => ApplyComparison(sampler, v, cmpVal));
+                    components[i] = texelCh;
+                }
+
+                results[t] = VectorValue.FromScalars(
+                    (ScalarValue)components[0], (ScalarValue)components[1],
+                    (ScalarValue)components[2], (ScalarValue)components[3]);
+            }
+
+            return (VectorValue)HLSLValueUtils.MergeThreadValues(results);
         }
 
         private static HLSLValue GetDimensions(ResourceValue rv, HLSLValue[] args)
