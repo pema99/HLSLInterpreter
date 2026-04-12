@@ -255,20 +255,20 @@
 <ul>
   <li class="green"><span class="sig">GetDimensions(out uint Width, out uint Height)</span></li>
   <li class="green"><span class="sig">GetDimensions(uint MipLevel, out uint Width, out uint Height, out uint NumberOfLevels)</span></li>
-  <li class="yellow"><span class="sig">Sample(SamplerState s, float3 uvw)</span> <span class="note">Cube face selection not implemented; direction vector not mapped to face + 2D UV</span></li>
-  <li class="yellow"><span class="sig">Sample(SamplerState s, float3 uvw, float Clamp)</span> <span class="note">Cube face selection not implemented</span></li>
-  <li class="yellow"><span class="sig">Sample(SamplerState s, float3 uvw, float Clamp, out uint Status)</span> <span class="note">Cube face selection not implemented</span></li>
-  <li class="yellow"><span class="sig">SampleLevel(SamplerState s, float3 uvw, float Lod)</span> <span class="note">Cube face selection not implemented</span></li>
-  <li class="yellow"><span class="sig">SampleLevel(SamplerState s, float3 uvw, float Lod, out uint Status)</span> <span class="note">Cube face selection not implemented</span></li>
-  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias)</span> <span class="note">Cube face selection not implemented</span></li>
-  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias, float Clamp)</span> <span class="note">Cube face selection not implemented</span></li>
-  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias, float Clamp, out uint Status)</span> <span class="note">Cube face selection not implemented</span></li>
-  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float3 Ddx, float3 Ddy)</span> <span class="note">Cube face selection not implemented</span></li>
-  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float3 Ddx, float3 Ddy, float Clamp)</span> <span class="note">Cube face selection not implemented</span></li>
-  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float3 Ddx, float3 Ddy, float Clamp, out uint Status)</span> <span class="note">Cube face selection not implemented</span></li>
+  <li class="green"><span class="sig">Sample(SamplerState s, float3 uvw)</span></li>
+  <li class="green"><span class="sig">Sample(SamplerState s, float3 uvw, float Clamp)</span></li>
+  <li class="green"><span class="sig">Sample(SamplerState s, float3 uvw, float Clamp, out uint Status)</span></li>
+  <li class="green"><span class="sig">SampleLevel(SamplerState s, float3 uvw, float Lod)</span></li>
+  <li class="green"><span class="sig">SampleLevel(SamplerState s, float3 uvw, float Lod, out uint Status)</span></li>
+  <li class="green"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias)</span></li>
+  <li class="green"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias, float Clamp)</span></li>
+  <li class="green"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias, float Clamp, out uint Status)</span></li>
+  <li class="green"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float3 Ddx, float3 Ddy)</span></li>
+  <li class="green"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float3 Ddx, float3 Ddy, float Clamp)</span></li>
+  <li class="green"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float3 Ddx, float3 Ddy, float Clamp, out uint Status)</span></li>
   <li class="red"><span class="sig">SampleCmp / SampleCmpLevel / SampleCmpLevelZero / SampleCmpBias / SampleCmpGrad</span> <span class="note">All overloads not implemented</span></li>
-  <li class="yellow"><span class="sig">CalculateLevelOfDetail(SamplerState s, float3 uvw)</span> <span class="note">Cube face selection not implemented; derivative computed on raw xyz direction</span></li>
-  <li class="yellow"><span class="sig">CalculateLevelOfDetailUnclamped(SamplerState s, float3 uvw)</span> <span class="note">Same as above; unclamped variant</span></li>
+  <li class="green"><span class="sig">CalculateLevelOfDetail(SamplerState s, float3 uvw)</span></li>
+  <li class="green"><span class="sig">CalculateLevelOfDetailUnclamped(SamplerState s, float3 uvw)</span></li>
   <li class="red"><span class="sig">Gather / GatherRed / GatherGreen / GatherBlue / GatherAlpha</span> <span class="note">All overloads not implemented</span></li>
   <li class="red"><span class="sig">GatherCmp / GatherCmpRed / GatherCmpGreen / GatherCmpBlue / GatherCmpAlpha</span> <span class="note">All overloads not implemented</span></li>
 </ul>
@@ -278,20 +278,20 @@
 <ul>
   <li class="green"><span class="sig">GetDimensions(out uint Width, out uint Height, out uint Elements)</span></li>
   <li class="green"><span class="sig">GetDimensions(uint MipLevel, out uint Width, out uint Height, out uint Elements, out uint NumberOfLevels)</span></li>
-  <li class="yellow"><span class="sig">Sample(SamplerState s, float4 uvwa)</span> <span class="note">Cube face selection not implemented; array slice ignored in sampling</span></li>
-  <li class="yellow"><span class="sig">Sample(SamplerState s, float4 uvwa, float Clamp)</span> <span class="note">Cube face selection not implemented</span></li>
-  <li class="yellow"><span class="sig">Sample(SamplerState s, float4 uvwa, float Clamp, out uint Status)</span> <span class="note">Cube face selection not implemented</span></li>
-  <li class="yellow"><span class="sig">SampleLevel(SamplerState s, float4 uvwa, float Lod)</span> <span class="note">Cube face selection not implemented; array slice ignored</span></li>
-  <li class="yellow"><span class="sig">SampleLevel(SamplerState s, float4 uvwa, float Lod, out uint Status)</span> <span class="note">Cube face selection not implemented</span></li>
-  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float4 uvwa, float Bias)</span> <span class="note">Cube face selection not implemented; array slice ignored</span></li>
-  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float4 uvwa, float Bias, float Clamp)</span> <span class="note">Cube face selection not implemented</span></li>
-  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float4 uvwa, float Bias, float Clamp, out uint Status)</span> <span class="note">Cube face selection not implemented</span></li>
-  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float4 uvwa, float4 Ddx, float4 Ddy)</span> <span class="note">Cube face selection not implemented; array slice ignored</span></li>
-  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float4 uvwa, float4 Ddx, float4 Ddy, float Clamp)</span> <span class="note">Cube face selection not implemented</span></li>
-  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float4 uvwa, float4 Ddx, float4 Ddy, float Clamp, out uint Status)</span> <span class="note">Cube face selection not implemented</span></li>
+  <li class="green"><span class="sig">Sample(SamplerState s, float4 uvwa)</span></li>
+  <li class="green"><span class="sig">Sample(SamplerState s, float4 uvwa, float Clamp)</span></li>
+  <li class="green"><span class="sig">Sample(SamplerState s, float4 uvwa, float Clamp, out uint Status)</span></li>
+  <li class="green"><span class="sig">SampleLevel(SamplerState s, float4 uvwa, float Lod)</span></li>
+  <li class="green"><span class="sig">SampleLevel(SamplerState s, float4 uvwa, float Lod, out uint Status)</span></li>
+  <li class="green"><span class="sig">SampleBias(SamplerState s, float4 uvwa, float Bias)</span></li>
+  <li class="green"><span class="sig">SampleBias(SamplerState s, float4 uvwa, float Bias, float Clamp)</span></li>
+  <li class="green"><span class="sig">SampleBias(SamplerState s, float4 uvwa, float Bias, float Clamp, out uint Status)</span></li>
+  <li class="green"><span class="sig">SampleGrad(SamplerState s, float4 uvwa, float4 Ddx, float4 Ddy)</span></li>
+  <li class="green"><span class="sig">SampleGrad(SamplerState s, float4 uvwa, float4 Ddx, float4 Ddy, float Clamp)</span></li>
+  <li class="green"><span class="sig">SampleGrad(SamplerState s, float4 uvwa, float4 Ddx, float4 Ddy, float Clamp, out uint Status)</span></li>
   <li class="red"><span class="sig">SampleCmp / SampleCmpLevel / SampleCmpLevelZero / SampleCmpBias / SampleCmpGrad</span> <span class="note">All overloads not implemented</span></li>
-  <li class="yellow"><span class="sig">CalculateLevelOfDetail(SamplerState s, float4 uvwa)</span> <span class="note">Cube face selection not implemented; array slice ignored in derivative</span></li>
-  <li class="yellow"><span class="sig">CalculateLevelOfDetailUnclamped(SamplerState s, float4 uvwa)</span> <span class="note">Same as above; unclamped variant</span></li>
+  <li class="green"><span class="sig">CalculateLevelOfDetail(SamplerState s, float4 uvwa)</span></li>
+  <li class="green"><span class="sig">CalculateLevelOfDetailUnclamped(SamplerState s, float4 uvwa)</span></li>
   <li class="red"><span class="sig">Gather / GatherRed / GatherGreen / GatherBlue / GatherAlpha</span> <span class="note">All overloads not implemented</span></li>
   <li class="red"><span class="sig">GatherCmp / GatherCmpRed / GatherCmpGreen / GatherCmpBlue / GatherCmpAlpha</span> <span class="note">All overloads not implemented</span></li>
 </ul>

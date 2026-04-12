@@ -335,6 +335,10 @@ namespace UnityShaderParser.Test
         // TODO: Texture Arrays
         public static NumericValue SampleLevel(ResourceValue rv, SamplerStateValue sampler, NumericValue location, NumericValue lod, NumericValue offset = null)
         {
+            // Cube maps use face selection + per-face bilinear sampling; offset is not applicable.
+            if (rv.IsCube)
+                return SampleLevelCube(rv, location, lod);
+
             int dim = rv.Dimension;
             var scalarLod = CastToScalar(lod);
             var size = VectorValue.FromScalars(rv.SizeX, rv.SizeY, rv.SizeZ).BroadcastToVector(dim) / (lod + 1);
@@ -407,6 +411,78 @@ namespace UnityShaderParser.Test
             }
         }
 
+        // Converts a float3 direction to a cube face index (0–5, D3D ±X/±Y/±Z order) and
+        // face-local UV in [0, 1]. Pure scalar math; called per-thread by the cube helpers below.
+        private static void ProjectCubeDirection(float x, float y, float z, out int face, out float u, out float v)
+        {
+            float ax = MathF.Abs(x), ay = MathF.Abs(y), az = MathF.Abs(z);
+            float sc, tc, ma;
+            if (ax >= ay && ax >= az)
+            {
+                ma = ax;
+                if (x >= 0) { face = 0; sc = -z; tc = -y; }
+                else         { face = 1; sc =  z; tc = -y; }
+            }
+            else if (ay >= az)
+            {
+                ma = ay;
+                if (y >= 0) { face = 2; sc =  x; tc =  z; }
+                else         { face = 3; sc =  x; tc = -z; }
+            }
+            else
+            {
+                ma = az;
+                if (z >= 0) { face = 4; sc =  x; tc = -y; }
+                else         { face = 5; sc = -x; tc = -y; }
+            }
+            u = (sc / ma + 1f) * 0.5f;
+            v = (tc / ma + 1f) * 0.5f;
+        }
+
+        // Samples a cube map or cube map array using face selection and per-face bilinear interpolation.
+        // rv.Get(x, y, face, arraySlice, mip) — z encodes face (0–5), w encodes array slice.
+        private static NumericValue SampleLevelCube(ResourceValue rv, NumericValue location, NumericValue lod)
+        {
+            var dir = CastToVector(location, rv.IsArray ? 4 : 3);
+            var scalarLod = CastToScalar(lod);
+            int threadCount = dir.ThreadCount;
+            HLSLValue[] results = new HLSLValue[threadCount];
+
+            for (int t = 0; t < threadCount; t++)
+            {
+                ProjectCubeDirection(
+                    Convert.ToSingle(dir.x.GetThreadValue(t)),
+                    Convert.ToSingle(dir.y.GetThreadValue(t)),
+                    Convert.ToSingle(dir.z.GetThreadValue(t)),
+                    out int face, out float u, out float v);
+
+                float lodClamped = MathF.Max(0f, Convert.ToSingle(scalarLod.GetThreadValue(t)));
+                float faceSize = MathF.Max(1f, rv.SizeX / MathF.Pow(2f, lodClamped));
+                int mip = (int)lodClamped;
+                int maxC = (int)faceSize - 1;
+                int arraySlice = rv.IsArray ? Convert.ToInt32(dir[3].GetThreadValue(t)) : 0;
+
+                float texelU = u * faceSize - 0.5f;
+                float texelV = v * faceSize - 0.5f;
+                int baseX = (int)MathF.Floor(texelU), baseY = (int)MathF.Floor(texelV);
+                float fracU = texelU - baseX, fracV = texelV - baseY;
+
+                int x0 = Math.Clamp(baseX,     0, maxC), x1 = Math.Clamp(baseX + 1, 0, maxC);
+                int y0 = Math.Clamp(baseY,     0, maxC), y1 = Math.Clamp(baseY + 1, 0, maxC);
+
+                var c00 = (NumericValue)rv.Get(x0, y0, face, arraySlice, mip);
+                var c10 = (NumericValue)rv.Get(x1, y0, face, arraySlice, mip);
+                var c01 = (NumericValue)rv.Get(x0, y1, face, arraySlice, mip);
+                var c11 = (NumericValue)rv.Get(x1, y1, face, arraySlice, mip);
+
+                var cx0 = Lerp(c00, c10, (ScalarValue)fracU);
+                var cx1 = Lerp(c01, c11, (ScalarValue)fracU);
+                results[t] = Lerp(cx0, cx1, (ScalarValue)fracV);
+            }
+
+            return (NumericValue)HLSLValueUtils.MergeThreadValues(results);
+        }
+
         // TODO: This doesn't account for elliptical transform.
         public static NumericValue CalculateLevelOfDetail(HLSLExecutionState executionState, ResourceValue rv, SamplerStateValue sampler, NumericValue location)
         {
@@ -445,11 +521,38 @@ namespace UnityShaderParser.Test
             return Max(lengthX, lengthY);
         }
 
+        // Returns face-local UV in [0, 1] per thread. Used by CalculateRho to get face-space derivatives.
+        private static VectorValue CubeDirectionToFaceUV(VectorValue dir)
+        {
+            int threadCount = dir.ThreadCount;
+            HLSLValue[] results = new HLSLValue[threadCount];
+            for (int t = 0; t < threadCount; t++)
+            {
+                ProjectCubeDirection(
+                    Convert.ToSingle(dir.x.GetThreadValue(t)),
+                    Convert.ToSingle(dir.y.GetThreadValue(t)),
+                    Convert.ToSingle(dir.z.GetThreadValue(t)),
+                    out _, out float u, out float v);
+                results[t] = VectorValue.FromScalars(u, v);
+            }
+            return (VectorValue)HLSLValueUtils.MergeThreadValues(results);
+        }
+
         // Computes rho (the maximum rate of texel change across screen pixels) for LOD calculation.
         private static NumericValue CalculateRho(HLSLExecutionState executionState, ResourceValue rv, NumericValue location)
         {
-            var sizeVec = VectorValue.FromScalars(rv.SizeX, rv.SizeY, rv.SizeZ).BroadcastToVector(rv.Dimension);
-            var scaledUV = (VectorValue)(CastToVector(location, rv.Dimension) * sizeVec);
+            VectorValue scaledUV;
+            if (rv.IsCube)
+            {
+                // Project direction to face-local UV, then scale by face size.
+                // Ddx/Ddy on face UV give the correct per-pixel texel footprint.
+                scaledUV = (VectorValue)(CubeDirectionToFaceUV(CastToVector(location, 3)) * rv.SizeX);
+            }
+            else
+            {
+                var sizeVec = VectorValue.FromScalars(rv.SizeX, rv.SizeY, rv.SizeZ).BroadcastToVector(rv.Dimension);
+                scaledUV = (VectorValue)(CastToVector(location, rv.Dimension) * sizeVec);
+            }
             var gradX = (VectorValue)Ddx(executionState, scaledUV);
             var gradY = (VectorValue)Ddy(executionState, scaledUV);
             return RhoFromGradients(gradX, gradY);
