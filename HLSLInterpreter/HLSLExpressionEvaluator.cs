@@ -93,7 +93,7 @@ namespace UnityShaderParser.Test
             if (context.GetReference("this")?.Get() is StructValue thisStruct)
             {
                 if (TryFindMethod(thisStruct.Name, name, out var method))
-                    return InvokeMethod(thisStruct, method, args);
+                    return CallMethodNode(thisStruct, method, args);
             }
 
             throw Error($"Unknown function '{name}' called.");
@@ -539,7 +539,7 @@ namespace UnityShaderParser.Test
             return false;
         }
 
-        private HLSLValue InvokeMethod(StructValue str, FunctionDefinitionNode method, HLSLValue[] args)
+        private HLSLValue CallMethodNode(StructValue str, FunctionDefinitionNode method, HLSLValue[] args)
         {
             if (args.Length != method.Parameters.Count)
                 throw Error($"Argument count mismatch in call to '{method.Name.GetName()}'.");
@@ -900,7 +900,7 @@ namespace UnityShaderParser.Test
                         }
                     }
 
-                    return InvokeMethod(str, method, args);
+                    return CallMethodNode(str, method, args);
                 }
 
                 throw Error(node, $"Couldn't find method '{node.Name.Identifier}' on type '{str.Name}'.");
