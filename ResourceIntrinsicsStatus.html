@@ -68,8 +68,8 @@
   <li class="red"><span class="sig">SampleCmpLevelZero(SamplerComparisonState s, float u, float CmpVal)</span></li>
   <li class="red"><span class="sig">SampleCmpLevelZero(SamplerComparisonState s, float u, float CmpVal, int Offset)</span></li>
   <li class="red"><span class="sig">SampleCmpLevelZero(SamplerComparisonState s, float u, float CmpVal, int Offset, out uint Status)</span></li>
-  <li class="yellow"><span class="sig">CalculateLevelOfDetail(SamplerState s, float u)</span> <span class="note">Dv derivative terms are zero (degenerate 1D case); result may be incorrect</span></li>
-  <li class="yellow"><span class="sig">CalculateLevelOfDetailUnclamped(SamplerState s, float u)</span> <span class="note">Same as above; unclamped variant</span></li>
+  <li class="green"><span class="sig">CalculateLevelOfDetail(SamplerState s, float u)</span></li>
+  <li class="green"><span class="sig">CalculateLevelOfDetailUnclamped(SamplerState s, float u)</span></li>
   <li class="red"><span class="sig">Gather(SamplerState s, float u)</span></li>
   <li class="red"><span class="sig">Gather(SamplerState s, float u, int Offset)</span></li>
   <li class="red"><span class="sig">Gather(SamplerState s, float u, int Offset, out uint Status)</span></li>
@@ -231,23 +231,23 @@
   <li class="green"><span class="sig">Load(int4 Location)</span></li>
   <li class="green"><span class="sig">Load(int4 Location, int3 Offset)</span></li>
   <li class="green"><span class="sig">Load(int4 Location, int3 Offset, out uint Status)</span></li>
-  <li class="yellow"><span class="sig">Sample(SamplerState s, float3 uvw)</span> <span class="note">Z (depth) axis not interpolated; only XY bilinear sampling performed</span></li>
-  <li class="yellow"><span class="sig">Sample(SamplerState s, float3 uvw, int3 Offset)</span> <span class="note">Z not interpolated</span></li>
-  <li class="yellow"><span class="sig">Sample(SamplerState s, float3 uvw, int3 Offset, float Clamp)</span> <span class="note">Z not interpolated</span></li>
-  <li class="yellow"><span class="sig">Sample(SamplerState s, float3 uvw, int3 Offset, float Clamp, out uint Status)</span> <span class="note">Z not interpolated</span></li>
-  <li class="yellow"><span class="sig">SampleLevel(SamplerState s, float3 uvw, float Lod)</span> <span class="note">Z axis not interpolated</span></li>
-  <li class="yellow"><span class="sig">SampleLevel(SamplerState s, float3 uvw, float Lod, int3 Offset)</span> <span class="note">Z not interpolated</span></li>
-  <li class="yellow"><span class="sig">SampleLevel(SamplerState s, float3 uvw, float Lod, int3 Offset, out uint Status)</span> <span class="note">Z not interpolated</span></li>
-  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias)</span> <span class="note">Z axis not interpolated</span></li>
-  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias, int3 Offset)</span> <span class="note">Z not interpolated</span></li>
-  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias, int3 Offset, float Clamp)</span> <span class="note">Z not interpolated</span></li>
-  <li class="yellow"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias, int3 Offset, float Clamp, out uint Status)</span> <span class="note">Z not interpolated</span></li>
-  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float3 Ddx, float3 Ddy)</span> <span class="note">Z axis not interpolated</span></li>
-  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float3 Ddx, float3 Ddy, int3 Offset)</span> <span class="note">Z not interpolated</span></li>
-  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float3 Ddx, float3 Ddy, int3 Offset, float Clamp)</span> <span class="note">Z not interpolated</span></li>
-  <li class="yellow"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float3 Ddx, float3 Ddy, int3 Offset, float Clamp, out uint Status)</span> <span class="note">Z not interpolated</span></li>
-  <li class="yellow"><span class="sig">CalculateLevelOfDetail(SamplerState s, float3 uvw)</span> <span class="note">Z component of UV not included in derivative calculation</span></li>
-  <li class="yellow"><span class="sig">CalculateLevelOfDetailUnclamped(SamplerState s, float3 uvw)</span> <span class="note">Z component of UV not included in derivative calculation</span></li>
+  <li class="green"><span class="sig">Sample(SamplerState s, float3 uvw)</span></li>
+  <li class="green"><span class="sig">Sample(SamplerState s, float3 uvw, int3 Offset)</span></li>
+  <li class="green"><span class="sig">Sample(SamplerState s, float3 uvw, int3 Offset, float Clamp)</span></li>
+  <li class="green"><span class="sig">Sample(SamplerState s, float3 uvw, int3 Offset, float Clamp, out uint Status)</span></li>
+  <li class="green"><span class="sig">SampleLevel(SamplerState s, float3 uvw, float Lod)</span></li>
+  <li class="green"><span class="sig">SampleLevel(SamplerState s, float3 uvw, float Lod, int3 Offset)</span></li>
+  <li class="green"><span class="sig">SampleLevel(SamplerState s, float3 uvw, float Lod, int3 Offset, out uint Status)</span></li>
+  <li class="green"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias)</span></li>
+  <li class="green"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias, int3 Offset)</span></li>
+  <li class="green"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias, int3 Offset, float Clamp)</span></li>
+  <li class="green"><span class="sig">SampleBias(SamplerState s, float3 uvw, float Bias, int3 Offset, float Clamp, out uint Status)</span></li>
+  <li class="green"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float3 Ddx, float3 Ddy)</span></li>
+  <li class="green"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float3 Ddx, float3 Ddy, int3 Offset)</span></li>
+  <li class="green"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float3 Ddx, float3 Ddy, int3 Offset, float Clamp)</span></li>
+  <li class="green"><span class="sig">SampleGrad(SamplerState s, float3 uvw, float3 Ddx, float3 Ddy, int3 Offset, float Clamp, out uint Status)</span></li>
+  <li class="green"><span class="sig">CalculateLevelOfDetail(SamplerState s, float3 uvw)</span></li>
+  <li class="green"><span class="sig">CalculateLevelOfDetailUnclamped(SamplerState s, float3 uvw)</span></li>
 </ul>
 
 <!-- ===================== TextureCUBE ===================== -->

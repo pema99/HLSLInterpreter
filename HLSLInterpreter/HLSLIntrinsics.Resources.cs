@@ -332,68 +332,126 @@ namespace UnityShaderParser.Test
         }
 
         // TODO: Texture Arrays
-        // TODO: 1D, 3D texture
         public static NumericValue SampleLevel(ResourceValue rv, SamplerStateValue sampler, NumericValue location, NumericValue lod, NumericValue offset = null)
         {
+            int dim = rv.Dimension;
             var scalarLod = CastToScalar(lod);
-            var size = VectorValue.FromScalars(rv.SizeX, rv.SizeY, rv.SizeZ).BroadcastToVector(rv.Dimension) / (lod + 1);
+            var size = VectorValue.FromScalars(rv.SizeX, rv.SizeY, rv.SizeZ).BroadcastToVector(dim) / (lod + 1);
 
-            var texelPos = CastToVector(location, rv.Dimension) * size - 0.5f;
+            var texelPos = CastToVector(location, dim) * size - 0.5f;
             if (offset is not null)
-                texelPos = (VectorValue)(texelPos + CastToVector(offset, rv.Dimension));
+                texelPos = (VectorValue)(texelPos + CastToVector(offset, dim));
 
             var basePos = Floor(texelPos).Cast(ScalarType.Int);
             var frac = (VectorValue)Frac(texelPos);
 
-            var p00 = (VectorValue)Clamp(basePos,                                 0, size - 1);
-            var p10 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(1, 0), 0, size - 1);
-            var p01 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(0, 1), 0, size - 1);
-            var p11 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(1, 1), 0, size - 1);
+            if (dim == 1)
+            {
+                // Linear interpolation
+                var p0 = (VectorValue)Clamp(basePos,                             0, size - 1);
+                var p1 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(1), 0, size - 1);
 
-            var c00 = (NumericValue)Load(rv, VectorValue.FromScalars(p00.x, p00.y, scalarLod));
-            var c10 = (NumericValue)Load(rv, VectorValue.FromScalars(p10.x, p10.y, scalarLod));
-            var c01 = (NumericValue)Load(rv, VectorValue.FromScalars(p01.x, p01.y, scalarLod));
-            var c11 = (NumericValue)Load(rv, VectorValue.FromScalars(p11.x, p11.y, scalarLod));
+                var c0 = (NumericValue)Load(rv, VectorValue.FromScalars(p0.x, scalarLod));
+                var c1 = (NumericValue)Load(rv, VectorValue.FromScalars(p1.x, scalarLod));
 
-            var cx0 = Lerp(c00, c10, frac.x);
-            var cx1 = Lerp(c01, c11, frac.x);
-            return Lerp(cx0, cx1, frac.y);
+                return Lerp(c0, c1, frac.x);
+            }
+            else if (dim == 2)
+            {
+                // Bilinear interpolation
+                var p00 = (VectorValue)Clamp(basePos,                                 0, size - 1);
+                var p10 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(1, 0), 0, size - 1);
+                var p01 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(0, 1), 0, size - 1);
+                var p11 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(1, 1), 0, size - 1);
+
+                var c00 = (NumericValue)Load(rv, VectorValue.FromScalars(p00.x, p00.y, scalarLod));
+                var c10 = (NumericValue)Load(rv, VectorValue.FromScalars(p10.x, p10.y, scalarLod));
+                var c01 = (NumericValue)Load(rv, VectorValue.FromScalars(p01.x, p01.y, scalarLod));
+                var c11 = (NumericValue)Load(rv, VectorValue.FromScalars(p11.x, p11.y, scalarLod));
+
+                var cx0 = Lerp(c00, c10, frac.x);
+                var cx1 = Lerp(c01, c11, frac.x);
+                return Lerp(cx0, cx1, frac.y);
+            }
+            else // dim == 3
+            {
+                // Trilinear interpolation
+                var p000 = (VectorValue)Clamp(basePos,                                    0, size - 1);
+                var p100 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(1, 0, 0), 0, size - 1);
+                var p010 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(0, 1, 0), 0, size - 1);
+                var p110 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(1, 1, 0), 0, size - 1);
+                var p001 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(0, 0, 1), 0, size - 1);
+                var p101 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(1, 0, 1), 0, size - 1);
+                var p011 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(0, 1, 1), 0, size - 1);
+                var p111 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(1, 1, 1), 0, size - 1);
+
+                var c000 = (NumericValue)Load(rv, VectorValue.FromScalars(p000.x, p000.y, p000.z, scalarLod));
+                var c100 = (NumericValue)Load(rv, VectorValue.FromScalars(p100.x, p100.y, p100.z, scalarLod));
+                var c010 = (NumericValue)Load(rv, VectorValue.FromScalars(p010.x, p010.y, p010.z, scalarLod));
+                var c110 = (NumericValue)Load(rv, VectorValue.FromScalars(p110.x, p110.y, p110.z, scalarLod));
+                var c001 = (NumericValue)Load(rv, VectorValue.FromScalars(p001.x, p001.y, p001.z, scalarLod));
+                var c101 = (NumericValue)Load(rv, VectorValue.FromScalars(p101.x, p101.y, p101.z, scalarLod));
+                var c011 = (NumericValue)Load(rv, VectorValue.FromScalars(p011.x, p011.y, p011.z, scalarLod));
+                var c111 = (NumericValue)Load(rv, VectorValue.FromScalars(p111.x, p111.y, p111.z, scalarLod));
+
+                var cx00 = Lerp(c000, c100, frac.x);
+                var cx10 = Lerp(c010, c110, frac.x);
+                var cx01 = Lerp(c001, c101, frac.x);
+                var cx11 = Lerp(c011, c111, frac.x);
+
+                var cxy0 = Lerp(cx00, cx10, frac.y);
+                var cxy1 = Lerp(cx01, cx11, frac.y);
+
+                return Lerp(cxy0, cxy1, frac.z);
+            }
         }
 
         // TODO: This doesn't account for elliptical transform.
-        // TODO: 1D, 3D texture
         public static NumericValue CalculateLevelOfDetail(HLSLExecutionState executionState, ResourceValue rv, SamplerStateValue sampler, NumericValue location)
         {
-            var vecLoc = CastToVector(location, rv.Dimension);
-
-            var du_dx = Ddx(executionState, vecLoc.x * rv.SizeX);
-            var dv_dx = Ddx(executionState, vecLoc.y * rv.SizeY);
-            var du_dy = Ddy(executionState, vecLoc.x * rv.SizeX);
-            var dv_dy = Ddy(executionState, vecLoc.y * rv.SizeY);
-
-            var lengthX = Sqrt(du_dx * du_dx + dv_dx * dv_dx);
-            var lengthY = Sqrt(du_dy * du_dy + dv_dy * dv_dy);
-            var rho = Max(lengthX, lengthY);
-
-            return Clamp(Log2(rho), 0.0f, MathF.Log(MathF.Max(rv.SizeX, rv.SizeY)) / MathF.Log(2) + 1);
+            var rho = CalculateRho(executionState, rv, location);
+            float maxDim = MathF.Max(rv.SizeX, MathF.Max(rv.SizeY, rv.SizeZ));
+            return Clamp(Log2(rho), 0.0f, MathF.Log(maxDim) / MathF.Log(2) + 1);
         }
 
         // Like CalculateLevelOfDetail but without clamping to [0, maxMip].
-        // TODO: 1D, 3D texture
         public static NumericValue CalculateLevelOfDetailUnclamped(HLSLExecutionState executionState, ResourceValue rv, SamplerStateValue sampler, NumericValue location)
         {
-            var vecLoc = CastToVector(location, rv.Dimension);
+            return Log2(CalculateRho(executionState, rv, location));
+        }
 
-            var du_dx = Ddx(executionState, vecLoc.x * rv.SizeX);
-            var dv_dx = Ddx(executionState, vecLoc.y * rv.SizeY);
-            var du_dy = Ddy(executionState, vecLoc.x * rv.SizeX);
-            var dv_dy = Ddy(executionState, vecLoc.y * rv.SizeY);
+        // Computes rho from two gradient vectors already in texel space.
+        // gradX = d(uvw * size)/dx per screen pixel; gradY = same along screen-y.
+        private static NumericValue RhoFromGradients(VectorValue gradX, VectorValue gradY)
+        {
+            int dim = gradX.Size;
+            NumericValue lengthX, lengthY;
+            if (dim == 1)
+            {
+                lengthX = Abs(gradX.x);
+                lengthY = Abs(gradY.x);
+            }
+            else if (dim == 2)
+            {
+                lengthX = Sqrt(gradX.x * gradX.x + gradX.y * gradX.y);
+                lengthY = Sqrt(gradY.x * gradY.x + gradY.y * gradY.y);
+            }
+            else
+            {
+                lengthX = Sqrt(gradX.x * gradX.x + gradX.y * gradX.y + gradX.z * gradX.z);
+                lengthY = Sqrt(gradY.x * gradY.x + gradY.y * gradY.y + gradY.z * gradY.z);
+            }
+            return Max(lengthX, lengthY);
+        }
 
-            var lengthX = Sqrt(du_dx * du_dx + dv_dx * dv_dx);
-            var lengthY = Sqrt(du_dy * du_dy + dv_dy * dv_dy);
-            var rho = Max(lengthX, lengthY);
-
-            return Log2(rho);
+        // Computes rho (the maximum rate of texel change across screen pixels) for LOD calculation.
+        private static NumericValue CalculateRho(HLSLExecutionState executionState, ResourceValue rv, NumericValue location)
+        {
+            var sizeVec = VectorValue.FromScalars(rv.SizeX, rv.SizeY, rv.SizeZ).BroadcastToVector(rv.Dimension);
+            var scaledUV = (VectorValue)(CastToVector(location, rv.Dimension) * sizeVec);
+            var gradX = (VectorValue)Ddx(executionState, scaledUV);
+            var gradY = (VectorValue)Ddy(executionState, scaledUV);
+            return RhoFromGradients(gradX, gradY);
         }
 
         public static NumericValue Sample(HLSLExecutionState executionState, ResourceValue rv, SamplerStateValue sampler, NumericValue location, NumericValue offset = null, NumericValue clamp = null)
@@ -404,28 +462,19 @@ namespace UnityShaderParser.Test
             return SampleLevel(rv, sampler, location, lod, offset);
         }
 
-        // TODO: 1D, 3D texture
         public static NumericValue SampleGrad(ResourceValue rv, SamplerStateValue sampler, NumericValue location, NumericValue ddx, NumericValue ddy, NumericValue offset = null, NumericValue clamp = null)
         {
-            var vecDdx = CastToVector(ddx, rv.Dimension);
-            var vecDdy = CastToVector(ddy, rv.Dimension);
+            var sizeVec = VectorValue.FromScalars(rv.SizeX, rv.SizeY, rv.SizeZ).BroadcastToVector(rv.Dimension);
+            var gradX = (VectorValue)(CastToVector(ddx, rv.Dimension) * sizeVec);
+            var gradY = (VectorValue)(CastToVector(ddy, rv.Dimension) * sizeVec);
 
-            var du_dx = vecDdx.x * rv.SizeX;
-            var dv_dx = vecDdx.y * rv.SizeY;
-            var du_dy = vecDdy.x * rv.SizeX;
-            var dv_dy = vecDdy.y * rv.SizeY;
-
-            var lengthX = Sqrt(du_dx * du_dx + dv_dx * dv_dx);
-            var lengthY = Sqrt(du_dy * du_dy + dv_dy * dv_dy);
-            var rho = Max(lengthX, lengthY);
-
-            var lod = Clamp(Log2(rho), 0.0f, MathF.Log(MathF.Max(rv.SizeX, rv.SizeY)) / MathF.Log(2) + 1);
+            float maxDim = MathF.Max(rv.SizeX, MathF.Max(rv.SizeY, rv.SizeZ));
+            var lod = Clamp(Log2(RhoFromGradients(gradX, gradY)), 0.0f, MathF.Log(maxDim) / MathF.Log(2) + 1);
             if (clamp is not null)
                 lod = Min(lod, ToFloatLike(clamp));
             return SampleLevel(rv, sampler, location, lod, offset);
         }
 
-        // TODO: 1D, 3D texture
         public static NumericValue SampleBias(HLSLExecutionState executionState, ResourceValue rv, SamplerStateValue sampler, NumericValue location, NumericValue bias, NumericValue offset = null, NumericValue clamp = null)
         {
             var lod = CalculateLevelOfDetail(executionState, rv, sampler, location) + ToFloatLike(bias);
