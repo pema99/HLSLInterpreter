@@ -274,12 +274,15 @@ namespace UnityShaderParser.Test
                                 defaultValue = new SamplerStateValue(true);
                                 break;
                             default:
-                                if (HLSLSyntaxFacts.IsTexture(predefinedObjectType.Kind) && HLSLSyntaxFacts.GetDimension(predefinedObjectType.Kind) == 2)
+                                if (HLSLSyntaxFacts.IsTexture(predefinedObjectType.Kind) || HLSLSyntaxFacts.IsBuffer(predefinedObjectType.Kind))
                                 {
+                                    int dim = HLSLSyntaxFacts.GetDimension(predefinedObjectType.Kind);
                                     defaultValue = new ResourceValue(
                                         predefinedObjectType.Kind,
                                         predefinedObjectType.TemplateArguments.ToArray(),
-                                        2, 2, 1,
+                                        dim >= 1 ? 2 : 1,
+                                        dim >= 2 ? 2 : 1,
+                                        dim >= 3 ? 2 : 1,
                                         (x, y, z, w, mip) => (NumericValue)0,
                                         (x, y, z, w, mip, val) => { });
                                 }
