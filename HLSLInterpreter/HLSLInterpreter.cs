@@ -7,20 +7,16 @@ using UnityShaderParser.HLSL;
 namespace UnityShaderParser.Test
 {
     // TODO:
-    // 
+    //
     // Statements:
-    //     public class InterfaceDefinitionNode : StatementNode
-    //     public class TypedefNode : StatementNode
     //     public class StatePropertyNode : StatementNode
-    // 
+    //
     // Expressions:
     //     VisitSamplerStateLiteralExpressionNode
-    // 
+    //
     // Semantics support
     // More test attributes
     // Texture/StructuredBuffer
-    // Array cast
-    // Generic vector/matrix types
 
     public class HLSLInterpreter : HLSLSyntaxVisitor
     {
@@ -654,7 +650,6 @@ namespace UnityShaderParser.Test
 
         public override void VisitStructDefinitionNode(StructDefinitionNode node)
         {
-            // TODO: Inline struct types
             context.AddStruct(node.StructType.Name.GetName(), node.StructType);
 
             foreach (var method in node.StructType.Methods)
