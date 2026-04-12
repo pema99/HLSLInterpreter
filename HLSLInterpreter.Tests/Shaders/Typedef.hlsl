@@ -296,3 +296,129 @@ void Typedef_LoopVariable()
         sum += i;
     ASSERT(sum == 10);
 }
+
+// ---- Typedef scoping ----
+
+void InnerTypedef()
+{
+    typedef float2 LocalVec;
+    LocalVec v = LocalVec(3.0, 4.0);
+    ASSERT(length(v) == 5.0);
+}
+
+[Test]
+void Typedef_DefinedInFunction_WorksLocally()
+{
+    typedef int Score;
+    Score s = 42;
+    ASSERT(s == 42);
+}
+
+[Test]
+void Typedef_DefinedInCalledFunction_DoesNotLinger()
+{
+    InnerTypedef();
+    // LocalVec was only defined inside InnerTypedef — re-defining it here
+    // should give us our own independent alias, not be poisoned by InnerTypedef's.
+    typedef int LocalVec;
+    LocalVec x = 7;
+    // If LocalVec wrongly resolved to float2, x would be float2(7,7) and
+    // integer division (7/2 == 3) would fail (7.0/2.0 == 3.5).
+    ASSERT(x / 2 == 3);
+}
+
+void InnerRedefinesAlias()
+{
+    typedef float2 Alias;
+    Alias v = Alias(1.0, 0.0);
+    ASSERT(v.x == 1.0);
+}
+
+[Test]
+void Typedef_SameNameInCalledFunction_DoesNotOverwriteCaller()
+{
+    typedef int Alias;
+    InnerRedefinesAlias(); // overwrites Alias → float2 if scoping is broken
+    Alias b = 7;
+    // If Alias wrongly resolved to float2, b = float2(7,7) and
+    // integer division (7/2 == 3) would fail (7.0/2.0 == 3.5).
+    ASSERT(b / 2 == 3);
+}
+
+// ---- Block-level typedef scoping ----
+
+[Test]
+void Typedef_InIfBlock_DoesNotLeakOutside()
+{
+    // Define an alias only inside the if branch.
+    if (true)
+    {
+        typedef int BlockInt;
+        BlockInt x = 10;
+        ASSERT(x == 10);
+    }
+    // BlockInt must not be visible here — redefine it as float to verify we
+    // get our own fresh alias, not the one from the if block.
+    typedef float BlockInt;
+    BlockInt y = 3;
+    // If BlockInt wrongly resolves to int, y = 3 (int) and y * 0.5 == 1 (int), not 1.5.
+    ASSERT(y * 0.5 == 1.5);
+}
+
+[Test]
+void Typedef_InForLoop_DoesNotLeakOutside()
+{
+    for (int i = 0; i < 1; i++)
+    {
+        typedef int LoopAlias;
+        LoopAlias v = 99;
+        ASSERT(v == 99);
+    }
+    // LoopAlias must not survive; redefine as float and confirm float semantics.
+    typedef float LoopAlias;
+    LoopAlias f = 7;
+    ASSERT(f * 0.5 == 3.5);
+}
+
+// ---- Sibling function isolation ----
+
+void SiblingA()
+{
+    typedef int SiblingType;
+    SiblingType x = 4;
+    ASSERT(x / 3 == 1); // int: 4/3 = 1
+}
+
+void SiblingB()
+{
+    typedef float2 SiblingType;
+    SiblingType v = SiblingType(6.0, 9.0);
+    ASSERT(v.x == 6.0 && v.y == 9.0);
+}
+
+[Test]
+void Typedef_SiblingFunctions_DoNotInterfere()
+{
+    // A defines SiblingType = int, B defines SiblingType = float2.
+    // Calling them in either order should leave no alias in the caller.
+    SiblingA();
+    SiblingB();
+    SiblingA(); // would crash/misbehave if SiblingType lingered as float2
+
+    // Define our own alias after both calls to confirm no pollution.
+    typedef int SiblingType;
+    SiblingType result = 9;
+    ASSERT(result / 2 == 4); // int: 9/2 = 4; float2 would give 4.5
+}
+
+// ---- Typedef of a namespace-qualified type ----
+
+[Test]
+void Typedef_OfNamespaceQualifiedType()
+{
+    // Units::Meters is already typedef'd to float inside the Units namespace.
+    // Here we create a file-scope alias that refers to the namespace-qualified name.
+    typedef Units::Meters Distance;
+    Distance d = 42.0;
+    ASSERT(d > 41.9 && d < 42.1);
+}

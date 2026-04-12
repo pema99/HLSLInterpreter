@@ -13,6 +13,7 @@ namespace UnityShaderParser.Test
             public readonly Dictionary<string, HLSLValue> Variables = new Dictionary<string, HLSLValue>();
             public readonly Dictionary<string, List<FunctionDefinitionNode>> Functions = new Dictionary<string, List<FunctionDefinitionNode>>();
             public readonly Dictionary<string, StructTypeNode> Structs = new Dictionary<string, StructTypeNode>();
+            public readonly Dictionary<string, TypeNode> TypeAliases = new Dictionary<string, TypeNode>();
 
             public Scope(bool isFunction) => IsFunction = isFunction;
         }
@@ -21,7 +22,6 @@ namespace UnityShaderParser.Test
         private Stack<HLSLValue> returnStack = new Stack<HLSLValue>();
         private Stack<string> namespaceStack = new Stack<string>();
 
-        private Dictionary<string, TypeNode> typeAliases = new Dictionary<string, TypeNode>();
         private HashSet<string> groupsharedVars = new HashSet<string>();
 
         public void EnterNamespace(string name)
@@ -66,30 +66,12 @@ namespace UnityShaderParser.Test
 
             // Not in local scope, try global scope with namespace resolution.
             var globalVars = environment.Last().Variables;
-            if (namespaceStack.Count > 0)
+            foreach (string candidate in CandidateNames(name))
             {
-                var reverseNamespace = namespaceStack.Reverse().ToArray();
-                for (int i = 0; i < namespaceStack.Count + 1; i++)
-                {
-                    int prefixLength = namespaceStack.Count - i;
-                    string currPrefix = string.Join("::", reverseNamespace.Take(prefixLength));
-                    string qualifiedName = string.IsNullOrEmpty(currPrefix) ? name : $"{currPrefix}::{name}";
-                    if (globalVars.TryGetValue(qualifiedName, out var val))
-                    {
-                        resolvedScope = globalVars;
-                        resolvedName = qualifiedName;
-                        resolvedValue = val;
-                        isGlobal = true;
-                        return true;
-                    }
-                }
-            }
-            else
-            {
-                if (globalVars.TryGetValue(name, out var val))
+                if (globalVars.TryGetValue(candidate, out var val))
                 {
                     resolvedScope = globalVars;
-                    resolvedName = name;
+                    resolvedName = candidate;
                     resolvedValue = val;
                     isGlobal = true;
                     return true;
@@ -257,7 +239,29 @@ namespace UnityShaderParser.Test
 
         public void AddTypeAlias(string name, TypeNode aliasedType)
         {
-            typeAliases[GetQualifiedName(name)] = aliasedType;
+            environment.Peek().TypeAliases[GetQualifiedName(name)] = aliasedType;
+        }
+
+        private bool TryFindTypeAlias(string name, out TypeNode resolvedType)
+        {
+            // Search from innermost scope outward, stopping at function boundaries for local scopes.
+            var localScopes = environment.Take(environment.Count - 1);
+            foreach (var scope in localScopes)
+            {
+                if (scope.TypeAliases.TryGetValue(name, out resolvedType))
+                    return true;
+                if (scope.IsFunction)
+                    break;
+            }
+            // Fall through to global scope with namespace resolution.
+            var globalAliases = environment.Last().TypeAliases;
+            foreach (string candidate in CandidateNames(name))
+            {
+                if (globalAliases.TryGetValue(candidate, out resolvedType))
+                    return true;
+            }
+            resolvedType = null;
+            return false;
         }
 
         public TypeNode ResolveType(TypeNode node)
@@ -266,9 +270,7 @@ namespace UnityShaderParser.Test
             while (limit-- > 0 && node is UserDefinedNamedTypeNode named)
             {
                 string rawName = named.GetName();
-                string qualName = GetQualifiedName(rawName);
-                if (typeAliases.TryGetValue(qualName, out var resolved) ||
-                    typeAliases.TryGetValue(rawName, out resolved))
+                if (TryFindTypeAlias(rawName, out var resolved))
                     node = resolved;
                 else
                     break;
@@ -278,9 +280,7 @@ namespace UnityShaderParser.Test
 
         public bool TryLookupTypeAlias(string name, out TypeNode resolvedType)
         {
-            string qualName = GetQualifiedName(name);
-            if (typeAliases.TryGetValue(qualName, out resolvedType) ||
-                typeAliases.TryGetValue(name, out resolvedType))
+            if (TryFindTypeAlias(name, out resolvedType))
             {
                 resolvedType = ResolveType(resolvedType);
                 return true;
