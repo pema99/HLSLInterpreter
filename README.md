@@ -73,7 +73,6 @@ I estimate that the interpreter supports around 80% of the HLSL language, though
 The main limitation of the interpreter is that it is very slow - think hundreds or thousands of time slower than running on a GPU. The interpreter is written primarily with correctness in mind, and I've made no attempt to optimize it more than necessary. Don't expect to run interesting shaders at high resolutions without waiting several seconds for a frame! The thread count is configurable, and most usecases will want to run just a few threads.
 
 Here is a list of features I have yet to implement:
-- Interface definitions and struct inheritance.
 - Inline struct definitions in variable declarations.
 - SamplerState declarations (`SamplerState mySampler = {...};`)
 - Most texture/buffer types beyond basic `Texture2D` (no `Gather*`, `SampleCmp`, `SampleBias`, `SampleGrad`, etc.)
