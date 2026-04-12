@@ -136,6 +136,10 @@ namespace UnityShaderParser.Test
             // GetSamplePosition(int sampleIndex) — Texture2DMS / Texture2DMSArray only.
             Stub("GetSamplePosition", 1);
 
+            // ==================== AppendStructuredBuffer / ConsumeStructuredBuffer ====================
+            Stub("Append",  1);
+            Stub("Consume", 0);
+
             // ==================== RWStructuredBuffer counter methods ====================
             Stub("IncrementCounter", 0);
             Stub("DecrementCounter", 0);
