@@ -868,20 +868,22 @@ namespace UnityShaderParser.Test
         public readonly int SizeX;
         public readonly int SizeY;
         public readonly int SizeZ;
+        public readonly int MipCount;
 
-        public ResourceValue(PredefinedObjectType type, TypeNode[] templateArguments, int sizeX, int sizeY, int sizeZ, ResourceGetter get, ResourceSetter set)
+        public ResourceValue(PredefinedObjectType type, TypeNode[] templateArguments, int sizeX, int sizeY, int sizeZ, int mipCount, ResourceGetter get, ResourceSetter set)
             : base(type, templateArguments)
         {
             SizeX = sizeX;
             SizeY = sizeY;
             SizeZ = sizeZ;
+            MipCount = mipCount;
             Get = get;
             Set = set;
         }
 
         public override HLSLValue Copy()
         {
-            return new ResourceValue(Type, TemplateArguments, SizeX, SizeY, SizeZ, Get, Set);
+            return new ResourceValue(Type, TemplateArguments, SizeX, SizeY, SizeZ, MipCount, Get, Set);
         }
 
         public bool IsWriteable => HLSLSyntaxFacts.IsWriteable(Type);

@@ -42,7 +42,7 @@
 <h2>Texture1D</h2>
 <ul>
   <li class="green"><span class="sig">GetDimensions(out uint Width)</span></li>
-  <li class="yellow"><span class="sig">GetDimensions(uint MipLevel, out uint Width, out uint NumberOfLevels)</span> <span class="note">NumberOfLevels always reported as 1</span></li>
+  <li class="green"><span class="sig">GetDimensions(uint MipLevel, out uint Width, out uint NumberOfLevels)</span></li>
   <li class="green"><span class="sig">Load(int2 Location)</span></li>
   <li class="green"><span class="sig">Load(int2 Location, int Offset)</span></li>
   <li class="green"><span class="sig">Load(int2 Location, int Offset, out uint Status)</span></li>
@@ -79,7 +79,7 @@
 <h2>Texture1DArray</h2>
 <ul>
   <li class="green"><span class="sig">GetDimensions(out uint Width, out uint Elements)</span></li>
-  <li class="yellow"><span class="sig">GetDimensions(uint MipLevel, out uint Width, out uint Elements, out uint NumberOfLevels)</span> <span class="note">NumberOfLevels always reported as 1</span></li>
+  <li class="green"><span class="sig">GetDimensions(uint MipLevel, out uint Width, out uint Elements, out uint NumberOfLevels)</span></li>
   <li class="green"><span class="sig">Load(int3 Location)</span></li>
   <li class="green"><span class="sig">Load(int3 Location, int Offset)</span></li>
   <li class="green"><span class="sig">Load(int3 Location, int Offset, out uint Status)</span></li>
@@ -116,7 +116,7 @@
 <h2>Texture2D</h2>
 <ul>
   <li class="green"><span class="sig">GetDimensions(out uint Width, out uint Height)</span></li>
-  <li class="yellow"><span class="sig">GetDimensions(uint MipLevel, out uint Width, out uint Height, out uint NumberOfLevels)</span> <span class="note">NumberOfLevels always reported as 1</span></li>
+  <li class="green"><span class="sig">GetDimensions(uint MipLevel, out uint Width, out uint Height, out uint NumberOfLevels)</span></li>
   <li class="green"><span class="sig">Load(int3 Location)</span></li>
   <li class="green"><span class="sig">Load(int3 Location, int2 Offset)</span></li>
   <li class="green"><span class="sig">Load(int3 Location, int2 Offset, out uint Status)</span></li>
@@ -183,7 +183,7 @@
 <h2>Texture2DArray</h2>
 <ul>
   <li class="green"><span class="sig">GetDimensions(out uint Width, out uint Height, out uint Elements)</span></li>
-  <li class="yellow"><span class="sig">GetDimensions(uint MipLevel, out uint Width, out uint Height, out uint Elements, out uint NumberOfLevels)</span> <span class="note">NumberOfLevels always reported as 1</span></li>
+  <li class="green"><span class="sig">GetDimensions(uint MipLevel, out uint Width, out uint Height, out uint Elements, out uint NumberOfLevels)</span></li>
   <li class="green"><span class="sig">Load(int4 Location)</span></li>
   <li class="green"><span class="sig">Load(int4 Location, int2 Offset)</span></li>
   <li class="green"><span class="sig">Load(int4 Location, int2 Offset, out uint Status)</span></li>
@@ -227,7 +227,7 @@
 <h2>Texture3D</h2>
 <ul>
   <li class="green"><span class="sig">GetDimensions(out uint Width, out uint Height, out uint Depth)</span></li>
-  <li class="yellow"><span class="sig">GetDimensions(uint MipLevel, out uint Width, out uint Height, out uint Depth, out uint NumberOfLevels)</span> <span class="note">NumberOfLevels always reported as 1</span></li>
+  <li class="green"><span class="sig">GetDimensions(uint MipLevel, out uint Width, out uint Height, out uint Depth, out uint NumberOfLevels)</span></li>
   <li class="green"><span class="sig">Load(int4 Location)</span></li>
   <li class="green"><span class="sig">Load(int4 Location, int3 Offset)</span></li>
   <li class="green"><span class="sig">Load(int4 Location, int3 Offset, out uint Status)</span></li>
@@ -254,7 +254,7 @@
 <h2>TextureCUBE</h2>
 <ul>
   <li class="green"><span class="sig">GetDimensions(out uint Width, out uint Height)</span></li>
-  <li class="yellow"><span class="sig">GetDimensions(uint MipLevel, out uint Width, out uint Height, out uint NumberOfLevels)</span> <span class="note">NumberOfLevels always reported as 1</span></li>
+  <li class="green"><span class="sig">GetDimensions(uint MipLevel, out uint Width, out uint Height, out uint NumberOfLevels)</span></li>
   <li class="yellow"><span class="sig">Sample(SamplerState s, float3 uvw)</span> <span class="note">Cube face selection not implemented; direction vector not mapped to face + 2D UV</span></li>
   <li class="yellow"><span class="sig">Sample(SamplerState s, float3 uvw, float Clamp)</span> <span class="note">Cube face selection not implemented</span></li>
   <li class="yellow"><span class="sig">Sample(SamplerState s, float3 uvw, float Clamp, out uint Status)</span> <span class="note">Cube face selection not implemented</span></li>
@@ -277,7 +277,7 @@
 <h2>TextureCUBEArray</h2>
 <ul>
   <li class="green"><span class="sig">GetDimensions(out uint Width, out uint Height, out uint Elements)</span></li>
-  <li class="yellow"><span class="sig">GetDimensions(uint MipLevel, out uint Width, out uint Height, out uint Elements, out uint NumberOfLevels)</span> <span class="note">NumberOfLevels always reported as 1</span></li>
+  <li class="green"><span class="sig">GetDimensions(uint MipLevel, out uint Width, out uint Height, out uint Elements, out uint NumberOfLevels)</span></li>
   <li class="yellow"><span class="sig">Sample(SamplerState s, float4 uvwa)</span> <span class="note">Cube face selection not implemented; array slice ignored in sampling</span></li>
   <li class="yellow"><span class="sig">Sample(SamplerState s, float4 uvwa, float Clamp)</span> <span class="note">Cube face selection not implemented</span></li>
   <li class="yellow"><span class="sig">Sample(SamplerState s, float4 uvwa, float Clamp, out uint Status)</span> <span class="note">Cube face selection not implemented</span></li>
@@ -332,25 +332,7 @@
   <li class="green"><span class="sig">Load(int3 Location)</span></li>
 </ul>
 
-<!-- ===================== RWTexture2DMS ===================== -->
-<h2>RWTexture2DMS&lt;T&gt; <span class="warn">Not representable — this type is absent from the PredefinedObjectType enum</span></h2>
-<ul>
-  <li class="red"><span class="sig">GetDimensions(out uint Width, out uint Height, out uint NumberOfSamples)</span></li>
-  <li class="red"><span class="sig">Load(int2 Location, int SampleIndex)</span></li>
-  <li class="red"><span class="sig">Load(int2 Location, int SampleIndex, int2 Offset)</span></li>
-  <li class="red"><span class="sig">Load(int2 Location, int SampleIndex, int2 Offset, out uint Status)</span></li>
-  <li class="red"><span class="sig">GetSamplePosition(int SampleIndex)</span></li>
-</ul>
 
-<!-- ===================== RWTexture2DMSArray ===================== -->
-<h2>RWTexture2DMSArray&lt;T&gt; <span class="warn">Not representable — this type is absent from the PredefinedObjectType enum</span></h2>
-<ul>
-  <li class="red"><span class="sig">GetDimensions(out uint Width, out uint Height, out uint Elements, out uint NumberOfSamples)</span></li>
-  <li class="red"><span class="sig">Load(int3 Location, int SampleIndex)</span></li>
-  <li class="red"><span class="sig">Load(int3 Location, int SampleIndex, int2 Offset)</span></li>
-  <li class="red"><span class="sig">Load(int3 Location, int SampleIndex, int2 Offset, out uint Status)</span></li>
-  <li class="red"><span class="sig">GetSamplePosition(int SampleIndex)</span></li>
-</ul>
 
 <!-- ===================== RWTexture3D ===================== -->
 <h2>RWTexture3D&lt;T&gt;</h2>

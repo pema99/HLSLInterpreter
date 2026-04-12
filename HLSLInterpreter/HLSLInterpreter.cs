@@ -283,6 +283,7 @@ namespace UnityShaderParser.Test
                                         dim >= 1 ? 2 : 1,
                                         dim >= 2 ? 2 : 1,
                                         dim >= 3 ? 2 : 1,
+                                        1,
                                         (x, y, z, w, mip) => (NumericValue)0,
                                         (x, y, z, w, mip, val) => { });
                                 }

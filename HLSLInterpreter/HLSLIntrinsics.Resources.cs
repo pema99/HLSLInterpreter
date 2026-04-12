@@ -535,7 +535,7 @@ namespace UnityShaderParser.Test
 
             // Mip level count — only when a mip input was given.
             if (hasMipInput)
-                Write(1); // our implementation only supports 1 mip level.
+                Write((uint)rv.MipCount);
 
             return ScalarValue.Null;
         }
