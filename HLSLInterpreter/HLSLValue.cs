@@ -867,8 +867,9 @@ namespace UnityShaderParser.Test
         public readonly ResourceSetter Set;
         public readonly int SizeX;
         public readonly int SizeY;
-        public readonly int SizeZ;
+        public readonly int SizeZ; // Depth or Slice count
         public readonly int MipCount;
+        public int Counter; // Counter for Append/Consume buffer
 
         public ResourceValue(PredefinedObjectType type, TypeNode[] templateArguments, int sizeX, int sizeY, int sizeZ, int mipCount, ResourceGetter get, ResourceSetter set)
             : base(type, templateArguments)
@@ -1773,6 +1774,57 @@ namespace UnityShaderParser.Test
                 default:
                     throw new InvalidOperationException();
             }
+        }
+
+        public static int GetTypeSize(TypeNode node)
+        {
+            int ScalarTypeSize(ScalarType type)
+            {
+                switch (type)
+                {
+                    case ScalarType.Void: return 0;
+                    case ScalarType.Bool: return 4;
+                    case ScalarType.Int: return 4;
+                    case ScalarType.Uint: return 4;
+                    case ScalarType.Half: return 2;
+                    case ScalarType.Float: return 4;
+                    case ScalarType.Double: return 8;
+                    case ScalarType.Min16Float: return 4;
+                    case ScalarType.Min10Float: return 4;
+                    case ScalarType.Min16Int: return 4;
+                    case ScalarType.Min12Int: return 4;
+                    case ScalarType.Min16Uint: return 4;
+                    case ScalarType.Min12Uint: return 4;
+                    case ScalarType.String: return 0;
+                    case ScalarType.Char: return 0;
+                    case ScalarType.UNormFloat: return 4;
+                    case ScalarType.SNormFloat: return 4;
+                    default: return 0;
+                }
+            }
+
+            if (node is StructTypeNode str)
+            {
+                int size = 0;
+                foreach (var member in str.Fields)
+                {
+                    size += GetTypeSize(member.Kind);
+                }
+                return size;
+            }
+            else if (node is ScalarTypeNode scalar)
+            {
+                return ScalarTypeSize(scalar.Kind);
+            }
+            else if (node is VectorTypeNode vec)
+            {
+                return vec.Dimension * ScalarTypeSize(vec.Kind);
+            }
+            else if (node is MatrixTypeNode mat)
+            {
+                return mat.FirstDimension * mat.SecondDimension * ScalarTypeSize(mat.Kind);
+            }
+            return 0;
         }
     }
 }

@@ -178,12 +178,20 @@ namespace UnityShaderParser.Test
                 VectorValue.FromScalars((ScalarValue)0.5f, (ScalarValue)0.5f));
 
             // ==================== AppendStructuredBuffer / ConsumeStructuredBuffer ====================
-            Stub("Append",  1);
-            Stub("Consume", 0);
+            Add("Append", 1, (state, rv, args) =>
+            {
+                rv.Set(rv.Counter++, 0, 0, 0, 0, args[0]);
+                return ScalarValue.Null;
+            });
+            Add("Consume", 0, (state, rv, args) =>
+            {
+                int index = rv.Counter--;
+                return rv.Get(index, 0, 0, 0, 0);
+            });
 
             // ==================== RWStructuredBuffer counter methods ====================
-            Stub("IncrementCounter", 0);
-            Stub("DecrementCounter", 0);
+            Add("IncrementCounter", 0, (state, rv, args) => (NumericValue)(uint)rv.Counter++);
+            Add("DecrementCounter", 0, (state, rv, args) => (NumericValue)(uint)--rv.Counter);
 
             // ==================== RWByteAddressBuffer Interlocked operations ====================
             // Basic:         InterlockedOp(byteOffset, value [, out original])
@@ -629,13 +637,13 @@ namespace UnityShaderParser.Test
             if (IsMSTexture(rv))
                 Write(1);
 
-            // Element stride — StructuredBuffer types (we don't track the element size).
+            // Element stride — StructuredBuffer types: size of the first template argument.
             if (rv.Type == PredefinedObjectType.StructuredBuffer           ||
                 rv.Type == PredefinedObjectType.RWStructuredBuffer          ||
                 rv.Type == PredefinedObjectType.AppendStructuredBuffer      ||
                 rv.Type == PredefinedObjectType.ConsumeStructuredBuffer     ||
                 rv.Type == PredefinedObjectType.RasterizerOrderedStructuredBuffer)
-                Write(0);
+                Write((uint)HLSLValueUtils.GetTypeSize(rv.TemplateArguments[0]));
 
             // Mip level count — only when a mip input was given.
             if (hasMipInput)
