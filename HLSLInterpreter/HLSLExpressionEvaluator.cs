@@ -99,6 +99,14 @@ namespace UnityShaderParser.Test
             throw Error($"Unknown function '{name}' called.");
         }
 
+        public HLSLValue CallMethod(StructValue str, string methodName, HLSLValue[] args)
+        {
+            if (TryFindMethod(str.Name, methodName, out var method))
+                return CallMethodNode(str, method, args);
+
+            throw Error($"Unknown method '{methodName}' called.");
+        }
+
         public TypeNode ResolveType(TypeNode type) => context.ResolveType(type);
 
         // Helpers
