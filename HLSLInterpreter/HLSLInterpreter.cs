@@ -110,15 +110,13 @@ namespace UnityShaderParser.Test
 
             expressionEvaluator.CallMethod(mockStruct, "Initialize", Array.Empty<HLSLValue>());
 
-            ResourceValue resource = null;
-
             ResourceGetter getter = (x, y, z, w, mip) => (NumericValue)0;
             ResourceSetter setter = (x, y, z, w, mip, val) => { };
             if (HasMethod("Read"))
             {
                 getter = (x, y, z, w, mip) =>
                 {
-                    var args = new HLSLValue[] { resource, (NumericValue)x, (NumericValue)y, (NumericValue)z, (NumericValue)w, (NumericValue)mip };
+                    var args = new HLSLValue[] { (NumericValue)x, (NumericValue)y, (NumericValue)z, (NumericValue)w, (NumericValue)mip };
                     var res = expressionEvaluator.CallMethod(mockStruct, "Read", args);
                     return res;
                 };
@@ -127,7 +125,7 @@ namespace UnityShaderParser.Test
             {
                 setter = (x, y, z, w, mip, val) =>
                 {
-                    var args = new HLSLValue[] { resource, (NumericValue)x, (NumericValue)y, (NumericValue)z, (NumericValue)w, (NumericValue)mip, val };
+                    var args = new HLSLValue[] { (NumericValue)x, (NumericValue)y, (NumericValue)z, (NumericValue)w, (NumericValue)mip, val };
                     expressionEvaluator.CallMethod(mockStruct, "Write", args);
                 };
             }

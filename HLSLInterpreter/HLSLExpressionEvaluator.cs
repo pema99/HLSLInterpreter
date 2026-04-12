@@ -980,15 +980,16 @@ namespace UnityShaderParser.Test
         public override HLSLValue VisitElementAccessExpressionNode(ElementAccessExpressionNode node)
         {
             HLSLValue arr = Visit(node.Target);
-            ScalarValue target = EvaluateScalar(node.Index);
+            NumericValue numTarget = EvaluateNumeric(node.Index);
+            ScalarValue scalarTarget = numTarget as ScalarValue;
             if (arr is ArrayValue arrValue)
             {
-                if (target.Value.IsVarying)
+                if (scalarTarget.Value.IsVarying)
                 {
                     HLSLValue[] values = new HLSLValue[executionState.GetThreadCount()];
                     for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
                     {
-                        var index = target.Value.Get(threadIndex);
+                        var index = scalarTarget.Value.Get(threadIndex);
                         values[threadIndex] = HLSLValueUtils.Scalarize(arrValue.Values[Convert.ToInt32(index)], threadIndex);
                     }
                     HLSLValue result = HLSLValueUtils.Vectorize(values[0], executionState.GetThreadCount());
@@ -1000,17 +1001,17 @@ namespace UnityShaderParser.Test
                 }
                 else
                 {
-                    return arrValue.Values[Convert.ToInt32(target.Value.UniformValue)];
+                    return arrValue.Values[Convert.ToInt32(scalarTarget.Value.UniformValue)];
                 }
             }
             else if (arr is VectorValue vec)
             {
-                if (target.Value.IsVarying)
+                if (scalarTarget.Value.IsVarying)
                 {
                     HLSLValue[] values = new HLSLValue[executionState.GetThreadCount()];
                     for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
                     {
-                        var index = target.Value.Get(threadIndex);
+                        var index = scalarTarget.Value.Get(threadIndex);
                         values[threadIndex] = HLSLValueUtils.Scalarize(vec[Convert.ToInt32(index)], threadIndex);
                     }
                     HLSLValue result = HLSLValueUtils.Vectorize(values[0], executionState.GetThreadCount());
@@ -1022,17 +1023,17 @@ namespace UnityShaderParser.Test
                 }
                 else
                 {
-                    return vec[Convert.ToInt32(target.Value.UniformValue)];
+                    return vec[Convert.ToInt32(scalarTarget.Value.UniformValue)];
                 }
             }
             else if (arr is MatrixValue mat)
             {
-                if (target.Value.IsVarying)
+                if (scalarTarget.Value.IsVarying)
                 {
                     HLSLValue[] values = new HLSLValue[executionState.GetThreadCount()];
                     for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
                     {
-                        var index = target.Value.Get(threadIndex);
+                        var index = scalarTarget.Value.Get(threadIndex);
                         ScalarValue[] rowVec = new ScalarValue[mat.Columns];
                         for (int i = 0; i < mat.Columns; i++)
                             rowVec[i] = mat[Convert.ToInt32(index), i];
@@ -1049,13 +1050,13 @@ namespace UnityShaderParser.Test
                 {
                     ScalarValue[] rowVec = new ScalarValue[mat.Columns];
                     for (int i = 0; i < mat.Columns; i++)
-                        rowVec[i] = mat[Convert.ToInt32(target.Value.UniformValue), i];
+                        rowVec[i] = mat[Convert.ToInt32(scalarTarget.Value.UniformValue), i];
                     return VectorValue.FromScalars(rowVec);
                 }
             }
             else if (arr is ResourceValue rv)
             {
-                return HLSLIntrinsics.ResourceSubscriptRead(rv, EvaluateNumeric(node.Index));
+                return HLSLIntrinsics.ResourceSubscriptRead(rv, numTarget);
             }
             throw Error(node, "Invalid element access.");
         }
