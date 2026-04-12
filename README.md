@@ -53,7 +53,7 @@ For some more examples, check the test files in [this folder](https://github.com
 
 ## Feature overview
 I estimate that the interpreter supports around 80% of the HLSL language, though several features are still missing. Here's a rough overview of what works:
-- Every arithmetic [operator](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-operators).
+- Every arithmetic [operator](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-operators) including casts.
 - Every [intrinsic](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-intrinsic-functions) which can be mapped reasonably to CPU execution.
   - This includes intrinsics that require simulating multiple threads, like `ddx()/ddy()` and wave intrinsics.
 - All kinds of control flow, including loops and conditionals.
@@ -68,6 +68,8 @@ I estimate that the interpreter supports around 80% of the HLSL language, though
 - Arrays and array indexing.
 - Namespaces.
 - Preprocessor directives and macros.
+- Groupshared memory.
+- Type aliases via `typedef`.
 
 ## Limitations
 The main limitation of the interpreter is that it is very slow - think hundreds or thousands of time slower than running on a GPU. The interpreter is written primarily with correctness in mind, and I've made no attempt to optimize it more than necessary. Don't expect to run interesting shaders at high resolutions without waiting several seconds for a frame! The thread count is configurable, and most usecases will want to run just a few threads.
