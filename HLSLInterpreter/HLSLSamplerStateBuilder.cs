@@ -115,8 +115,7 @@ namespace UnityShaderParser.Test
 
         private static float ParseFloat(ExpressionNode expr, HLSLExpressionEvaluator eval)
         {
-            var val = eval.Visit(expr);
-            if (val is NumericValue num)
+            if (eval.Visit(expr) is NumericValue num)
                 return Convert.ToSingle(num.Cast(ScalarType.Float).GetThreadValue(0));
             return 0f;
         }
