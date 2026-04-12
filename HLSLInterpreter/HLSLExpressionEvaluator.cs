@@ -983,8 +983,72 @@ namespace UnityShaderParser.Test
 
         public override HLSLValue VisitCastExpressionNode(CastExpressionNode node)
         {
-            // TODO: Array cast
-            var numeric = EvaluateNumeric(node.Expression);
+            List<ScalarValue> FlattenToScalars(HLSLValue value, HLSLSyntaxNode errorNode)
+            {
+                if (value is NumericValue num)
+                    return new List<ScalarValue>(num.ToScalars());
+                if (value is ArrayValue arr)
+                    return arr.Values.SelectMany(x => FlattenToScalars(x, errorNode)).ToList();
+                throw Error(errorNode, $"Cannot flatten to scalars for array cast.");
+            }
+
+            HLSLValue PackScalarsToNumeric(IEnumerable<ScalarValue> slice, TypeNode targetType, HLSLSyntaxNode errorNode)
+            {
+                switch (targetType)
+                {
+                    case ScalarTypeNode st:
+                        return slice.First().Cast(st.Kind);
+                    case VectorTypeNode vt:
+                        var castedVec = slice.Select(s => (ScalarValue)s.Cast(vt.Kind)).ToArray();
+                        return VectorValue.FromScalars(castedVec);
+                    case MatrixTypeNode mt:
+                        var castedMat = slice.Select(s => (ScalarValue)s.Cast(mt.Kind)).ToArray();
+                        return MatrixValue.FromScalars(mt.FirstDimension, mt.SecondDimension, castedMat);
+                    default:
+                        throw Error(errorNode, $"Unsupported element type in array cast.");
+                }
+            }
+
+            var sourceValue = Visit(node.Expression);
+            if (sourceValue is ReferenceValue refVal)
+                sourceValue = refVal.Get();
+
+            // If source or target involves an array type, use flatten-then-pack strategy.
+            bool isTargetArray = node.ArrayRanks.Count > 0;
+            if (isTargetArray || sourceValue is ArrayValue)
+            {
+                var flattened = FlattenToScalars(sourceValue, node);
+
+                if (isTargetArray)
+                {
+                    int arrayLen = Convert.ToInt32(EvaluateNumeric(node.ArrayRanks[0].Dimension).GetThreadValue(0));
+                    int components = 0;
+                    switch (node.Kind)
+                    {
+                        case ScalarTypeNode: components = 1; break;
+                        case VectorTypeNode vt: components = vt.Dimension; break;
+                        case MatrixTypeNode mt: components = mt.FirstDimension * mt.SecondDimension; break;
+                        default: throw Error(node, $"Unsupported element type in array cast.");
+                    }
+                    var elements = new HLSLValue[arrayLen];
+                    for (int i = 0; i < arrayLen; i++)
+                    {
+                        int offset = (i * components);
+                        int end = offset + components;
+                        elements[i] = PackScalarsToNumeric(flattened[offset..end], node.Kind, node);
+                    }
+                    return new ArrayValue(elements);
+                }
+                else
+                {
+                    return PackScalarsToNumeric(flattened, node.Kind, node);
+                }
+            }
+
+            // Otherwise, regular numeric cast
+            if (sourceValue is not NumericValue numeric)
+                throw Error(node, $"Expected a numeric expression, but got a {sourceValue.GetType().Name}.");
+
             switch (node.Kind)
             {
                 case ScalarTypeNode scalarType when numeric is ScalarValue scalar:

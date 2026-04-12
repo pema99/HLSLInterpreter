@@ -369,3 +369,132 @@ void Assignment_MatrixScalarBroadcast()
     ASSERT(m[0][0] == 3.0 && m[0][1] == 3.0);
     ASSERT(m[1][0] == 3.0 && m[1][1] == 3.0);
 }
+
+// ============================================================================
+// ARRAY CASTS
+// ============================================================================
+
+// --- TO scalar array ---
+
+[Test]
+void Cast_VectorToFloatArray()
+{
+    float4 v = float4(1.0, 2.0, 3.0, 4.0);
+    float arr[4] = (float[4])v;
+    ASSERT(arr[0] == 1.0 && arr[1] == 2.0 && arr[2] == 3.0 && arr[3] == 4.0);
+}
+
+[Test]
+void Cast_VectorToIntArray()
+{
+    float4 v = float4(1.5, 2.7, 3.9, 4.1);
+    int arr[4] = (int[4])v;
+    ASSERT(arr[0] == 1 && arr[1] == 2 && arr[2] == 3 && arr[3] == 4);
+}
+
+[Test]
+void Cast_FloatScalarArrayToIntArray()
+{
+    float arr[3] = {1.5, 2.7, 3.9};
+    int intArr[3] = (int[3])arr;
+    ASSERT(intArr[0] == 1 && intArr[1] == 2 && intArr[2] == 3);
+}
+
+[Test]
+void Cast_IntArrayToFloatArray()
+{
+    int arr[4] = {10, 20, 30, 40};
+    float fArr[4] = (float[4])arr;
+    ASSERT(fArr[0] == 10.0 && fArr[1] == 20.0 && fArr[2] == 30.0 && fArr[3] == 40.0);
+}
+
+[Test]
+void Cast_MatrixToScalarArray()
+{
+    // float2x3 has 6 components (2 rows, 3 cols)
+    float2x3 m = float2x3(1.0, 2.0, 3.0, 4.0, 5.0, 6.0);
+    float arr[6] = (float[6])m;
+    ASSERT(arr[0] == 1.0 && arr[1] == 2.0 && arr[2] == 3.0);
+    ASSERT(arr[3] == 4.0 && arr[4] == 5.0 && arr[5] == 6.0);
+}
+
+// --- TO vector array ---
+
+[Test]
+void Cast_ScalarArrayToVectorArray()
+{
+    // 6 floats → 2 float3s
+    float src[6] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0};
+    float3 dst[2] = (float3[2])src;
+    ASSERT(dst[0].x == 1.0 && dst[0].y == 2.0 && dst[0].z == 3.0);
+    ASSERT(dst[1].x == 4.0 && dst[1].y == 5.0 && dst[1].z == 6.0);
+}
+
+[Test]
+void Cast_VectorToVectorArray()
+{
+    // float4 (4 components) → float2[2]
+    float4 v = float4(1.0, 2.0, 3.0, 4.0);
+    float2 arr[2] = (float2[2])v;
+    ASSERT(arr[0].x == 1.0 && arr[0].y == 2.0);
+    ASSERT(arr[1].x == 3.0 && arr[1].y == 4.0);
+}
+
+[Test]
+void Cast_VectorArrayToVectorArrayDifferentType()
+{
+    float2 src[2] = {float2(1.5, 2.7), float2(3.9, 4.1)};
+    int2 dst[2] = (int2[2])src;
+    ASSERT(dst[0].x == 1 && dst[0].y == 2);
+    ASSERT(dst[1].x == 3 && dst[1].y == 4);
+}
+
+// --- TO matrix array ---
+
+[Test]
+void Cast_ScalarArrayToMatrixArray()
+{
+    // 8 floats → 2 float2x2 matrices (4 components each)
+    float src[8] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0};
+    float2x2 dst[2] = (float2x2[2])src;
+    ASSERT(dst[0][0][0] == 1.0 && dst[0][0][1] == 2.0);
+    ASSERT(dst[0][1][0] == 3.0 && dst[0][1][1] == 4.0);
+    ASSERT(dst[1][0][0] == 5.0 && dst[1][0][1] == 6.0);
+    ASSERT(dst[1][1][0] == 7.0 && dst[1][1][1] == 8.0);
+}
+
+// --- FROM array to non-array ---
+
+[Test]
+void Cast_ScalarArrayToVector()
+{
+    float arr[4] = {1.0, 2.0, 3.0, 4.0};
+    float4 v = (float4)arr;
+    ASSERT(v.x == 1.0 && v.y == 2.0 && v.z == 3.0 && v.w == 4.0);
+}
+
+[Test]
+void Cast_ScalarArrayToVectorWithTypeChange()
+{
+    float arr[3] = {1.5, 2.7, 3.9};
+    int3 v = (int3)arr;
+    ASSERT(v.x == 1 && v.y == 2 && v.z == 3);
+}
+
+[Test]
+void Cast_ScalarArrayToMatrix()
+{
+    float arr[6] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0};
+    float2x3 m = (float2x3)arr;
+    ASSERT(m[0][0] == 1.0 && m[0][1] == 2.0 && m[0][2] == 3.0);
+    ASSERT(m[1][0] == 4.0 && m[1][1] == 5.0 && m[1][2] == 6.0);
+}
+
+[Test]
+void Cast_VectorArrayToVector()
+{
+    // 2 float2s (4 total components) → float4
+    float2 arr[2] = {float2(1.0, 2.0), float2(3.0, 4.0)};
+    float4 v = (float4)arr;
+    ASSERT(v.x == 1.0 && v.y == 2.0 && v.z == 3.0 && v.w == 4.0);
+}
