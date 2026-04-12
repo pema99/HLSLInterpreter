@@ -139,3 +139,57 @@ void ThisKeyword_AssignmentInVaryingControlFlow_ResetsForSomeThreads()
     ASSERT(WaveReadLaneAt(foo.a, 1) == 1);
     ASSERT(WaveReadLaneAt(foo.b, 1) == 2);
 }
+
+interface Foo
+{
+    int bar();
+};
+
+struct Bar : Foo
+{
+    int a;
+    int bar() { return a; }
+    int bom() { return 5; }
+};
+
+struct Baz : Bar
+{
+    int b;
+    int bar() { return a + bom() + b; }
+};
+
+[Test]
+void CanConstruct_Struct_ImplementingInterface()
+{
+    Bar b;
+    b.a = 1;
+    ASSERT(b.bar() == 1);
+}
+
+[Test]
+void Struct_InheritingFromOtherStruct_InheritsMembers()
+{
+    Baz b;
+    b.a = 1;
+    b.b = 3;
+    ASSERT(b.bar() == 9);
+    ASSERT(b.bom() == 5);
+}
+
+int RunBar(Foo f)
+{
+    return f.bar();
+}
+
+[Test]
+void Struct_ImplementingInterface_CanBePassedAsInterfaceParameter()
+{
+    Bar b;
+    b.a = 1;
+    ASSERT(RunBar(b) == 1);
+
+    Baz c;
+    c.a = 1;
+    c.b = 3;
+    ASSERT(RunBar(c) == 9);
+}

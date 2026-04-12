@@ -91,6 +91,13 @@ namespace UnityShaderParser.Test
                 return ConstructNumericValue(numericAliasType, args.Select(a => (NumericValue)a).ToArray());
             }
 
+            // Try as an implicit this.method() call (e.g. calling an inherited method from within a method body)
+            if (context.GetReference("this")?.Get() is StructValue thisStruct)
+            {
+                if (TryFindMethod(thisStruct.Name, name, out var method) && !method.Modifiers.Contains(BindingModifier.Static))
+                    return InvokeMethod(thisStruct, method, args);
+            }
+
             throw Error($"Unknown function '{name}' called.");
         }
 
@@ -491,6 +498,78 @@ namespace UnityShaderParser.Test
             return value;
         }
 
+        private bool TryFindMethod(string structName, string methodName, out FunctionDefinitionNode function)
+        {
+            function = null;
+
+            var structDef = context.GetStruct(structName);
+            if (structDef == null)
+                return false;
+
+            foreach (var method in structDef.Methods)
+            {
+                if (method is FunctionDefinitionNode func && method.Name.GetName() == methodName)
+                {
+                    function = func;
+                    return true;
+                }
+            }
+
+            foreach (var baseTypeName in structDef.Inherits)
+            {
+                if (TryFindMethod(baseTypeName.GetName(), methodName, out function))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private HLSLValue InvokeMethod(StructValue str, FunctionDefinitionNode method, HLSLValue[] args)
+        {
+            if (args.Length != method.Parameters.Count)
+                throw Error($"Argument count mismatch in call to '{method.Name.GetName()}'.");
+
+            context.PushScope(isFunction: true);
+            context.PushReturn();
+            executionState.PushExecutionMask(ExecutionScope.Function);
+
+            // If this is an instance method, push the fields as local variables, alongside 'this'.
+            if (!method.Modifiers.Contains(BindingModifier.Static))
+            {
+                foreach (string field in str.Members.Keys)
+                {
+                    context.AddVariable(field, new ReferenceValue(
+                        () => str.Members[field],
+                        val => str.Members[field] = val));
+                }
+
+                context.AddVariable("this", new ReferenceValue(
+                    () => str,
+                    newVal =>
+                    {
+                        if (newVal is StructValue newStruct)
+                        {
+                            foreach (var kvp in newStruct.Members)
+                            {
+                                str.Members[kvp.Key] = kvp.Value;
+                            }
+                        }
+                    }));
+            }
+
+            for (int i = 0; i < method.Parameters.Count; i++)
+            {
+                var param = method.Parameters[i];
+                context.AddVariable(param.Declarator.Name, HLSLValueUtils.CastForParameter(this, args[i], param.ParamType));
+            }
+            interpreter.Visit(method.Body);
+
+            executionState.PopExecutionMask();
+            context.PopScope();
+
+            return context.PopReturn();
+        }
+
         // Visit implementation
         protected override HLSLValue DefaultVisit(HLSLSyntaxNode node)
         {
@@ -781,7 +860,7 @@ namespace UnityShaderParser.Test
                 throw Error(node.Target, "Expected a struct or numeric type for field access.");
             return targetStruct.Members[node.Name];
         }
-        
+
         public override HLSLValue VisitMethodCallExpressionNode(MethodCallExpressionNode node)
         {
             HLSLValue[] args = new HLSLValue[node.Arguments.Count];
@@ -793,68 +872,20 @@ namespace UnityShaderParser.Test
             var target = Visit(node.Target);
             if (target is StructValue str)
             {
-                var methods = context.GetStruct(str.Name).Methods;
-                foreach (var method in methods)
+                if (TryFindMethod(str.Name, node.Name.Identifier, out var method))
                 {
-                    if (method.Name.GetName() == node.Name.Identifier)
+                    // Handle out/inout parameters
+                    for (int i = 0; i < args.Length; i++)
                     {
-                        // Handle out/inout parameters
-                        for (int i = 0; i < args.Length; i++)
+                        if (method.Parameters[i].Modifiers.Contains(BindingModifier.Inout) ||
+                            method.Parameters[i].Modifiers.Contains(BindingModifier.Out))
                         {
-                            if (method.Parameters[i].Modifiers.Contains(BindingModifier.Inout) ||
-                                method.Parameters[i].Modifiers.Contains(BindingModifier.Out))
-                            {
-                                if (TryGetLValueReference(node.Arguments[i], out var lvalRef))
-                                    args[i] = lvalRef;
-                            }
+                            if (TryGetLValueReference(node.Arguments[i], out var lvalRef))
+                                args[i] = lvalRef;
                         }
-
-                        if (args.Length != method.Parameters.Count)
-                            throw Error($"Argument count mismatch in call to '{method}'.");
-
-                        context.PushScope(isFunction: true);
-                        context.PushReturn();
-                        executionState.PushExecutionMask(ExecutionScope.Function);
-
-                        // Push local state as references
-                        if (!method.Modifiers.Contains(BindingModifier.Static))
-                        {
-                            foreach (string field in str.Members.Keys)
-                            {
-                                context.AddVariable(field, new ReferenceValue(
-                                    () => str.Members[field],
-                                    val => str.Members[field] = val));
-                            }
-
-                            // Push 'this' as a reference to the whole struct instance.
-                            // The setter handles `this = value` by copying all members in-place.
-                            context.AddVariable("this", new ReferenceValue(
-                                () => str,
-                                newVal =>
-                                {
-                                    if (newVal is StructValue newStruct)
-                                    {
-                                        foreach (var kvp in newStruct.Members)
-                                        {
-                                            str.Members[kvp.Key] = kvp.Value;
-                                        }
-                                    }
-                                }));
-                        }
-
-                        for (int i = 0; i < method.Parameters.Count; i++)
-                        {
-                            var param = method.Parameters[i];
-                            var declarator = param.Declarator;
-                            context.AddVariable(declarator.Name, HLSLValueUtils.CastForParameter(this, args[i], param.ParamType));
-                        }
-                        interpreter.Visit(((FunctionDefinitionNode)method).Body);
-
-                        executionState.PopExecutionMask();
-                        context.PopScope();
-
-                        return context.PopReturn();
                     }
+
+                    return InvokeMethod(str, method, args);
                 }
 
                 throw Error(node, $"Couldn't find method '{node.Name.Identifier}' on type '{str.Name}'.");

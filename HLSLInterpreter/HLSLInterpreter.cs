@@ -308,17 +308,36 @@ namespace UnityShaderParser.Test
                 }
             }
         }
-        
-        internal StructValue CreateStructValue(StructTypeNode structType)
+
+        // Returns all fields in declaration order: inherited fields first (skipping interfaces), then own fields.
+        private IEnumerable<(TypeNode Kind, VariableDeclaratorNode Decl)> GetStructFields(StructTypeNode structType)
         {
-            // TODO: Inheritance
-            Dictionary<string, HLSLValue> members = new Dictionary<string, HLSLValue>();
+            foreach (var baseTypeName in structType.Inherits)
+            {
+                var baseStruct = context.GetStruct(baseTypeName.GetName());
+                if (baseStruct != null)
+                {
+                    foreach (var kv in GetStructFields(baseStruct))
+                    {
+                        yield return kv;
+                    }
+                }
+            }
             foreach (var field in structType.Fields)
             {
                 foreach (var decl in field.Declarators)
                 {
-                    members[decl.Name] = GetVariableDeclarationInitialValue(field.Kind, decl);
+                    yield return (field.Kind, decl);
                 }
+            }
+        }
+
+        internal StructValue CreateStructValue(StructTypeNode structType)
+        {
+            Dictionary<string, HLSLValue> members = new Dictionary<string, HLSLValue>();
+            foreach (var (kind, decl) in GetStructFields(structType))
+            {
+                members[decl.Name] = GetVariableDeclarationInitialValue(kind, decl);
             }
             return new StructValue(context.GetQualifiedName(structType.Name.GetName()), members);
         }
@@ -326,32 +345,29 @@ namespace UnityShaderParser.Test
         internal StructValue CreateStructValueFilledWith(StructTypeNode structType, NumericValue fillValue)
         {
             Dictionary<string, HLSLValue> members = new Dictionary<string, HLSLValue>();
-            foreach (var field in structType.Fields)
+            foreach (var (kind, decl) in GetStructFields(structType))
             {
-                foreach (var decl in field.Declarators)
+                HLSLValue fieldValue;
+                switch (kind)
                 {
-                    HLSLValue fieldValue;
-                    switch (field.Kind)
-                    {
-                        case ScalarTypeNode scalarType:
-                            fieldValue = fillValue.Cast(scalarType.Kind);
-                            break;
-                        case VectorTypeNode vectorType:
-                            fieldValue = fillValue.Cast(vectorType.Kind).BroadcastToVector(vectorType.Dimension);
-                            break;
-                        case MatrixTypeNode matrixType:
-                            fieldValue = fillValue.Cast(matrixType.Kind).BroadcastToMatrix(matrixType.FirstDimension, matrixType.SecondDimension);
-                            break;
-                        case UserDefinedNamedTypeNode namedType:
-                            var nestedStruct = context.GetStruct(namedType.GetName());
-                            fieldValue = CreateStructValueFilledWith(nestedStruct, fillValue);
-                            break;
-                        default:
-                            fieldValue = GetVariableDeclarationInitialValue(field.Kind, decl);
-                            break;
-                    }
-                    members[decl.Name] = fieldValue;
+                    case ScalarTypeNode scalarType:
+                        fieldValue = fillValue.Cast(scalarType.Kind);
+                        break;
+                    case VectorTypeNode vectorType:
+                        fieldValue = fillValue.Cast(vectorType.Kind).BroadcastToVector(vectorType.Dimension);
+                        break;
+                    case MatrixTypeNode matrixType:
+                        fieldValue = fillValue.Cast(matrixType.Kind).BroadcastToMatrix(matrixType.FirstDimension, matrixType.SecondDimension);
+                        break;
+                    case UserDefinedNamedTypeNode namedType:
+                        var nestedStruct = context.GetStruct(namedType.GetName());
+                        fieldValue = CreateStructValueFilledWith(nestedStruct, fillValue);
+                        break;
+                    default:
+                        fieldValue = GetVariableDeclarationInitialValue(kind, decl);
+                        break;
                 }
+                members[decl.Name] = fieldValue;
             }
             return new StructValue(context.GetQualifiedName(structType.Name.GetName()), members);
         }
@@ -365,21 +381,18 @@ namespace UnityShaderParser.Test
         private StructValue CreateStructValueFromArray(StructTypeNode structType, HLSLValue[] values, ref int offset)
         {
             var members = new Dictionary<string, HLSLValue>();
-            foreach (var field in structType.Fields)
+            foreach (var (kind, decl) in GetStructFields(structType))
             {
-                foreach (var decl in field.Declarators)
+                if (kind is UserDefinedNamedTypeNode namedType)
                 {
-                    if (field.Kind is UserDefinedNamedTypeNode namedType)
-                    {
-                        var nestedStruct = context.GetStruct(namedType.GetName());
-                        members[decl.Name] = CreateStructValueFromArray(nestedStruct, values, ref offset);
-                    }
-                    else
-                    {
-                        members[decl.Name] = offset < values.Length
-                            ? values[offset++]
-                            : GetVariableDeclarationInitialValue(field.Kind, decl);
-                    }
+                    var nestedStruct = context.GetStruct(namedType.GetName());
+                    members[decl.Name] = CreateStructValueFromArray(nestedStruct, values, ref offset);
+                }
+                else
+                {
+                    members[decl.Name] = offset < values.Length
+                        ? values[offset++]
+                        : GetVariableDeclarationInitialValue(kind, decl);
                 }
             }
             return new StructValue(context.GetQualifiedName(structType.Name.GetName()), members);
