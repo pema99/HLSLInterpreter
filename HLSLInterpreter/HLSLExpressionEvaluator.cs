@@ -94,7 +94,7 @@ namespace UnityShaderParser.Test
             // Try as an implicit this.method() call (e.g. calling an inherited method from within a method body)
             if (context.GetReference("this")?.Get() is StructValue thisStruct)
             {
-                if (TryFindMethod(thisStruct.Name, name, out var method) && !method.Modifiers.Contains(BindingModifier.Static))
+                if (TryFindMethod(thisStruct.Name, name, out var method))
                     return InvokeMethod(thisStruct, method, args);
             }
 
@@ -517,8 +517,17 @@ namespace UnityShaderParser.Test
 
             foreach (var baseTypeName in structDef.Inherits)
             {
-                if (TryFindMethod(baseTypeName.GetName(), methodName, out function))
+                string baseName = baseTypeName.GetName();
+                if (TryFindMethod(baseName, methodName, out function))
                     return true;
+
+                // Couldn't find method, try with qualified name.
+                if (structName.Contains("::"))
+                {
+                    string namespacePrefix = structName.Substring(0, structName.LastIndexOf("::"));
+                    if (TryFindMethod($"{namespacePrefix}::{baseName}", methodName, out function))
+                        return true;
+                }
             }
 
             return false;

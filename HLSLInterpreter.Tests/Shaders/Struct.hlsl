@@ -193,3 +193,123 @@ void Struct_ImplementingInterface_CanBePassedAsInterfaceParameter()
     c.b = 3;
     ASSERT(RunBar(c) == 9);
 }
+
+// --- Inherited static methods ---
+
+struct Vehicle
+{
+    int speed;
+
+    static int GetCategory() { return 7; }
+
+    int GetSpeed() { return speed; }
+
+    // Calls inherited static GetCategory() and own GetSpeed() from within a method
+    int Describe() { return GetCategory() * 100 + GetSpeed(); }
+};
+
+struct Car : Vehicle
+{
+    int doors;
+};
+
+struct Truck : Car
+{
+    int payload;
+};
+
+[Test]
+void InheritedStaticMethod_CalledDirectlyOnBase()
+{
+    ASSERT(Vehicle::GetCategory() == 7);
+}
+
+[Test]
+void InheritedInstanceMethod_CalledOnDerivedStruct()
+{
+    Car c;
+    c.speed = 5;
+    c.doors = 4;
+    ASSERT(c.GetSpeed() == 5);
+}
+
+[Test]
+void InheritedMethod_CallsImplicitStaticFromBody()
+{
+    // Describe() is inherited from Vehicle; it calls GetCategory() (static) + GetSpeed() (instance)
+    Car c;
+    c.speed = 3;
+    ASSERT(c.Describe() == 703); // 7*100 + 3
+}
+
+[Test]
+void DeepInheritance_InheritsFieldsAndMethods()
+{
+    Truck t;
+    t.speed = 9;
+    t.doors = 2;
+    t.payload = 1000;
+    ASSERT(t.GetSpeed() == 9);
+    ASSERT(t.Describe() == 709); // 7*100 + 9
+}
+
+// --- Namespace + struct inheritance ---
+
+namespace Shapes
+{
+    struct Shape
+    {
+        int color;
+        static int GetDimensions() { return 2; }
+        int GetColor() { return color; }
+    };
+
+    struct Circle : Shape
+    {
+        int radius;
+        int Area() { return radius * radius; } // simplified: r*r instead of pi*r*r
+    };
+
+    struct LabeledCircle : Circle
+    {
+        int label;
+    };
+}
+
+[Test]
+void Namespace_InheritedFields_AreAccessible()
+{
+    Shapes::Circle c;
+    c.color = 5;
+    c.radius = 3;
+    ASSERT(c.color == 5);
+    ASSERT(c.radius == 3);
+}
+
+[Test]
+void Namespace_InheritedInstanceMethod_Works()
+{
+    Shapes::Circle c;
+    c.color = 5;
+    c.radius = 3;
+    ASSERT(c.GetColor() == 5);
+    ASSERT(c.Area() == 9);
+}
+
+[Test]
+void Namespace_InheritedStaticMethod_CalledOnBase()
+{
+    ASSERT(Shapes::Shape::GetDimensions() == 2);
+}
+
+[Test]
+void Namespace_DeepInheritance_InheritsAllFields()
+{
+    Shapes::LabeledCircle lc;
+    lc.color = 1;
+    lc.radius = 4;
+    lc.label = 99;
+    ASSERT(lc.GetColor() == 1);
+    ASSERT(lc.Area() == 16);
+    ASSERT(lc.label == 99);
+}
