@@ -1123,6 +1123,10 @@ namespace UnityShaderParser.Test
             return HLSLIntrinsics.Select(cond, left, right);
         }
 
-        public override HLSLValue VisitSamplerStateLiteralExpressionNode(SamplerStateLiteralExpressionNode node) => throw new NotImplementedException();
+        public override HLSLValue VisitSamplerStateLiteralExpressionNode(SamplerStateLiteralExpressionNode node)
+        {
+            // Legacy sampler_state { ... } syntax is always a non-comparison sampler.
+            return HLSLSamplerStateBuilder.Build(false, node.States, this);
+        }
     }
 }

@@ -8,12 +8,6 @@ namespace UnityShaderParser.Test
 {
     // TODO:
     //
-    // Statements:
-    //     public class StatePropertyNode : StatementNode
-    //
-    // Expressions:
-    //     VisitSamplerStateLiteralExpressionNode
-    //
     // Semantics support
     // More test attributes
     // Texture/StructuredBuffer
@@ -150,10 +144,8 @@ namespace UnityShaderParser.Test
             type = context.ResolveType(type);
             bool isArray = decl.ArrayRanks.Count > 0;
             int arrayLength = isArray ? Convert.ToInt32(EvaluateNumeric(decl.ArrayRanks[0].Dimension).GetThreadValue(0)) : 0;
-
-            // TODO: StateInitializer, StateArrayInitializer
-            var initializer = decl.Initializer as ValueInitializerNode;
-            if (initializer != null)
+            
+            if (decl.Initializer is ValueInitializerNode initializer)
             {
                 HLSLValue initializerValue;
                 if (type is NumericTypeNode numericType && !isArray)
@@ -213,6 +205,16 @@ namespace UnityShaderParser.Test
 
                 return initializerValue;
             }
+            else if (decl.Initializer is StateInitializerNode stateInit)
+            {
+                bool isCmp = type is PredefinedObjectTypeNode pot && pot.Kind == PredefinedObjectType.SamplerComparisonState;
+                return HLSLSamplerStateBuilder.Build(isCmp, stateInit.States, expressionEvaluator);
+            }
+            else if (decl.Initializer is StateArrayInitializerNode stateArrayInit && stateArrayInit.Initializers.Count > 0)
+            {
+                bool isCmp = type is PredefinedObjectTypeNode pot && pot.Kind == PredefinedObjectType.SamplerComparisonState;
+                return HLSLSamplerStateBuilder.Build(isCmp, stateArrayInit.Initializers[0].States, expressionEvaluator);
+            }
             else
             {
                 HLSLValue defaultValue;
@@ -232,7 +234,7 @@ namespace UnityShaderParser.Test
                     case QualifiedNamedTypeNode qualifiedNamedTypeNodeType:
                         string fullName = qualifiedNamedTypeNodeType.GetName();
                         string[] namespaces = fullName.Split("::");
-                        for (int i = 0; i < namespaces.Length-1; i++)
+                        for (int i = 0; i < namespaces.Length - 1; i++)
                             context.EnterNamespace(namespaces[i]);
 
                         var qualNamedStruct = context.GetStruct(qualifiedNamedTypeNodeType.GetName());
@@ -264,6 +266,7 @@ namespace UnityShaderParser.Test
                         // TODO: More types
                         switch (predefinedObjectType.Kind)
                         {
+                            case PredefinedObjectType.Sampler:
                             case PredefinedObjectType.SamplerState:
                                 defaultValue = new SamplerStateValue(false);
                                 break;
