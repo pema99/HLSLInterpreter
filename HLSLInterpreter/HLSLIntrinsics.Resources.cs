@@ -258,6 +258,52 @@ namespace UnityShaderParser.Test
             return false;
         }
 
+        // res[coord]
+        public static HLSLValue ResourceSubscriptRead(ResourceValue rv, NumericValue coord)
+        {
+            int dim = rv.Dimension;
+            int coordCount = dim + (rv.IsArray ? 1 : 0);
+            var vecCoord = CastToVector(coord.Cast(ScalarType.Int), coordCount);
+            var scalarCoord = vecCoord.ToScalars();
+            int threadCount = vecCoord.ThreadCount;
+            var results = new HLSLValue[threadCount];
+            for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
+            {
+                int x = dim >= 1 ? Convert.ToInt32(scalarCoord[0].GetThreadValue(threadIndex)) : 0;
+                int y = dim >= 2 ? Convert.ToInt32(scalarCoord[1].GetThreadValue(threadIndex)) : 0;
+                int z = dim >= 3 ? Convert.ToInt32(scalarCoord[2].GetThreadValue(threadIndex)) : 0;
+                if (rv.IsArray)
+                {
+                    int slice = Convert.ToInt32(scalarCoord[dim].GetThreadValue(threadIndex));
+                    if (dim == 1) y = slice; else z = slice;
+                }
+                results[threadIndex] = HLSLValueUtils.Scalarize(rv.Get(x, y, z, 0, 0), threadIndex);
+            }
+            return HLSLValueUtils.MergeThreadValues(results);
+        }
+
+        // res[coord] = value
+        public static void ResourceSubscriptWrite(ResourceValue rv, NumericValue coord, NumericValue value)
+        {
+            int dim = rv.Dimension;
+            int coordCount = dim + (rv.IsArray ? 1 : 0);
+            var vecCoord = CastToVector(coord.Cast(ScalarType.Int), coordCount);
+            var scalarCoord = vecCoord.ToScalars();
+            int threadCount = Math.Max(vecCoord.ThreadCount, value.ThreadCount);
+            for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
+            {
+                int x = dim >= 1 ? Convert.ToInt32(scalarCoord[0].GetThreadValue(threadIndex)) : 0;
+                int y = dim >= 2 ? Convert.ToInt32(scalarCoord[1].GetThreadValue(threadIndex)) : 0;
+                int z = dim >= 3 ? Convert.ToInt32(scalarCoord[2].GetThreadValue(threadIndex)) : 0;
+                if (rv.IsArray)
+                {
+                    int slice = Convert.ToInt32(scalarCoord[dim].GetThreadValue(threadIndex));
+                    if (dim == 1) y = slice; else z = slice;
+                }
+                rv.Set(x, y, z, 0, 0, HLSLValueUtils.Scalarize(value, threadIndex));
+            }
+        }
+
         public static HLSLValue Load(ResourceValue rv, NumericValue location, NumericValue offset = null)
             => LoadCore(rv, location, offset, hasMip: rv.IsTexture && !rv.IsWriteable);
 
