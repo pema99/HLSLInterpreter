@@ -42,9 +42,6 @@ namespace UnityShaderParser.Test
             void StubN(string name, int minArgs, int maxArgs) =>
                 AddN(name, minArgs, maxArgs, NotImplementedMethod(name));
 
-            void Stub(string name, int argCount) =>
-                Add(name, argCount, NotImplementedMethod(name));
-
             // ==================== Load ====================
             // Load(intN location [, intN offset [, out uint status]])
             //   Non-MS: location encodes (x [,y [,z]] [, arraySlice] [, mipLevel]).
@@ -77,31 +74,25 @@ namespace UnityShaderParser.Test
             // ==================== Load2 / Load3 / Load4 ====================
             // ByteAddressBuffer / RWByteAddressBuffer: load 2/3/4 consecutive uints from a byte offset.
             // Each element occupies 4 bytes (DWORD-aligned).
-            AddN("Load2", 1, 2, (state, rv, args) =>
+            foreach (int n in new[] { 2, 3, 4 })
             {
-                var r = LoadN(rv, (NumericValue)args[0], 2);
-                if (args.Length > 1 && args[1] is ReferenceValue sr) sr.Set((NumericValue)(uint)0);
-                return r;
-            });
-            AddN("Load3", 1, 2, (state, rv, args) =>
-            {
-                var r = LoadN(rv, (NumericValue)args[0], 3);
-                if (args.Length > 1 && args[1] is ReferenceValue sr) sr.Set((NumericValue)(uint)0);
-                return r;
-            });
-            AddN("Load4", 1, 2, (state, rv, args) =>
-            {
-                var r = LoadN(rv, (NumericValue)args[0], 4);
-                if (args.Length > 1 && args[1] is ReferenceValue sr) sr.Set((NumericValue)(uint)0);
-                return r;
-            });
+                int count = n;
+                AddN($"Load{count}", 1, 2, (state, rv, args) =>
+                {
+                    var r = LoadN(rv, (NumericValue)args[0], count);
+                    if (args.Length > 1 && args[1] is ReferenceValue sr) sr.Set((NumericValue)(uint)0);
+                    return r;
+                });
+            }
 
             // ==================== Store / Store2 / Store3 / Store4 ====================
             // RWByteAddressBuffer: store value(s) at a byte offset.
-            Stub("Store",  2);
-            Stub("Store2", 2);
-            Stub("Store3", 2);
-            Stub("Store4", 2);
+            foreach (int n in new[] { 1, 2, 3, 4 })
+            {
+                int count = n;
+                string suffix = count == 1 ? "" : count.ToString();
+                Add($"Store{suffix}", 2, (state, rv, args) => { StoreN(rv, (NumericValue)args[0], (NumericValue)args[1], count); return null; });
+            }
 
             // ==================== Sample ====================
             // Sample(sampler, uv [, offset [, clamp [, out status]]])
@@ -196,16 +187,16 @@ namespace UnityShaderParser.Test
             // Always samples at mip 0. Returns one channel from each of the four bilinear-footprint
             // texels as float4. Output: .x=(u0,v1), .y=(u1,v1), .z=(u1,v0), .w=(u0,v0).
 
-            // Gather: 2–4 args — returns channel 0 (red/first).
-            AddN("Gather", 2, 4, (state, rv, args) =>
+            // Gather returns channel 0 with no 4-offset variant.
+            // GatherRed/Green/Blue/Alpha additionally support the 4-offset variant (6–7 args).
+            foreach ((string gName, int gCh, bool has4Offset) in new (string, int, bool)[]
             {
-                var offset = args.Length >= 3 && args[2] is not ReferenceValue ? (NumericValue)args[2] : null;
-                return GatherCore(rv, (NumericValue)args[1], 0, uniformOffset: offset);
-            });
-
-            // GatherRed/Green/Blue/Alpha: 2–4 args (basic) or 6–7 args (4-offset variant).
-            foreach ((string gName, int gCh) in new (string, int)[]
-                { ("GatherRed", 0), ("GatherGreen", 1), ("GatherBlue", 2), ("GatherAlpha", 3) })
+                ("Gather",      0, false),
+                ("GatherRed",   0, true),
+                ("GatherGreen", 1, true),
+                ("GatherBlue",  2, true),
+                ("GatherAlpha", 3, true),
+            })
             {
                 int ch = gCh;
                 AddN(gName, 2, 4, (state, rv, args) =>
@@ -213,28 +204,30 @@ namespace UnityShaderParser.Test
                     var offset = args.Length >= 3 && args[2] is not ReferenceValue ? (NumericValue)args[2] : null;
                     return GatherCore(rv, (NumericValue)args[1], ch, uniformOffset: offset);
                 });
-                // 4-offset: each corner gets its own offset (o0→.x, o1→.y, o2→.z, o3→.w).
-                AddN(gName, 6, 7, (state, rv, args) =>
-                    GatherCore(rv, (NumericValue)args[1], ch,
-                        cornerOffsets: new[] { (NumericValue)args[2], (NumericValue)args[3],
-                                               (NumericValue)args[4], (NumericValue)args[5] }));
-                Add(gName, 5, NotImplementedMethod(gName)); // not a valid HLSL overload
+                if (has4Offset)
+                {
+                    // 4-offset variant: each corner gets its own offset (o0→.x, o1→.y, o2→.z, o3→.w).
+                    AddN(gName, 6, 7, (state, rv, args) =>
+                        GatherCore(rv, (NumericValue)args[1], ch,
+                            cornerOffsets: new[] { (NumericValue)args[2], (NumericValue)args[3],
+                                                   (NumericValue)args[4], (NumericValue)args[5] }));
+                    Add(gName, 5, NotImplementedMethod(gName)); // not a valid HLSL overload
+                }
             }
 
             // GatherRaw: not a standard HLSL intrinsic — keep as stub.
             StubN("GatherRaw", 2, 7);
 
-            // GatherCmp: 3–5 args — compares channel 0 of each texel against the reference value.
-            AddN("GatherCmp", 3, 5, (state, rv, args) =>
+            // GatherCmp returns channel 0 with no 4-offset variant.
+            // GatherCmpRed/Green/Blue/Alpha additionally support the 4-offset variant (7–8 args).
+            foreach ((string gName, int gCh, bool has4Offset) in new (string, int, bool)[]
             {
-                var offset = args.Length >= 4 && args[3] is not ReferenceValue ? (NumericValue)args[3] : null;
-                return GatherCore(rv, (NumericValue)args[1], 0, uniformOffset: offset,
-                    comparisonSampler: (SamplerStateValue)args[0], comparisonValue: (NumericValue)args[2]);
-            });
-
-            // GatherCmpRed/Green/Blue/Alpha: 3–5 args (basic) or 7–8 args (4-offset variant).
-            foreach ((string gName, int gCh) in new (string, int)[]
-                { ("GatherCmpRed", 0), ("GatherCmpGreen", 1), ("GatherCmpBlue", 2), ("GatherCmpAlpha", 3) })
+                ("GatherCmp",      0, false),
+                ("GatherCmpRed",   0, true),
+                ("GatherCmpGreen", 1, true),
+                ("GatherCmpBlue",  2, true),
+                ("GatherCmpAlpha", 3, true),
+            })
             {
                 int ch = gCh;
                 AddN(gName, 3, 5, (state, rv, args) =>
@@ -243,12 +236,15 @@ namespace UnityShaderParser.Test
                     return GatherCore(rv, (NumericValue)args[1], ch, uniformOffset: offset,
                         comparisonSampler: (SamplerStateValue)args[0], comparisonValue: (NumericValue)args[2]);
                 });
-                AddN(gName, 7, 8, (state, rv, args) =>
-                    GatherCore(rv, (NumericValue)args[1], ch,
-                        cornerOffsets: new[] { (NumericValue)args[3], (NumericValue)args[4],
-                                               (NumericValue)args[5], (NumericValue)args[6] },
-                        comparisonSampler: (SamplerStateValue)args[0], comparisonValue: (NumericValue)args[2]));
-                Add(gName, 6, NotImplementedMethod(gName)); // not a valid HLSL overload
+                if (has4Offset)
+                {
+                    AddN(gName, 7, 8, (state, rv, args) =>
+                        GatherCore(rv, (NumericValue)args[1], ch,
+                            cornerOffsets: new[] { (NumericValue)args[3], (NumericValue)args[4],
+                                                   (NumericValue)args[5], (NumericValue)args[6] },
+                            comparisonSampler: (SamplerStateValue)args[0], comparisonValue: (NumericValue)args[2]));
+                    Add(gName, 6, NotImplementedMethod(gName)); // not a valid HLSL overload
+                }
             }
 
             // ==================== GetDimensions ====================
@@ -277,35 +273,37 @@ namespace UnityShaderParser.Test
             Add("DecrementCounter", 0, (state, rv, args) => (NumericValue)(uint)--rv.Counter);
 
             // ==================== RWByteAddressBuffer Interlocked operations ====================
-            // Basic:         InterlockedOp(byteOffset, value [, out original])
-            foreach (string name in new[] {
-                "InterlockedAdd", "InterlockedAdd64",
-                "InterlockedMin", "InterlockedMin64",
-                "InterlockedMax", "InterlockedMax64",
-                "InterlockedAnd", "InterlockedAnd64",
-                "InterlockedOr",  "InterlockedOr64",
-                "InterlockedXor", "InterlockedXor64" })
-            {
-                StubN(name, 2, 3);
-            }
-            // Compare-store: InterlockedCompare*(byteOffset, compare, value)
-            foreach (string name in new[] {
-                "InterlockedCompareStore", "InterlockedCompareStore64", "InterlockedCompareStoreFloatBitwise" })
-            {
-                Stub(name, 3);
-            }
-            // Exchange:      Interlocked*Exchange*(byteOffset, value, out original)
-            foreach (string name in new[] {
-                "InterlockedExchange", "InterlockedExchange64", "InterlockedExchangeFloat" })
-            {
-                Stub(name, 3);
-            }
-            // Compare-exchange: InterlockedCompareExchange*(byteOffset, compare, value, out original)
-            foreach (string name in new[] {
-                "InterlockedCompareExchange", "InterlockedCompareExchange64", "InterlockedCompareExchangeFloatBitwise" })
-            {
-                Stub(name, 4);
-            }
+            // Single-thread assumption: no actual atomicity needed — each op is a plain read-modify-write.
+
+            // Basic: InterlockedOp(byteOffset, value [, out original])
+            AddN("InterlockedAdd", 2, 3, (state, rv, args) => { InterlockedRMW32(rv, args, (a, b) => a + b); return null; });
+            AddN("InterlockedMin", 2, 3, (state, rv, args) => { InterlockedRMW32(rv, args, (a, b) => (int)a < (int)b ? a : b); return null; });
+            AddN("InterlockedMax", 2, 3, (state, rv, args) => { InterlockedRMW32(rv, args, (a, b) => (int)a > (int)b ? a : b); return null; });
+            AddN("InterlockedAnd", 2, 3, (state, rv, args) => { InterlockedRMW32(rv, args, (a, b) => a & b); return null; });
+            AddN("InterlockedOr",  2, 3, (state, rv, args) => { InterlockedRMW32(rv, args, (a, b) => a | b); return null; });
+            AddN("InterlockedXor", 2, 3, (state, rv, args) => { InterlockedRMW32(rv, args, (a, b) => a ^ b); return null; });
+
+            // 64-bit variants: same operations on two consecutive 32-bit slots packed as ulong.
+            AddN("InterlockedAdd64", 2, 3, (state, rv, args) => { InterlockedRMW64(rv, args, (a, b) => a + b); return null; });
+            AddN("InterlockedMin64", 2, 3, (state, rv, args) => { InterlockedRMW64(rv, args, (a, b) => (long)a < (long)b ? a : b); return null; });
+            AddN("InterlockedMax64", 2, 3, (state, rv, args) => { InterlockedRMW64(rv, args, (a, b) => (long)a > (long)b ? a : b); return null; });
+            AddN("InterlockedAnd64", 2, 3, (state, rv, args) => { InterlockedRMW64(rv, args, (a, b) => a & b); return null; });
+            AddN("InterlockedOr64",  2, 3, (state, rv, args) => { InterlockedRMW64(rv, args, (a, b) => a | b); return null; });
+            AddN("InterlockedXor64", 2, 3, (state, rv, args) => { InterlockedRMW64(rv, args, (a, b) => a ^ b); return null; });
+
+            // Exchange: InterlockedExchange(byteOffset, value, out original) — identity RMW, always captures original.
+            Add("InterlockedExchange",      3, (state, rv, args) => { InterlockedRMW32(rv, args, (_, b) => b); return null; });
+            Add("InterlockedExchange64",    3, (state, rv, args) => { InterlockedRMW64(rv, args, (_, b) => b); return null; });
+            Add("InterlockedExchangeFloat", 3, (state, rv, args) => { InterlockedExchangeFloat(rv, args); return null; });
+
+            // Compare-store and compare-exchange share the same implementation — the out param is
+            // detected by args.Length. InterlockedCompareStore has 3 args (no out); InterlockedCompareExchange has 4 (with out).
+            Add("InterlockedCompareStore",              3, (state, rv, args) => { InterlockedCmpStore32(rv, args);    return null; });
+            Add("InterlockedCompareStore64",            3, (state, rv, args) => { InterlockedCmpStore64(rv, args);    return null; });
+            Add("InterlockedCompareStoreFloatBitwise",  3, (state, rv, args) => { InterlockedCmpStoreFloat(rv, args); return null; });
+            Add("InterlockedCompareExchange",                 4, (state, rv, args) => { InterlockedCmpStore32(rv, args);    return null; });
+            Add("InterlockedCompareExchange64",               4, (state, rv, args) => { InterlockedCmpStore64(rv, args);    return null; });
+            Add("InterlockedCompareExchangeFloatBitwise",     4, (state, rv, args) => { InterlockedCmpStoreFloat(rv, args); return null; });
 
             return table;
         }
@@ -362,6 +360,186 @@ namespace UnityShaderParser.Test
             }
 
             return (NumericValue)HLSLValueUtils.MergeThreadValues(results);
+        }
+
+        // Stores N consecutive uints starting at byteOffset (4 bytes apart).
+        // Used by RWByteAddressBuffer.Store / Store2 / Store3 / Store4.
+        private static void StoreN(ResourceValue rv, NumericValue byteOffset, NumericValue value, int count)
+        {
+            var scalarOff = CastToScalar(byteOffset.Cast(ScalarType.Int));
+            var vec = CastToVector(value.Cast(ScalarType.Uint), count);
+            int threadCount = scalarOff.ThreadCount;
+            for (int t = 0; t < threadCount; t++)
+            {
+                int baseOff = Convert.ToInt32(scalarOff.GetThreadValue(t));
+                for (int i = 0; i < count; i++)
+                {
+                    var raw = vec[i].GetThreadValue(t);
+                    rv.Set(baseOff + i * 4, 0, 0, 0, 0, new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR(raw)));
+                }
+            }
+        }
+
+        // Reads a single uint at the given byte offset from the buffer.
+        private static uint ReadUint32(ResourceValue rv, int byteOff)
+        {
+            var v = (NumericValue)rv.Get(byteOff, 0, 0, 0, 0);
+            return Convert.ToUInt32(CastToScalar(v.Cast(ScalarType.Uint)).GetThreadValue(0));
+        }
+
+        // Writes a single uint at the given byte offset into the buffer.
+        private static void WriteUint32(ResourceValue rv, int byteOff, uint value) =>
+            rv.Set(byteOff, 0, 0, 0, 0, new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR(value)));
+
+        // Reads two consecutive uint slots as a packed ulong (low word at byteOff, high word at byteOff+4).
+        private static ulong ReadUint64(ResourceValue rv, int byteOff)
+        {
+            ulong lo = ReadUint32(rv, byteOff);
+            ulong hi = ReadUint32(rv, byteOff + 4);
+            return lo | (hi << 32);
+        }
+
+        // Writes a ulong as two consecutive uint slots.
+        private static void WriteUint64(ResourceValue rv, int byteOff, ulong value)
+        {
+            WriteUint32(rv, byteOff,     (uint)(value & 0xFFFFFFFF));
+            WriteUint32(rv, byteOff + 4, (uint)(value >> 32));
+        }
+
+        // Read-modify-write for 32-bit Interlocked ops. Each thread operates on its own byte offset.
+        // args: [byteOffset, value, (optional) out original]
+        private static void InterlockedRMW32(ResourceValue rv, HLSLValue[] args, Func<uint, uint, uint> op)
+        {
+            var scalarOff = CastToScalar(((NumericValue)args[0]).Cast(ScalarType.Int));
+            var scalarVal = CastToScalar(((NumericValue)args[1]).Cast(ScalarType.Uint));
+            int threadCount = scalarOff.ThreadCount;
+            bool hasOut = args.Length > 2 && args[2] is ReferenceValue;
+            var originals = hasOut ? new HLSLValue[threadCount] : null;
+            for (int t = 0; t < threadCount; t++)
+            {
+                int off = Convert.ToInt32(scalarOff.GetThreadValue(t));
+                uint old = ReadUint32(rv, off);
+                uint val = Convert.ToUInt32(scalarVal.GetThreadValue(t));
+                if (originals is not null) originals[t] = new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR(old));
+                WriteUint32(rv, off, op(old, val));
+            }
+            if (originals is not null)
+                ((ReferenceValue)args[2]).Set((NumericValue)HLSLValueUtils.MergeThreadValues(originals));
+        }
+
+        // Read-modify-write for 64-bit Interlocked ops.
+        // args: [byteOffset, uint2 value, (optional) out uint2 original]
+        private static void InterlockedRMW64(ResourceValue rv, HLSLValue[] args, Func<ulong, ulong, ulong> op)
+        {
+            var scalarOff = CastToScalar(((NumericValue)args[0]).Cast(ScalarType.Int));
+            var valVec    = CastToVector(((NumericValue)args[1]).Cast(ScalarType.Uint), 2);
+            int threadCount = scalarOff.ThreadCount;
+            bool hasOut = args.Length > 2 && args[2] is ReferenceValue;
+            var originals = hasOut ? new HLSLValue[threadCount] : null;
+            for (int t = 0; t < threadCount; t++)
+            {
+                int off    = Convert.ToInt32(scalarOff.GetThreadValue(t));
+                ulong old  = ReadUint64(rv, off);
+                ulong val  = Convert.ToUInt32(valVec[0].GetThreadValue(t)) |
+                             ((ulong)Convert.ToUInt32(valVec[1].GetThreadValue(t)) << 32);
+                if (originals is not null)
+                    originals[t] = VectorValue.FromScalars(
+                        new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR((uint)(old & 0xFFFFFFFF))),
+                        new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR((uint)(old >> 32))));
+                WriteUint64(rv, off, op(old, val));
+            }
+            if (originals is not null)
+                ((ReferenceValue)args[2]).Set((NumericValue)HLSLValueUtils.MergeThreadValues(originals));
+        }
+
+        // InterlockedExchangeFloat(byteOffset, float value, out float original)
+        private static void InterlockedExchangeFloat(ResourceValue rv, HLSLValue[] args)
+        {
+            var scalarOff = CastToScalar(((NumericValue)args[0]).Cast(ScalarType.Int));
+            var scalarVal = CastToScalar(((NumericValue)args[1]).Cast(ScalarType.Float));
+            int threadCount = scalarOff.ThreadCount;
+            var originals = new HLSLValue[threadCount];
+            for (int t = 0; t < threadCount; t++)
+            {
+                int off   = Convert.ToInt32(scalarOff.GetThreadValue(t));
+                float old = BitConverter.UInt32BitsToSingle(ReadUint32(rv, off));
+                float val = Convert.ToSingle(scalarVal.GetThreadValue(t));
+                originals[t] = new ScalarValue(ScalarType.Float, HLSLValueUtils.MakeScalarSGPR(old));
+                WriteUint32(rv, off, BitConverter.SingleToUInt32Bits(val));
+            }
+            if (args[2] is ReferenceValue outRef)
+                outRef.Set((NumericValue)HLSLValueUtils.MergeThreadValues(originals));
+        }
+
+        // InterlockedCompareStore / InterlockedCompareExchange (32-bit): store only if old == compare.
+        // args[3] is out original when present (CompareExchange); absent for CompareStore.
+        private static void InterlockedCmpStore32(ResourceValue rv, HLSLValue[] args)
+        {
+            var scalarOff = CastToScalar(((NumericValue)args[0]).Cast(ScalarType.Int));
+            var scalarCmp = CastToScalar(((NumericValue)args[1]).Cast(ScalarType.Uint));
+            var scalarVal = CastToScalar(((NumericValue)args[2]).Cast(ScalarType.Uint));
+            int threadCount = scalarOff.ThreadCount;
+            bool hasOut = args.Length > 3 && args[3] is ReferenceValue;
+            var originals = hasOut ? new HLSLValue[threadCount] : null;
+            for (int t = 0; t < threadCount; t++)
+            {
+                int off  = Convert.ToInt32(scalarOff.GetThreadValue(t));
+                uint old = ReadUint32(rv, off);
+                uint cmp = Convert.ToUInt32(scalarCmp.GetThreadValue(t));
+                uint val = Convert.ToUInt32(scalarVal.GetThreadValue(t));
+                if (originals is not null) originals[t] = new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR(old));
+                if (old == cmp) WriteUint32(rv, off, val);
+            }
+            if (originals is not null)
+                ((ReferenceValue)args[3]).Set((NumericValue)HLSLValueUtils.MergeThreadValues(originals));
+        }
+
+        // InterlockedCompareStore / InterlockedCompareExchange (64-bit).
+        private static void InterlockedCmpStore64(ResourceValue rv, HLSLValue[] args)
+        {
+            var scalarOff = CastToScalar(((NumericValue)args[0]).Cast(ScalarType.Int));
+            var cmpVec    = CastToVector(((NumericValue)args[1]).Cast(ScalarType.Uint), 2);
+            var valVec    = CastToVector(((NumericValue)args[2]).Cast(ScalarType.Uint), 2);
+            int threadCount = scalarOff.ThreadCount;
+            bool hasOut = args.Length > 3 && args[3] is ReferenceValue;
+            var originals = hasOut ? new HLSLValue[threadCount] : null;
+            for (int t = 0; t < threadCount; t++)
+            {
+                int off   = Convert.ToInt32(scalarOff.GetThreadValue(t));
+                ulong old = ReadUint64(rv, off);
+                ulong cmp = Convert.ToUInt32(cmpVec[0].GetThreadValue(t)) | ((ulong)Convert.ToUInt32(cmpVec[1].GetThreadValue(t)) << 32);
+                ulong val = Convert.ToUInt32(valVec[0].GetThreadValue(t)) | ((ulong)Convert.ToUInt32(valVec[1].GetThreadValue(t)) << 32);
+                if (originals is not null)
+                    originals[t] = VectorValue.FromScalars(
+                        new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR((uint)(old & 0xFFFFFFFF))),
+                        new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR((uint)(old >> 32))));
+                if (old == cmp) WriteUint64(rv, off, val);
+            }
+            if (originals is not null)
+                ((ReferenceValue)args[3]).Set((NumericValue)HLSLValueUtils.MergeThreadValues(originals));
+        }
+
+        // InterlockedCompareStoreFloatBitwise / InterlockedCompareExchangeFloatBitwise.
+        private static void InterlockedCmpStoreFloat(ResourceValue rv, HLSLValue[] args)
+        {
+            var scalarOff = CastToScalar(((NumericValue)args[0]).Cast(ScalarType.Int));
+            var scalarCmp = CastToScalar(((NumericValue)args[1]).Cast(ScalarType.Float));
+            var scalarVal = CastToScalar(((NumericValue)args[2]).Cast(ScalarType.Float));
+            int threadCount = scalarOff.ThreadCount;
+            bool hasOut = args.Length > 3 && args[3] is ReferenceValue;
+            var originals = hasOut ? new HLSLValue[threadCount] : null;
+            for (int t = 0; t < threadCount; t++)
+            {
+                int off      = Convert.ToInt32(scalarOff.GetThreadValue(t));
+                uint oldBits = ReadUint32(rv, off);
+                uint cmpBits = BitConverter.SingleToUInt32Bits(Convert.ToSingle(scalarCmp.GetThreadValue(t)));
+                uint valBits = BitConverter.SingleToUInt32Bits(Convert.ToSingle(scalarVal.GetThreadValue(t)));
+                if (originals is not null)
+                    originals[t] = new ScalarValue(ScalarType.Float, HLSLValueUtils.MakeScalarSGPR(BitConverter.UInt32BitsToSingle(oldBits)));
+                if (oldBits == cmpBits) WriteUint32(rv, off, valBits);
+            }
+            if (originals is not null)
+                ((ReferenceValue)args[3]).Set((NumericValue)HLSLValueUtils.MergeThreadValues(originals));
         }
 
         private static HLSLValue LoadCore(ResourceValue rv, NumericValue location, NumericValue offset, bool hasMip)
