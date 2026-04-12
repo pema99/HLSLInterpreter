@@ -100,7 +100,6 @@ namespace UnityShaderParser.Test
         #region Basic intrinsics
         private static readonly HashSet<string> unsupportedIntrinsics = new HashSet<string>()
         {
-            "CheckAccessFullyMapped",
             "EvaluateAttributeCentroid",
             "EvaluateAttributeAtSample",
             "EvaluateAttributeSnapped",
@@ -167,6 +166,7 @@ namespace UnityShaderParser.Test
             ["atan"] = N1(Atan),
             ["atan2"] = N2(Atan2),
             ["ceil"] = N1(Ceil),
+            ["CheckAccessFullyMapped"] = N1(CheckAccessFullyMapped),
             ["clamp"] = N3(Clamp),
             ["cos"] = N1(Cos),
             ["cosh"] = N1(Cosh),
@@ -496,7 +496,13 @@ namespace UnityShaderParser.Test
         {
             return ToFloatLike(x).Map(val => MathF.Ceiling(Convert.ToSingle(val)));
         }
-        
+
+        public static NumericValue CheckAccessFullyMapped(NumericValue x)
+        {
+            return (NumericValue)true;
+        }
+
+
         public static NumericValue Cos(NumericValue x)
         {
             return ToFloatLike(x).Map(val => MathF.Cos(Convert.ToSingle(val)));
