@@ -1406,7 +1406,7 @@ namespace UnityShaderParser.Test
                     return num.Scalarize(threadIndex);
                 case StructValue str:
                     Dictionary<string, HLSLValue> members = new Dictionary<string, HLSLValue>();
-                    foreach (var kvp in members)
+                    foreach (var kvp in str.Members)
                         members.Add(kvp.Key, Scalarize(kvp.Value, threadIndex));
                     return new StructValue(str.Name, members);
                 case ArrayValue arr:
@@ -1427,7 +1427,7 @@ namespace UnityShaderParser.Test
                     return num.Vectorize(threadCount);
                 case StructValue str:
                     Dictionary<string, HLSLValue> members = new Dictionary<string, HLSLValue>();
-                    foreach (var kvp in members)
+                    foreach (var kvp in str.Members)
                         members.Add(kvp.Key, Vectorize(kvp.Value, threadCount));
                     return new StructValue(str.Name, members);
                 case ArrayValue arr:
