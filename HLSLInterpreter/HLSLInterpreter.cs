@@ -208,6 +208,8 @@ namespace UnityShaderParser.Test
                             structTypeDef = context.GetStruct(namedType.GetName());
                         else if (type is QualifiedNamedTypeNode qualNamedType)
                             structTypeDef = context.GetStruct(qualNamedType.GetName());
+                        else if (type is StructTypeNode inlineStructType)
+                            structTypeDef = inlineStructType;
                         if (structTypeDef != null)
                             initializerValue = CreateStructValueFromArray(structTypeDef, arrayInitVal);
                     }
@@ -290,6 +292,8 @@ namespace UnityShaderParser.Test
                         }
                         break;
                     case StructTypeNode structType:
+                        defaultValue = CreateStructValue(structType);
+                        break;
                     default:
                         throw new NotImplementedException();
                 }
