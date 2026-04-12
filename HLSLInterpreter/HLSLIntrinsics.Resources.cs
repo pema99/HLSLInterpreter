@@ -174,7 +174,8 @@ namespace UnityShaderParser.Test
 
             // ==================== GetSamplePosition ====================
             // GetSamplePosition(int sampleIndex) — Texture2DMS / Texture2DMSArray only.
-            Stub("GetSamplePosition", 1);
+            Add("GetSamplePosition", 1, (state, rv, args) =>
+                VectorValue.FromScalars((ScalarValue)0.5f, (ScalarValue)0.5f));
 
             // ==================== AppendStructuredBuffer / ConsumeStructuredBuffer ====================
             Stub("Append",  1);

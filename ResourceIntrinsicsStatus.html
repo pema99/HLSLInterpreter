@@ -105,8 +105,8 @@
   <li class="red"><span class="sig">SampleCmpLevelZero(SamplerComparisonState s, float2 uv, float CmpVal)</span></li>
   <li class="red"><span class="sig">SampleCmpLevelZero(SamplerComparisonState s, float2 uv, float CmpVal, int Offset)</span></li>
   <li class="red"><span class="sig">SampleCmpLevelZero(SamplerComparisonState s, float2 uv, float CmpVal, int Offset, out uint Status)</span></li>
-  <li class="yellow"><span class="sig">CalculateLevelOfDetail(SamplerState s, float2 uv)</span> <span class="note">Array slice ignored in LOD calculation</span></li>
-  <li class="yellow"><span class="sig">CalculateLevelOfDetailUnclamped(SamplerState s, float2 uv)</span> <span class="note">Array slice ignored in LOD calculation</span></li>
+  <li class="green"><span class="sig">CalculateLevelOfDetail(SamplerState s, float2 uv)</span></li>
+  <li class="green"><span class="sig">CalculateLevelOfDetailUnclamped(SamplerState s, float2 uv)</span></li>
   <li class="red"><span class="sig">Gather(SamplerState s, float2 uv)</span></li>
   <li class="red"><span class="sig">Gather(SamplerState s, float2 uv, int Offset)</span></li>
   <li class="red"><span class="sig">Gather(SamplerState s, float2 uv, int Offset, out uint Status)</span></li>
@@ -172,11 +172,11 @@
 <!-- ===================== Texture2DMS ===================== -->
 <h2>Texture2DMS</h2>
 <ul>
-  <li class="yellow"><span class="sig">GetDimensions(out uint Width, out uint Height, out uint NumberOfSamples)</span> <span class="note">NumberOfSamples always reported as 1</span></li>
+  <li class="green"><span class="sig">GetDimensions(out uint Width, out uint Height, out uint NumberOfSamples)</span></li>
   <li class="green"><span class="sig">Load(int2 Location, int SampleIndex)</span></li>
   <li class="green"><span class="sig">Load(int2 Location, int SampleIndex, int2 Offset)</span></li>
   <li class="green"><span class="sig">Load(int2 Location, int SampleIndex, int2 Offset, out uint Status)</span></li>
-  <li class="red"><span class="sig">GetSamplePosition(int SampleIndex)</span></li>
+  <li class="green"><span class="sig">GetSamplePosition(int SampleIndex)</span></li>
 </ul>
 
 <!-- ===================== Texture2DArray ===================== -->
@@ -207,8 +207,8 @@
   <li class="red"><span class="sig">SampleCmpLevelZero(SamplerComparisonState s, float3 uvw, float CmpVal [, ...])</span> <span class="note">All overloads (3–5 args) not implemented</span></li>
   <li class="red"><span class="sig">SampleCmpBias(SamplerComparisonState s, float3 uvw, float CmpVal, float Bias [, ...])</span> <span class="note">All overloads (4–7 args) not implemented</span></li>
   <li class="red"><span class="sig">SampleCmpGrad(SamplerComparisonState s, float3 uvw, float CmpVal, float2 Ddx, float2 Ddy [, ...])</span> <span class="note">All overloads (5–8 args) not implemented</span></li>
-  <li class="yellow"><span class="sig">CalculateLevelOfDetail(SamplerState s, float3 uvw)</span> <span class="note">Array slice component ignored in LOD calculation</span></li>
-  <li class="yellow"><span class="sig">CalculateLevelOfDetailUnclamped(SamplerState s, float3 uvw)</span> <span class="note">Array slice component ignored in LOD calculation</span></li>
+  <li class="green"><span class="sig">CalculateLevelOfDetail(SamplerState s, float3 uvw)</span></li>
+  <li class="green"><span class="sig">CalculateLevelOfDetailUnclamped(SamplerState s, float3 uvw)</span></li>
   <li class="red"><span class="sig">Gather / GatherRed / GatherGreen / GatherBlue / GatherAlpha</span> <span class="note">All overloads not implemented</span></li>
   <li class="red"><span class="sig">GatherCmp / GatherCmpRed / GatherCmpGreen / GatherCmpBlue / GatherCmpAlpha</span> <span class="note">All overloads not implemented</span></li>
 </ul>
@@ -216,11 +216,11 @@
 <!-- ===================== Texture2DMSArray ===================== -->
 <h2>Texture2DMSArray</h2>
 <ul>
-  <li class="yellow"><span class="sig">GetDimensions(out uint Width, out uint Height, out uint Elements, out uint NumberOfSamples)</span> <span class="note">NumberOfSamples always reported as 1</span></li>
+  <li class="green"><span class="sig">GetDimensions(out uint Width, out uint Height, out uint Elements, out uint NumberOfSamples)</span></li>
   <li class="green"><span class="sig">Load(int3 Location, int SampleIndex)</span></li>
   <li class="green"><span class="sig">Load(int3 Location, int SampleIndex, int2 Offset)</span></li>
   <li class="green"><span class="sig">Load(int3 Location, int SampleIndex, int2 Offset, out uint Status)</span></li>
-  <li class="red"><span class="sig">GetSamplePosition(int SampleIndex)</span></li>
+  <li class="green"><span class="sig">GetSamplePosition(int SampleIndex)</span></li>
 </ul>
 
 <!-- ===================== Texture3D ===================== -->
