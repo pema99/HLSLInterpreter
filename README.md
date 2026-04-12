@@ -74,7 +74,6 @@ The main limitation of the interpreter is that it is very slow - think hundreds 
 
 Here is a list of features I have yet to implement:
 - Type aliases using `typedef`.
-- Casts with array types, like `(float[4])float4(1,2,3,4)`, or `(int[7])myFloatArray`.
 - Interface definitions and struct inheritance.
 - Inline struct definitions in variable declarations.
 - SamplerState declarations (`SamplerState mySampler = {...};`)
