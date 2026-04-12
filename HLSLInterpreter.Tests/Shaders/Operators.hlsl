@@ -1751,4 +1751,15 @@ void Operator_MatrixSwizzleWrite_VaryingMatrix()
     ASSERT(WaveReadLaneAt(m[1][0], 3) == 88.0);
 }
 
+[Test]
+void Operator_Assignment_WithArrayLiteralRHS()
+{
+    float3 foo = {1,2,3};
+    ASSERT(foo == float3(1,2,3));
+
+    float2x2 bar = { 1,2,3,4 };
+    ASSERT(bar == float2x2(1,2,3,4));
+
+    float2x2 baz = { {1,2}, {3,4} };
+    ASSERT(baz == float2x2(1,2,3,4));
 }

@@ -160,10 +160,16 @@ namespace UnityShaderParser.Test
             if (initializer != null)
             {
                 HLSLValue initializerValue;
-                if (type is NumericTypeNode && !isArray)
+                if (type is NumericTypeNode numericType && !isArray)
                 {
-                    NumericValue numericInitializerValue = EvaluateNumeric(initializer.Expression);
+                    // Array-literal initializer for a vector/matrix: float3 v = {1,2,3}
+                    var rawValue = EvaluateExpression(initializer.Expression);
+                    if (rawValue is ArrayValue arrayInit)
+                        return HLSLValueUtils.PackScalarsToNumeric(HLSLValueUtils.FlattenToScalars(arrayInit), numericType);
 
+                    // Regular numeric initializer
+                    if (rawValue is not NumericValue numericInitializerValue)
+                        throw Error(initializer.Expression, $"Expected a numeric expression, but got a {rawValue.GetType().Name}.");
                     switch (type)
                     {
                         case ScalarTypeNode scalarType:

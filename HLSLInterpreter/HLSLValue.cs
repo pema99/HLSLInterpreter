@@ -1746,5 +1746,31 @@ namespace UnityShaderParser.Test
             }
             return result;
         }
+
+        public static ScalarValue[] FlattenToScalars(HLSLValue value)
+        {
+            if (value is NumericValue num)
+                return num.ToScalars();
+            if (value is ArrayValue arr)
+                return arr.Values.SelectMany(x => FlattenToScalars(x)).ToArray();
+            throw new InvalidOperationException();
+        }
+
+        public static HLSLValue PackScalarsToNumeric(IEnumerable<ScalarValue> slice, TypeNode targetType)
+        {
+            switch (targetType)
+            {
+                case ScalarTypeNode st:
+                    return slice.First().Cast(st.Kind);
+                case VectorTypeNode vt:
+                    var castedVec = slice.Select(s => (ScalarValue)s.Cast(vt.Kind)).ToArray();
+                    return VectorValue.FromScalars(castedVec);
+                case MatrixTypeNode mt:
+                    var castedMat = slice.Select(s => (ScalarValue)s.Cast(mt.Kind)).ToArray();
+                    return MatrixValue.FromScalars(mt.FirstDimension, mt.SecondDimension, castedMat);
+                default:
+                    throw new InvalidOperationException();
+            }
+        }
     }
 }

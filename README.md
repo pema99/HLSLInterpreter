@@ -79,7 +79,6 @@ Here is a list of features I have yet to implement:
 - Most texture/buffer types beyond basic `Texture2D` (no `Gather*`, `SampleCmp`, `SampleBias`, `SampleGrad`, etc.)
 - Writes to texture and buffer types like `myTexture[int2(2,3)] = float4(1,2,3,4);`.
 - Legacy texture functions like `tex2D()` and `tex3D()`.
-- Assigning array literals to vectors like `float3 foo = {1,2,3}`. Same for matrices.
 
 There might be some more things I missed, and the library is still very much work in progress - bugs be plenty!
 
