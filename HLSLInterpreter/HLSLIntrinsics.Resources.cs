@@ -241,6 +241,53 @@ namespace UnityShaderParser.Test
             return table;
         }
 
+        public static bool IsResourceMethodInoutParameter(ResourceValue rv, string methodName, int argCount, int paramIndex)
+        {
+            switch (methodName)
+            {
+                // Every is out param
+                case "GetDimensions":
+                    return true;
+
+                // Status flag
+                case "Load":
+                    return argCount >= 2 && paramIndex == argCount - 1;
+
+                // Status flag
+                case "Load2":
+                case "Load3":
+                case "Load4":
+                    return paramIndex == 1;
+
+                // Last value
+                case "InterlockedAdd":
+                case "InterlockedMin":
+                case "InterlockedMax":
+                case "InterlockedAnd":
+                case "InterlockedOr":
+                case "InterlockedXor":
+                case "InterlockedAdd64":
+                case "InterlockedMin64":
+                case "InterlockedMax64":
+                case "InterlockedAnd64":
+                case "InterlockedOr64":
+                case "InterlockedXor64":
+                case "InterlockedExchange":
+                case "InterlockedExchange64":
+                case "InterlockedExchangeFloat":
+                    return paramIndex == 2;
+
+                // Last value
+                case "InterlockedCompareExchange":
+                case "InterlockedCompareExchange64":
+                case "InterlockedCompareExchangeFloatBitwise":
+                    return paramIndex == 3;
+
+                default:
+                    return false;
+            }
+        }
+
         public static bool TryInvokeResourceMethod(HLSLExecutionState executionState, ResourceValue rv, string name, HLSLValue[] args, out HLSLValue result)
         {
             if (ResourceMethodTable.TryGetValue(name, out var overloads))

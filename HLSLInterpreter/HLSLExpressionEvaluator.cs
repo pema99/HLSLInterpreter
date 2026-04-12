@@ -918,7 +918,16 @@ namespace UnityShaderParser.Test
 
             if (target is ResourceValue resource)
             {
-                if (HLSLIntrinsics.TryInvokeResourceMethod(executionState, resource, node.Name.Identifier, args, out HLSLValue result))
+                string resourceMethodName = node.Name.Identifier;
+                for (int i = 0; i < args.Length; i++)
+                {
+                    if (HLSLIntrinsics.IsResourceMethodInoutParameter(resource, resourceMethodName, args.Length, i))
+                    {
+                        if (TryGetLValueReference(node.Arguments[i], out var lvalRef))
+                            args[i] = lvalRef;
+                    }
+                }
+                if (HLSLIntrinsics.TryInvokeResourceMethod(executionState, resource, resourceMethodName, args, out HLSLValue result))
                     return result;
                 else
                     throw Error(node, $"Can't call unknown method '{resource}.{node.Name.Identifier}'.");
