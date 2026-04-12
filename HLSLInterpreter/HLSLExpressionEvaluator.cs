@@ -825,6 +825,17 @@ namespace UnityShaderParser.Test
                                     () => str.Members[field],
                                     val => str.Members[field] = val));
                             }
+
+                            // Push 'this' as a reference to the whole struct instance.
+                            // The setter handles `this = value` by copying all members in-place.
+                            context.AddVariable("this", new ReferenceValue(
+                                () => str,
+                                newVal =>
+                                {
+                                    if (newVal is StructValue newStruct)
+                                        foreach (var kvp in newStruct.Members)
+                                            str.Members[kvp.Key] = kvp.Value;
+                                }));
                         }
 
                         for (int i = 0; i < method.Parameters.Count; i++)

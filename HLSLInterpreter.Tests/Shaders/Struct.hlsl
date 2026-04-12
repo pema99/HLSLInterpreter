@@ -82,3 +82,60 @@ void StructArrayInitializer_ReadField_MatchesValues()
     ASSERT(f.foo == 2);
     ASSERT(f.baz.baz == 1);
 }
+
+struct weird
+{
+    int a;
+    int b;
+    
+    float getA() { return this.a; }
+
+    void reset()
+    { 
+        this = (weird)0; 
+    }
+};
+
+[Test]
+void ThisKeyword_InsideMethod_AccessesInstance()
+{
+    weird foo;
+    foo.a = 1;
+    foo.b = 2;
+    ASSERT(foo.getA() == 1);
+}
+
+[Test]
+void ThisKeyword_Assignment_ResetsMembers()
+{
+    weird foo;
+    foo.a = 1;
+    foo.b = 2;
+    foo.reset();
+    ASSERT(foo.a == 0);
+    ASSERT(foo.b == 0);
+}
+
+[Test]
+void ThisKeyword_InsideMethod_GetsVaryingValue()
+{
+    weird foo;
+    foo.a = WaveGetLaneIndex();
+    foo.b = 2;
+    ASSERT(!WaveActiveAllEqual(foo.getA()));
+}
+
+
+[Test]
+void ThisKeyword_AssignmentInVaryingControlFlow_ResetsForSomeThreads()
+{
+    weird foo;
+    foo.a = 1;
+    foo.b = 2;
+    if (WaveGetLaneIndex() == 0)
+        foo.reset();
+    ASSERT(WaveReadLaneAt(foo.a, 0) == 0);
+    ASSERT(WaveReadLaneAt(foo.b, 0) == 0);
+    ASSERT(WaveReadLaneAt(foo.a, 1) == 1);
+    ASSERT(WaveReadLaneAt(foo.b, 1) == 2);
+}
