@@ -21,6 +21,8 @@
         #define IGNORE_TEST_MSG(msg)
         #define MOCK_RESOURCE(res, mock)
         #define TEST_NAME()
+        #define TEST_CASE
+        #define TEST_VALUE
     #endif
 
 #endif

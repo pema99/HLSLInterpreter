@@ -61,6 +61,9 @@ namespace UnityShaderParser.Test
         protected HLSLInterpreter interpreter;
         protected TestRun currentTest;
 
+        private List<List<HLSLValue>> collectedCases;
+        private List<HLSLValue> collectedValues;
+
         public HLSLRunner(int defaultThreadsX = 2, int defaultThreadsY = 2)
         {
             interpreter = new HLSLInterpreter(defaultThreadsX, defaultThreadsY);
@@ -269,6 +272,25 @@ namespace UnityShaderParser.Test
             {
                 return new ScalarValue(ScalarType.String, HLSLValueUtils.MakeScalarSGPR(currentTest.TestName));
             });
+
+            interpreter.AddCallback("TEST_CASE", (state, args) =>
+            {
+                if (collectedCases != null)
+                {
+                    var inputs = args.Select(a => interpreter.EvaluateExpression(a)).ToList();
+                    collectedCases.Add(inputs);
+                }
+                return ScalarValue.Null;
+            });
+
+            interpreter.AddCallback("TEST_VALUE", (state, args) =>
+            {
+                if (collectedValues != null && args.Length > 0)
+                {
+                    collectedValues.Add(interpreter.EvaluateExpression(args[0]));
+                }
+                return ScalarValue.Null;
+            });
         }
 
         private HLSLParserConfig AddTestRunnerDefine(HLSLParserConfig config)
@@ -324,6 +346,7 @@ namespace UnityShaderParser.Test
         {
             reason = null;
             var func = interpreter.GetFunction(functionName, inputs.ToArray());
+            if (func == null) return false;
             foreach (var attr in func.Attributes.Where(x => x.Name.Identifier.ToLower() == "ignore"))
             {
                 if (attr.Arguments.Count > 0)
@@ -331,6 +354,47 @@ namespace UnityShaderParser.Test
                 return true;
             }
             return false;
+        }
+
+        private List<List<HLSLValue>> RunTestCaseGenerator(string funcName)
+        {
+            collectedCases = new List<List<HLSLValue>>();
+            try
+            {
+                interpreter.CallFunction(funcName);
+            }
+            catch (Exception ex)
+            {
+                collectedCases = null;
+                throw new TestFailException($"Error in TestCaseSource generator '{funcName}': {ex.Message}", ex);
+            }
+            var result = collectedCases;
+            collectedCases = null;
+            return result;
+        }
+
+        private List<HLSLValue> RunValueGenerator(string funcName)
+        {
+            collectedValues = new List<HLSLValue>();
+            try
+            {
+                interpreter.CallFunction(funcName);
+            }
+            catch (Exception ex)
+            {
+                collectedValues = null;
+                throw new TestFailException($"Error in ValueSource generator '{funcName}': {ex.Message}", ex);
+            }
+            var result = collectedValues;
+            collectedValues = null;
+            return result;
+        }
+
+        private static IEnumerable<IEnumerable<T>> CartesianProduct<T>(IEnumerable<IEnumerable<T>> sequences)
+        {
+            IEnumerable<IEnumerable<T>> seed = new[] { Enumerable.Empty<T>() };
+            return sequences.Aggregate(seed, (acc, seq) =>
+                acc.SelectMany(a => seq.Select(s => a.Concat(new[] { s }))));
         }
 
         public void ProcessCode(string code) =>
@@ -353,21 +417,22 @@ namespace UnityShaderParser.Test
 
         public TestRun[] DiscoverTests(string testFilter = null)
         {
-            FunctionDefinitionNode[] functions = interpreter.GetFunctions();
+            var functions = interpreter.GetFunctions();
             var testsToRun = new List<TestRun>();
 
-            foreach (var func in functions.Where(x => string.IsNullOrEmpty(testFilter) || Regex.IsMatch(x.Name.GetName(), testFilter)))
+            foreach (var (qualifiedName, func) in functions.Where(x => string.IsNullOrEmpty(testFilter) || Regex.IsMatch(x.Item1, testFilter)))
             {
                 bool hasTestAttribute = false;
                 var testCases = new List<(List<HLSLValue> inputs, string formattedName)>();
                 TestRun testRun = default;
-                testRun.FunctionName = func.Name.GetName();
+                testRun.FunctionName = qualifiedName;
                 testRun.TestName = func.Name.GetName();
 
                 // Detect [MockResource] params first so [TestCase] knows how many args to expect.
                 bool hasMocks = TryBuildMockResourceFactories(func, out var mockFactories);
                 int nonMockCount = mockFactories.Count(f => f == null);
 
+                // Gather test attributes
                 foreach (var attribute in func.Attributes)
                 {
                     string lexeme = attribute.Name.Identifier.ToLower();
@@ -397,6 +462,20 @@ namespace UnityShaderParser.Test
                                 testCases.Add((inputs, $"{testRun.FunctionName}({string.Join(", ", inputs)})"));
                             }
                             break;
+                        case "testcasesource":
+                            if (attribute.Arguments.Count == 1)
+                            {
+                                string generatorName = (attribute.Arguments[0] as IdentifierExpressionNode)?.GetName();
+                                if (generatorName != null)
+                                {
+                                    var cases = RunTestCaseGenerator(generatorName);
+                                    foreach (var caseInputs in cases.Where(c => c.Count == nonMockCount))
+                                    {
+                                        testCases.Add((caseInputs, $"{testRun.FunctionName}({string.Join(", ", caseInputs)})"));
+                                    }
+                                }
+                            }
+                            break;
                         case "description":
                             if (attribute.Arguments.Count > 0)
                                 testRun.Description = (interpreter.EvaluateExpression(attribute.Arguments[0]) as ScalarValue)?.Value.Get(0) as string ?? "";
@@ -409,34 +488,72 @@ namespace UnityShaderParser.Test
                     }
                 }
 
+                // Process per-parameter [Values] and [ValueSource] attributes combinatorially.
+                var paramValueSets = new List<List<HLSLValue>>();
+                bool allParamsHaveValues = func.Parameters.Count > 0;
+                foreach (var param in func.Parameters)
+                {
+                    List<HLSLValue> paramValues = null;
+                    foreach (var attr in param.Attributes)
+                    {
+                        string attrLexeme = attr.Name.Identifier.ToLower();
+                        if (attrLexeme == "valuesource" && attr.Arguments.Count == 1)
+                        {
+                            string genName = (attr.Arguments[0] as IdentifierExpressionNode)?.GetName();
+                            if (genName != null)
+                                paramValues = RunValueGenerator(genName);
+                        }
+                        else if (attrLexeme == "values" && attr.Arguments.Count > 0)
+                        {
+                            paramValues = attr.Arguments.Select(a => interpreter.EvaluateExpression(a)).ToList();
+                        }
+                    }
+                    if (paramValues != null)
+                        paramValueSets.Add(paramValues);
+                    else
+                        allParamsHaveValues = false;
+                }
+                if (allParamsHaveValues && paramValueSets.Count > 0)
+                {
+                    foreach (var combo in CartesianProduct(paramValueSets))
+                    {
+                        var comboList = combo.ToList();
+                        testCases.Add((comboList, $"{testRun.FunctionName}({string.Join(", ", comboList)})"));
+                    }
+                }
+
+                // If we have the test attribute, register the tests
                 if (hasTestAttribute)
                 {
+                    // Simple test
                     if (testCases.Count == 0)
                     {
                         if (hasMocks)
                             testRun.InputGenerator = () => mockFactories.Select(f => f?.Invoke()).ToList();
                         testsToRun.Add(testRun);
                     }
+                    // Test with cases
                     else
                     {
                         foreach (var (caseInputs, formattedName) in testCases)
                         {
                             var caseRun = testRun;
                             caseRun.TestName = formattedName;
+                            // If we have mocks, include them
                             if (hasMocks)
                             {
-                                var capturedCaseInputs = caseInputs;
                                 caseRun.InputGenerator = () =>
                                 {
                                     var merged = new List<HLSLValue>(mockFactories.Length);
                                     int caseIdx = 0;
                                     foreach (var factory in mockFactories)
                                     {
-                                        merged.Add(factory != null ? factory() : capturedCaseInputs[caseIdx++]);
+                                        merged.Add(factory != null ? factory() : caseInputs[caseIdx++]);
                                     }
                                     return merged;
                                 };
                             }
+                            // Otherwise use the regular generator
                             else
                             {
                                 caseRun.InputGenerator = () => caseInputs;

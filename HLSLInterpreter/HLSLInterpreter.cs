@@ -48,7 +48,7 @@ namespace UnityShaderParser.Test
         public HLSLValue CallFunction(string name, params HLSLValue[] args) => expressionEvaluator.CallFunction(name, args);
         public FunctionDefinitionNode GetFunction(string name, HLSLValue[] args) => context.GetFunction(expressionEvaluator, name, args);
 
-        public FunctionDefinitionNode[] GetFunctions() => context.GetFunctions();
+        public (string QualifiedName, FunctionDefinitionNode Func)[] GetFunctions() => context.GetFunctions();
 
         public HLSLValue EvaluateExpression(ExpressionNode node) => expressionEvaluator.Visit(node);
 
