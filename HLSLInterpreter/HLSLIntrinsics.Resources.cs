@@ -1090,7 +1090,7 @@ namespace UnityShaderParser.Test
 
                     if (x == -1 || y == -1)
                     {
-                        components[i] = comparisonValue != null ? CompareScalars(sampler, 0f, cmpV) : 0f;
+                        components[i] = comparisonValue is not null ? CompareScalars(sampler, 0f, cmpV) : 0f;
                         continue;
                     }
 
@@ -1099,7 +1099,7 @@ namespace UnityShaderParser.Test
                         ? Convert.ToSingle(vv[Math.Min(channelIndex, vv.Size - 1)].GetThreadValue(thread))
                         : Convert.ToSingle(CastToScalar((NumericValue)texel).GetThreadValue(thread));
 
-                    if (comparisonValue != null)
+                    if (comparisonValue is not null)
                         texelCh = CompareScalars(sampler, texelCh, cmpV);
 
                     components[i] = texelCh;

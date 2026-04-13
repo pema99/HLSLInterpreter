@@ -141,3 +141,75 @@ void TestWaveActiveSum()
     ASSERT(ddx(index) == 1); // 1-0=1, 3-2=1
 }
 ```
+
+To test code that reads from or writes to textures and buffers, you can define a **mock struct** in HLSL that backs the resource. The interpreter calls into this struct for every read and write.
+
+A mock struct can implement any of the following methods:
+
+| Method | Purpose |
+|--------|---------|
+| `void Initialize()` | Called once when the mock is created. Use it to fill initial data. |
+| `T Read(int x, int y, int z, int w, int mipLevel)` | Called for every texel read. |
+| `void Write(int x, int y, int z, int w, int mipLevel, T value)` | Called for every texel write. |
+| `int SizeX()` / `int SizeY()` / `int SizeZ()` | Return the resource dimensions. |
+| `int MipCount()` | Returns the mip level count. |
+
+There are two ways to attach a mock to a resource.
+
+**`[MockResource]` on a test parameter** - the test runner creates and injects a fresh mock before each test call. This is the preferred style when the resource is a test input:
+
+```hlsl
+struct MockTex2D
+{
+    int width;
+    int height;
+    float4 data[16];
+
+    void Initialize()
+    {
+        width = 4;
+        height = 4;
+        for (int i = 0; i < 16; i++)
+            data[i] = float4(i, 0, 0, 1);
+    }
+
+    float4 Read(int x, int y, int z, int w, int mipLevel) { return data[y * width + x]; }
+    void Write(int x, int y, int z, int w, int mipLevel, float4 value) { data[y * width + x] = value; }
+};
+
+[Test]
+void Texture_Load([MockResource(MockTex2D)] RWTexture2D<float4> tex)
+{
+    // pixel (2,1): index = 1*4+2 = 6
+    float4 val = tex.Load(int2(2, 1));
+    ASSERT(val.x == 6.0);
+}
+```
+
+`[MockResource]` parameters can be combined with `[TestCase]`:
+
+```hlsl
+[Test]
+[TestCase(0, 0)]
+[TestCase(2, 1)]
+void Texture_LoadAtCoord([MockResource(MockTex2D)] RWTexture2D<float4> tex, int x, int y)
+{
+    float4 val = tex.Load(int2(x, y));
+    ASSERT(val.x == float(y * 4 + x));
+}
+```
+
+**`MOCK_RESOURCE(resource, MockStructType)`** - binds a mock to a globally declared resource variable at the point of the call. Use this when the resource is a shader global rather than a function parameter:
+
+```hlsl
+RWTexture2D<float4> g_tex;
+
+[Test]
+void Texture_Write_Global()
+{
+    MOCK_RESOURCE(g_tex, MockTex2D);
+    g_tex[int2(3, 0)] = float4(77, 0, 0, 1);
+    float4 val = g_tex.Load(int2(3, 0));
+    ASSERT(val.x == 77.0);
+}
+```

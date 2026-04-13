@@ -108,7 +108,8 @@ namespace UnityShaderParser.Test
                 };
             }
 
-            expressionEvaluator.CallMethod(mockStruct, "Initialize", Array.Empty<HLSLValue>());
+            if (HasMethod("Initialize"))
+                expressionEvaluator.CallMethod(mockStruct, "Initialize", Array.Empty<HLSLValue>());
 
             ResourceGetter getter = (x, y, z, w, mip) => (NumericValue)0;
             ResourceSetter setter = (x, y, z, w, mip, val) => { };
