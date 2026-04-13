@@ -1,4 +1,19 @@
 //=============================================================================
+// FORWARD DECLARATIONS
+//=============================================================================
+
+// Declared before its definition; the test below uses it before the body appears.
+int ForwardDeclared(int x);
+
+[Test]
+void ForwardDeclaration_FunctionCalledBeforeDefinition()
+{
+    ASSERT(ForwardDeclared(3) == 9);
+}
+
+int ForwardDeclared(int x) { return x * x; }
+
+//=============================================================================
 // BASIC OVERLOADING BY PARAMETER COUNT
 //=============================================================================
 
