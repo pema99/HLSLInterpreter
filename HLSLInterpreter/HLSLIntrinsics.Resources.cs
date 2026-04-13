@@ -36,6 +36,12 @@ namespace UnityShaderParser.Test
             // === Load ===
             AddN("Load", 1, 4, (state, rv, args) =>
             {
+                // ByteAddressBuffer.Load(uint ByteOffset) returns a raw uint, not a texel.
+                if (rv.Type == PredefinedObjectType.ByteAddressBuffer ||
+                    rv.Type == PredefinedObjectType.RWByteAddressBuffer ||
+                    rv.Type == PredefinedObjectType.RasterizerOrderedByteAddressBuffer)
+                    return LoadN(rv, (NumericValue)args[0], 1);
+
                 if (IsMSTexture(rv))
                 {
                     NumericValue msOffset = args.Length >= 3 && args[2] is not ReferenceValue
@@ -250,8 +256,8 @@ namespace UnityShaderParser.Test
                 // For RW textures, buffers, and MS textures every arg is OUT.
                 if (rv.IsTexture && !rv.IsWriteable && !IsMSTexture(rv))
                 {
-                    // The out-only overload has one slot per spatial dimension plus one for array slices.
-                    int outOnlyCount = rv.Dimension + (rv.IsArray ? 1 : 0);
+                    // For cube textures GetDimensions outputs width + height (2 values), not Dimension (3).
+                    int outOnlyCount = (rv.IsCube ? 2 : rv.Dimension) + (rv.IsArray ? 1 : 0);
                     if (argCount > outOnlyCount)
                         return paramIndex > 0;   // arg 0 is the mip input; the rest are OUT
                 }
@@ -658,7 +664,19 @@ namespace UnityShaderParser.Test
             var scalarLod = CastToScalar(lod);
             var size = VectorValue.FromScalars(rv.SizeX, rv.SizeY, rv.SizeZ).BroadcastToVector(dim) / (lod + 1);
 
-            var texelPos = CastToVector(location, dim) * size - 0.5f;
+            // For array textures the location vector is (spatial_coords..., arraySlice).
+            // Extract the spatial part and remember the slice for Fetch.
+            ScalarValue arrSlice = null;
+            NumericValue spatialLocation = location;
+            if (rv.IsArray)
+            {
+                var locVec = CastToVector(location, dim + 1);
+                var locScalars = locVec.ToScalars();
+                arrSlice = locScalars[dim];
+                spatialLocation = locVec.BroadcastToVector(dim);  // truncate to spatial dims
+            }
+
+            var texelPos = CastToVector(spatialLocation, dim).BroadcastToVector(dim) * size - 0.5f;
             if (offset is not null)
                 texelPos = texelPos + CastToVector(offset, dim);
 
@@ -677,8 +695,12 @@ namespace UnityShaderParser.Test
                 var p0 = (VectorValue)Clamp(basePos, 0, size - 1);
                 var p1 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(1), 0, size - 1);
 
-                var c0 = Fetch(VectorValue.FromScalars(p0.x, scalarLod));
-                var c1 = Fetch(VectorValue.FromScalars(p1.x, scalarLod));
+                var c0 = rv.IsArray
+                    ? Fetch(VectorValue.FromScalars(p0.x, arrSlice, scalarLod))
+                    : Fetch(VectorValue.FromScalars(p0.x, scalarLod));
+                var c1 = rv.IsArray
+                    ? Fetch(VectorValue.FromScalars(p1.x, arrSlice, scalarLod))
+                    : Fetch(VectorValue.FromScalars(p1.x, scalarLod));
 
                 return Lerp(c0, c1, frac.x);
             }
@@ -690,10 +712,18 @@ namespace UnityShaderParser.Test
                 var p01 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(0, 1), 0, size - 1);
                 var p11 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(1, 1), 0, size - 1);
 
-                var c00 = Fetch(VectorValue.FromScalars(p00.x, p00.y, scalarLod));
-                var c10 = Fetch(VectorValue.FromScalars(p10.x, p10.y, scalarLod));
-                var c01 = Fetch(VectorValue.FromScalars(p01.x, p01.y, scalarLod));
-                var c11 = Fetch(VectorValue.FromScalars(p11.x, p11.y, scalarLod));
+                var c00 = rv.IsArray
+                    ? Fetch(VectorValue.FromScalars(p00.x, p00.y, arrSlice, scalarLod))
+                    : Fetch(VectorValue.FromScalars(p00.x, p00.y, scalarLod));
+                var c10 = rv.IsArray
+                    ? Fetch(VectorValue.FromScalars(p10.x, p10.y, arrSlice, scalarLod))
+                    : Fetch(VectorValue.FromScalars(p10.x, p10.y, scalarLod));
+                var c01 = rv.IsArray
+                    ? Fetch(VectorValue.FromScalars(p01.x, p01.y, arrSlice, scalarLod))
+                    : Fetch(VectorValue.FromScalars(p01.x, p01.y, scalarLod));
+                var c11 = rv.IsArray
+                    ? Fetch(VectorValue.FromScalars(p11.x, p11.y, arrSlice, scalarLod))
+                    : Fetch(VectorValue.FromScalars(p11.x, p11.y, scalarLod));
 
                 var cx0 = Lerp(c00, c10, frac.x);
                 var cx1 = Lerp(c01, c11, frac.x);
@@ -701,7 +731,7 @@ namespace UnityShaderParser.Test
             }
             else
             {
-                // Trilinear interpolation
+                // Trilinear interpolation (3D textures; arrays not applicable for Texture3D)
                 var p000 = (VectorValue)Clamp(basePos, 0, size - 1);
                 var p100 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(1, 0, 0), 0, size - 1);
                 var p010 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(0, 1, 0), 0, size - 1);
@@ -1042,6 +1072,9 @@ namespace UnityShaderParser.Test
             for (int o = 0; o < outCount; o++)
                 collected[o] = new uint[threadCount];
 
+            // For cube textures, GetDimensions reports face width/height (2D), not a 3D dimension.
+            int outDim = rv.IsCube ? 2 : rv.Dimension;
+
             for (int thread = 0; thread < threadCount; thread++)
             {
                 int mipLevel = hasMipInput ? Convert.ToInt32(scalarMip.GetThreadValue(thread)) : 0;
@@ -1054,9 +1087,9 @@ namespace UnityShaderParser.Test
                 // Width — all resource types have a width.
                 collected[o++][thread] = w;
                 // Height — 2D+ non-buffer resources.
-                if (!rv.IsBuffer && rv.Dimension >= 2) collected[o++][thread] = h;
+                if (!rv.IsBuffer && outDim >= 2) collected[o++][thread] = h;
                 // Depth or array element count — 3D textures and array textures.
-                if (rv.Dimension >= 3 || rv.IsArray) collected[o++][thread] = d;
+                if (outDim >= 3 || rv.IsArray) collected[o++][thread] = d;
                 // Sample count — MS textures (we report 1 since we don't track per-sample data).
                 if (IsMSTexture(rv)) collected[o++][thread] = 1;
                 // Element stride — StructuredBuffer types: size of the first template argument.

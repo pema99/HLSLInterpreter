@@ -1291,9 +1291,11 @@ namespace UnityShaderParser.Test
                 (int leftSize, _) = left.TensorSize;
                 (int rightSize, _) = right.TensorSize;
                 int newSize = Math.Max(leftSize, rightSize);
-                if (leftSize != newSize)
+                // Also broadcast a ScalarValue to VectorValue even when sizes are equal,
+                // so Map2 always receives two operands of the same concrete type.
+                if (leftSize != newSize || (left is ScalarValue && right is VectorValue))
                     left = left.BroadcastToVector(newSize);
-                if (rightSize != newSize)
+                if (rightSize != newSize || (right is ScalarValue && left is VectorValue))
                     right = right.BroadcastToVector(newSize);
             }
 
