@@ -40,10 +40,14 @@ namespace UnityShaderParser.Test
         {
             public string TestName;
             public string FunctionName;
+            public string Description;
+            public string Category;
+
             public bool UsesCustomWarpSize;
             public int WarpSizeX;
             public int WarpSizeY;
-            public Func<List<HLSLValue>> GetInputs;
+
+            public Func<List<HLSLValue>> InputGenerator;
         }
 
         public struct TestResult
@@ -393,6 +397,14 @@ namespace UnityShaderParser.Test
                                 testCases.Add((inputs, $"{testRun.FunctionName}({string.Join(", ", inputs)})"));
                             }
                             break;
+                        case "description":
+                            if (attribute.Arguments.Count > 0)
+                                testRun.Description = (interpreter.EvaluateExpression(attribute.Arguments[0]) as ScalarValue)?.Value.Get(0) as string ?? "";
+                            break;
+                        case "category":
+                            if (attribute.Arguments.Count > 0)
+                                testRun.Category = (interpreter.EvaluateExpression(attribute.Arguments[0]) as ScalarValue)?.Value.Get(0) as string ?? "";
+                            break;
                         default: break;
                     }
                 }
@@ -402,7 +414,7 @@ namespace UnityShaderParser.Test
                     if (testCases.Count == 0)
                     {
                         if (hasMocks)
-                            testRun.GetInputs = () => mockFactories.Select(f => f?.Invoke()).ToList();
+                            testRun.InputGenerator = () => mockFactories.Select(f => f?.Invoke()).ToList();
                         testsToRun.Add(testRun);
                     }
                     else
@@ -414,7 +426,7 @@ namespace UnityShaderParser.Test
                             if (hasMocks)
                             {
                                 var capturedCaseInputs = caseInputs;
-                                caseRun.GetInputs = () =>
+                                caseRun.InputGenerator = () =>
                                 {
                                     var merged = new List<HLSLValue>(mockFactories.Length);
                                     int caseIdx = 0;
@@ -427,7 +439,7 @@ namespace UnityShaderParser.Test
                             }
                             else
                             {
-                                caseRun.GetInputs = () => caseInputs;
+                                caseRun.InputGenerator = () => caseInputs;
                             }
                             testsToRun.Add(caseRun);
                         }
@@ -458,9 +470,9 @@ namespace UnityShaderParser.Test
                 List<HLSLValue> inputs = new List<HLSLValue>();
                 try
                 {
-                    if (currentTest.GetInputs != null)
+                    if (currentTest.InputGenerator != null)
                     {
-                        inputs = currentTest.GetInputs();
+                        inputs = currentTest.InputGenerator();
                     }
                 }
                 catch (Exception ex)
