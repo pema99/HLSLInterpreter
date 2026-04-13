@@ -7,7 +7,6 @@ using UnityShaderParser.HLSL;
 
 namespace UnityShaderParser.Test
 {
-    // TODO: Put this functionality as recursive functions in interpreter rather than using SyntaxVisitor
     public class HLSLExpressionEvaluator : HLSLSyntaxVisitor<HLSLValue>
     {
         protected HLSLInterpreter interpreter;
