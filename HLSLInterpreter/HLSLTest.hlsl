@@ -20,6 +20,7 @@
         #define IGNORE_TEST()
         #define IGNORE_TEST_MSG(msg)
         #define MOCK_RESOURCE(res, mock)
+        #define TEST_NAME()
     #endif
 
 #endif
