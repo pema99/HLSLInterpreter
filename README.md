@@ -75,10 +75,9 @@ I estimate that the interpreter supports around 80% of the HLSL language, though
 ## Limitations
 The main limitation of the interpreter is that it is very slow - think hundreds or thousands of time slower than running on a GPU. The interpreter is written primarily with correctness in mind, and I've made no attempt to optimize it more than necessary. Don't expect to run interesting shaders at high resolutions without waiting several seconds for a frame! The thread count is configurable, and most usecases will want to run just a few threads.
 
-Here is a list of features I have yet to implement:
-- Legacy texture functions like `tex2D()` and `tex3D()`.
+The interpreter is capable of simulating 1 warp/wavefront of arbitrary size. If you need multiple warps, you can use multiple instances of the interpreter ([example](https://github.com/pema99/HLSLInterpreter/blob/7a5ae52c439afe29fd38b20cf2589e16dba03325/HLSLInterpreter.Examples/Program.cs#L124)). If run in parallel, beware that atomic operations and barriers are no-ops, so you'll have to manually handle synchronization if multiple threads access the same memory.
 
-There might be some more things I missed, and the library is still very much work in progress - bugs be plenty!
+The library is still very much work in progress - bugs be plenty!
 
 ## Advanced testing features
 This section will show a few more advanced features you can use when writing tests. The testing API is still a work in progress, more to come.
