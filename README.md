@@ -53,6 +53,7 @@ The interpreter supports the majority of the HLSL language, though a few niche f
 - Groupshared memory.
 - Type aliases via `typedef`.
 - Texture and Buffer types.
+- Interfaces and struct inheritance.
 - Namespaces.
 
 ## Shader testing framework
