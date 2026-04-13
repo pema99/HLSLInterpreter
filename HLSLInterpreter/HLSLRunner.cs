@@ -465,7 +465,8 @@ namespace UnityShaderParser.Test
                         case "testcasesource":
                             if (attribute.Arguments.Count == 1)
                             {
-                                string generatorName = (attribute.Arguments[0] as IdentifierExpressionNode)?.GetName();
+                                string generatorName = (attribute.Arguments[0] as IdentifierExpressionNode)?.GetName()
+                                    ?? (interpreter.EvaluateExpression(attribute.Arguments[0]) as ScalarValue)?.Value.Get(0) as string;
                                 if (generatorName != null)
                                 {
                                     var cases = RunTestCaseGenerator(generatorName);
@@ -499,7 +500,8 @@ namespace UnityShaderParser.Test
                         string attrLexeme = attr.Name.Identifier.ToLower();
                         if (attrLexeme == "valuesource" && attr.Arguments.Count == 1)
                         {
-                            string genName = (attr.Arguments[0] as IdentifierExpressionNode)?.GetName();
+                            string genName = (attr.Arguments[0] as IdentifierExpressionNode)?.GetName()
+                                ?? (interpreter.EvaluateExpression(attr.Arguments[0]) as ScalarValue)?.Value.Get(0) as string;
                             if (genName != null)
                                 paramValues = RunValueGenerator(genName);
                         }

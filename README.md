@@ -146,16 +146,16 @@ void CheckApproximateResult()
 
 ### Special test assertions
 
-If you want to manually control when a test fails or passes, you can use `PASS_TEST()` and `FAIL_TEST()` macros.
+If you want to manually control when a test fails or passes, you can use `PASS_TEST` and `FAIL_TEST` macros.
 
 ```hlsl
 [Test]
 void AlwaysPass()
 {
     if (1 == 1) // Water is wet
-        PASS_TEST();
+        PASS_TEST;
     else
-        FAIL_TEST();
+        FAIL_TEST;
 }
 ```
 
@@ -172,7 +172,7 @@ void CheckSign()
 }
 ```
 
-`IGNORE_TEST()` and `IGNORE_TEST_MSG()` skip the test at runtime from within the test body. This is useful when the skip condition can only be evaluated at runtime. The `[Ignore]` attribute is the unconditional alternative, which skips the test regardless, and accepts an optional reason string:
+`IGNORE_TEST` and `IGNORE_TEST_MSG()` skip the test at runtime from within the test body. This is useful when the skip condition can only be evaluated at runtime. The `[Ignore]` attribute is the unconditional alternative, which skips the test regardless, and accepts an optional reason string:
 
 ```hlsl
 [Test]
@@ -279,7 +279,7 @@ void GenerateCases()
 }
 
 [Test]
-[TestCaseSource(GenerateCases)]
+[TestCaseSource("GenerateCases")]
 void CheckSquareRoot(int n, float expected)
 {
     ASSERT_NEAR(sqrt(expected), float(n), 0.0001);
@@ -296,7 +296,7 @@ void GenerateScales()
 }
 
 [Test]
-void ScaleIsPositive([ValueSource(GenerateScales)] int scale, [Values(0.5, 1.0, 2.0)] float x)
+void ScaleIsPositive([ValueSource("GenerateScales")] int scale, [Values(0.5, 1.0, 2.0)] float x)
 {
     ASSERT(x * scale > 0);
 }
@@ -330,7 +330,7 @@ void SphereSDF_SignIsCorrect()
 }
 ```
 
-`TEST_NAME()` returns the name of the currently running test as a string.
+`TEST_NAME` returns the name of the currently running test as a string.
 
 ```hlsl
 [Test]
@@ -338,7 +338,7 @@ void SphereSDF_SignIsCorrect()
 [TestCase(1)]
 void LogCurrentTest(int x)
 {
-    PRINTF("Running %s with x=%d", TEST_NAME(), x);
+    PRINTF("Running %s with x=%d", TEST_NAME, x);
 }
 ```
 
@@ -424,9 +424,9 @@ void Texture_Write_Global()
 |-----------|-------|-------------|
 | `[Test]` | Function | Marks a function as a test to be discovered and run. |
 | `[TestCase(args...)]` | Function | Runs the test once per attribute, passing the given arguments. |
-| `[TestCaseSource(Generator)]` | Function | Runs the test for each case emitted by `Generator` via `TEST_CASE()`. |
+| `[TestCaseSource("Generator")]` | Function | Runs the test for each case emitted by `Generator` via `TEST_CASE()`. |
 | `[Values(vals...)]` | Parameter | Provides a set of values for this parameter, combined combinatorially with other parameters. |
-| `[ValueSource(Generator)]` | Parameter | Like `[Values]`, but values are emitted by `Generator` via `TEST_VALUE()`. |
+| `[ValueSource("Generator")]` | Parameter | Like `[Values]`, but values are emitted by `Generator` via `TEST_VALUE()`. |
 | `[MockResource(MockType)]` | Parameter | Injects a mock resource of the given struct type before each test call. |
 | `[WarpSize(x, y)]` | Function | Sets the warp size for the test. Required for tests using wave intrinsics or `ddx()/ddy()`. |
 | `[Ignore]`<br>`[Ignore("reason")]` | Function | Unconditionally skips the test, with an optional reason shown in the output. |
@@ -442,11 +442,11 @@ void Texture_Write_Global()
 | `ASSERT_NEAR(a, b, eps)` | Fails if `\|a - b\| > eps`. |
 | `ASSERT_UNIFORM(expr)` | Fails if `expr` is stored in a vector register (may differ across threads). |
 | `ASSERT_VARYING(expr)` | Fails if `expr` is stored in a uniform register (same across all threads). |
-| `PASS_TEST()`<br>`PASS_TEST_MSG(msg)` | Immediately passes the test. |
-| `FAIL_TEST()`<br>`FAIL_TEST_MSG(msg)` | Immediately fails the test. |
-| `IGNORE_TEST()`<br>`IGNORE_TEST_MSG(msg)` | Skips the test at runtime. |
+| `PASS_TEST`<br>`PASS_TEST_MSG(msg)` | Immediately passes the test. |
+| `FAIL_TEST`<br>`FAIL_TEST_MSG(msg)` | Immediately fails the test. |
+| `IGNORE_TEST`<br>`IGNORE_TEST_MSG(msg)` | Skips the test at runtime. |
 | `PRINTF(fmt, ...)` | Prints to the console. Prints once per active thread when data is varying. |
-| `TEST_NAME()` | Returns the name of the currently running test as a string. |
+| `TEST_NAME` | Returns the name of the currently running test as a string. |
 | `TEST_CASE(args...)` | Emits a test case from a `[TestCaseSource]` generator function. |
 | `TEST_VALUE(val)` | Emits a single value from a `[ValueSource]` generator function. |
 | `MOCK_RESOURCE(resource, MockType)` | Binds a mock struct to a global resource variable. |

@@ -617,7 +617,11 @@ namespace UnityShaderParser.Test
         
         public override HLSLValue VisitIdentifierExpressionNode(IdentifierExpressionNode node)
         {
-            if (context.TryGetVariable(node.GetName(), out var variable))
+            string name = node.GetName();
+            if (callbacks.ContainsKey(name))
+                return callbacks[name](executionState, Array.Empty<ExpressionNode>());
+
+            if (context.TryGetVariable(name, out var variable))
             {
                 if (variable is ReferenceValue reference)
                     return reference.Get();
@@ -626,7 +630,7 @@ namespace UnityShaderParser.Test
             }
             else
             {
-                throw Error(node, $"Use of unknown variable '{node.GetName()}'.");
+                throw Error(node, $"Use of unknown variable '{name}'.");
             }
         }
         

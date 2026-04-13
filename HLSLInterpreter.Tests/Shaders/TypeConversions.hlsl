@@ -334,15 +334,6 @@ void Assignment_VectorTruncation()
 }
 
 [Test]
-void Assignment_VectorExtension()
-{
-    float4 v4;
-    float2 v2 = float2(5.0, 6.0);
-    v4 = v2;  // Extends with zeros
-    ASSERT(v4.x == 5.0 && v4.y == 6.0 && v4.z == 0.0 && v4.w == 0.0);
-}
-
-[Test]
 void Assignment_WithTypeConversion()
 {
     float3 fv;

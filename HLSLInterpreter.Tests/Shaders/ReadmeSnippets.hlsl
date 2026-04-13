@@ -65,9 +65,9 @@ void Readme_CheckApproximateResult()
 void Readme_AlwaysPass()
 {
     if (1 == 1) // Water is wet
-        PASS_TEST();
+        PASS_TEST;
     else
-        FAIL_TEST();
+        FAIL_TEST;
 }
 
 [Test]
@@ -154,7 +154,7 @@ void Readme_GenerateCases()
 }
 
 [Test]
-[TestCaseSource(Readme_GenerateCases)]
+[TestCaseSource("Readme_GenerateCases")]
 void Readme_CheckSquareRoot(int n, float expected)
 {
     ASSERT_NEAR(sqrt(expected), float(n), 0.0001);
@@ -167,7 +167,7 @@ void Readme_GenerateScales()
 }
 
 [Test]
-void Readme_ScaleIsPositive([ValueSource(Readme_GenerateScales)] int scale, [Values(0.5, 1.0, 2.0)] float x)
+void Readme_ScaleIsPositive([ValueSource("Readme_GenerateScales")] int scale, [Values(0.5, 1.0, 2.0)] float x)
 {
     ASSERT(x * scale > 0);
 }
@@ -190,7 +190,7 @@ void Readme_SphereSDF_SignIsCorrect_WithMeta()
 [TestCase(1)]
 void Readme_LogCurrentTest(int x)
 {
-    PRINTF("Running %s with x=%d", TEST_NAME(), x);
+    PRINTF("Running %s with x=%d", TEST_NAME, x);
 }
 
 // ============================================================
