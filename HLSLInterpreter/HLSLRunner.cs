@@ -144,6 +144,24 @@ namespace UnityShaderParser.Test
                 HLSLIntrinsics.Printf(state, args.Select(x => interpreter.EvaluateExpression(x)).ToArray());
                 return ScalarValue.Null;
             });
+
+            interpreter.AddCallback("MOCK_RESOURCE", (state, args) =>
+            {
+                if (args.Length != 2)
+                    throw new Exception("MOCK_RESOURCE requires exactly 2 arguments: MOCK_RESOURCE(resource, MockStructType).");
+
+                string resourceName = (args[0] as IdentifierExpressionNode)?.GetName()
+                    ?? throw new Exception("First argument to MOCK_RESOURCE must be a resource variable name.");
+                string mockStructName = (args[1] as IdentifierExpressionNode)?.GetName()
+                    ?? throw new Exception("Second argument to MOCK_RESOURCE must be a mock struct type name.");
+
+                var existing = interpreter.GetVariable(resourceName) as ResourceValue
+                    ?? throw new Exception($"MOCK_RESOURCE: '{resourceName}' is not a resource variable.");
+
+                var mock = interpreter.CreateMockResource(mockStructName, existing.Type, existing.TemplateArguments);
+                interpreter.SetVariable(resourceName, mock);
+                return ScalarValue.Null;
+            });
         }
 
         private HLSLParserConfig AddTestRunnerDefine(HLSLParserConfig config)

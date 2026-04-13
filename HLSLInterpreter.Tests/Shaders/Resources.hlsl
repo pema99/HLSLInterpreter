@@ -130,3 +130,36 @@ void MockResource_GetDimensions_VaryingMip([MockResource(MockTex2D_Sized)] Textu
     ASSERT(w == expectedW);
     ASSERT(h == expectedW);
 }
+
+// --- MOCK_RESOURCE inline binding ---
+
+RWTexture2D<float4> g_tex;
+
+[Test]
+void MockResource_Inline_Load()
+{
+    MOCK_RESOURCE(g_tex, MockTex2D);
+    // After MockTex2D.Initialize(), pixel (2,1) has .x == 6.
+    float4 val = g_tex.Load(int2(2, 1));
+    ASSERT(val.x == 6.0);
+    ASSERT(val.w == 1.0);
+}
+
+[Test]
+void MockResource_Inline_Store()
+{
+    MOCK_RESOURCE(g_tex, MockTex2D);
+    g_tex[int2(3, 0)] = float4(77, 0, 0, 1);
+    float4 val = g_tex.Load(int2(3, 0));
+    ASSERT(val.x == 77.0);
+}
+
+[Test]
+void MockResource_Inline_Dimensions()
+{
+    MOCK_RESOURCE(g_tex, MockTex2D_Sized);
+    uint w, h;
+    g_tex.GetDimensions(w, h);
+    ASSERT(w == 8);
+    ASSERT(h == 8);
+}

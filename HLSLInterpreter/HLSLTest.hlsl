@@ -11,6 +11,7 @@
         #define ASSERT_MSG(x, msg)
         #define PASS_TEST()
         #define FAIL_TEST()
+        #define MOCK_RESOURCE(res, mock)
     #endif
 
 #endif

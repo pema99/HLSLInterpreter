@@ -943,15 +943,15 @@ namespace UnityShaderParser.Test
         
         public override HLSLValue VisitFunctionCallExpressionNode(FunctionCallExpressionNode node)
         {
+            string name = node.Name.GetName();
+            if (callbacks.ContainsKey(name))
+                return callbacks[name](executionState, node.Arguments.ToArray());
+
             HLSLValue[] args = new HLSLValue[node.Arguments.Count];
             for (int i = 0; i < args.Length; i++)
             {
                 args[i] = Visit(node.Arguments[i]);
             }
-
-            string name = node.Name.GetName();
-            if (callbacks.ContainsKey(name))
-                return callbacks[name](executionState, node.Arguments.ToArray());
             
             // Handle out/inout parameters
             FunctionDefinitionNode func = context.GetFunction(this, name, args);
