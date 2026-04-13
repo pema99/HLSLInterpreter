@@ -1,3 +1,5 @@
+#include "HLSLTest.hlsl"
+
 // Validates that every HLSL code snippet shown in README.md compiles and behaves correctly.
 
 // ============================================================

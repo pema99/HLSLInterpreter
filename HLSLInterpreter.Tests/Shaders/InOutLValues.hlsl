@@ -1,3 +1,5 @@
+#include "HLSLTest.hlsl"
+
 struct Bar
 {
     int x;

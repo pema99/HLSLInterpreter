@@ -21,7 +21,12 @@ namespace HLSLInterpreter.Tests
         {
             if (!_nodeCache.TryGetValue(filePath, out var nodes))
             {
-                nodes = ShaderParser.ParseTopLevelDeclarations(File.ReadAllText(filePath));
+                var config = new HLSLParserConfig
+                {
+                    BasePath = Path.GetDirectoryName(filePath),
+                    Defines = new Dictionary<string, string> { ["__HLSL_TEST_RUNNER__"] = "1" },
+                };
+                nodes = ShaderParser.ParseTopLevelDeclarations(File.ReadAllText(filePath), config);
                 _nodeCache[filePath] = nodes;
             }
             var runner = new HLSLRunner();

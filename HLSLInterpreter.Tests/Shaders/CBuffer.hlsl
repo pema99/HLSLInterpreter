@@ -1,3 +1,5 @@
+#include "HLSLTest.hlsl"
+
 cbuffer Foo
 {
     int a = 1;

@@ -1,3 +1,5 @@
+#include "HLSLTest.hlsl"
+
 // Tests for the test framework assertions: ASSERT_EQUAL, ASSERT_NEAR,
 // ASSERT_UNIFORM, ASSERT_VARYING, and [Ignore].
 
