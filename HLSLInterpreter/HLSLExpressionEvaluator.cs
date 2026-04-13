@@ -247,7 +247,7 @@ namespace UnityShaderParser.Test
                     var coord = EvaluateNumeric(elementAccess.Index);
                     reference = new ReferenceValue(
                         () => HLSLIntrinsics.ResourceSubscriptRead(rv, coord),
-                        val => HLSLIntrinsics.ResourceSubscriptWrite(rv, coord, (NumericValue)val));
+                        val => HLSLIntrinsics.ResourceSubscriptWrite(executionState, rv, coord, (NumericValue)val));
                     return true;
                 }
 

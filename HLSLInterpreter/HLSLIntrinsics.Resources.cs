@@ -178,7 +178,7 @@ namespace UnityShaderParser.Test
             }
 
             // === GetDimensions ===
-            AddN("GetDimensions", 1, 5, (state, rv, args) => GetDimensions(rv, args));
+            AddN("GetDimensions", 1, 5, (state, rv, args) => GetDimensions(state, rv, args));
 
             // === AppendStructuredBuffer / ConsumeStructuredBuffer functions ===
             Add("Append", 1, (state, rv, args) =>
@@ -207,31 +207,31 @@ namespace UnityShaderParser.Test
             {
                 int count = n;
                 string suffix = count == 1 ? "" : count.ToString();
-                Add($"Store{suffix}", 2, (state, rv, args) => { StoreN(rv, (NumericValue)args[0], (NumericValue)args[1], count); return ScalarValue.Null; });
+                Add($"Store{suffix}", 2, (state, rv, args) => { StoreN(state, rv, (NumericValue)args[0], (NumericValue)args[1], count); return ScalarValue.Null; });
             }
 
             // === RWByteAddressBuffer atomics ===
-            AddN("InterlockedAdd", 2, 3, (state, rv, args) => { InterlockedRMW32(rv, args, (a, b) => a + b); return ScalarValue.Null; });
-            AddN("InterlockedMin", 2, 3, (state, rv, args) => { InterlockedRMW32(rv, args, (a, b) => (int)a < (int)b ? a : b); return ScalarValue.Null; });
-            AddN("InterlockedMax", 2, 3, (state, rv, args) => { InterlockedRMW32(rv, args, (a, b) => (int)a > (int)b ? a : b); return ScalarValue.Null; });
-            AddN("InterlockedAnd", 2, 3, (state, rv, args) => { InterlockedRMW32(rv, args, (a, b) => a & b); return ScalarValue.Null; });
-            AddN("InterlockedOr", 2, 3, (state, rv, args) => { InterlockedRMW32(rv, args, (a, b) => a | b); return ScalarValue.Null; });
-            AddN("InterlockedXor", 2, 3, (state, rv, args) => { InterlockedRMW32(rv, args, (a, b) => a ^ b); return ScalarValue.Null; });
-            AddN("InterlockedAdd64", 2, 3, (state, rv, args) => { InterlockedRMW64(rv, args, (a, b) => a + b); return ScalarValue.Null; });
-            AddN("InterlockedMin64", 2, 3, (state, rv, args) => { InterlockedRMW64(rv, args, (a, b) => (long)a < (long)b ? a : b); return ScalarValue.Null; });
-            AddN("InterlockedMax64", 2, 3, (state, rv, args) => { InterlockedRMW64(rv, args, (a, b) => (long)a > (long)b ? a : b); return ScalarValue.Null; });
-            AddN("InterlockedAnd64", 2, 3, (state, rv, args) => { InterlockedRMW64(rv, args, (a, b) => a & b); return ScalarValue.Null; });
-            AddN("InterlockedOr64", 2, 3, (state, rv, args) => { InterlockedRMW64(rv, args, (a, b) => a | b); return ScalarValue.Null; });
-            AddN("InterlockedXor64", 2, 3, (state, rv, args) => { InterlockedRMW64(rv, args, (a, b) => a ^ b); return ScalarValue.Null; });
-            Add("InterlockedExchange", 3, (state, rv, args) => { InterlockedRMW32(rv, args, (_, b) => b); return ScalarValue.Null; });
-            Add("InterlockedExchange64", 3, (state, rv, args) => { InterlockedRMW64(rv, args, (_, b) => b); return ScalarValue.Null; });
-            Add("InterlockedExchangeFloat", 3, (state, rv, args) => { InterlockedExchangeFloat(rv, args); return ScalarValue.Null; });
-            Add("InterlockedCompareStore", 3, (state, rv, args) => { InterlockedCmpStore32(rv, args); return ScalarValue.Null; });
-            Add("InterlockedCompareStore64", 3, (state, rv, args) => { InterlockedCmpStore64(rv, args); return ScalarValue.Null; });
-            Add("InterlockedCompareStoreFloatBitwise", 3, (state, rv, args) => { InterlockedCmpStoreFloat(rv, args); return ScalarValue.Null; });
-            Add("InterlockedCompareExchange", 4, (state, rv, args) => { InterlockedCmpStore32(rv, args); return ScalarValue.Null; });
-            Add("InterlockedCompareExchange64", 4, (state, rv, args) => { InterlockedCmpStore64(rv, args); return ScalarValue.Null; });
-            Add("InterlockedCompareExchangeFloatBitwise", 4, (state, rv, args) => { InterlockedCmpStoreFloat(rv, args); return ScalarValue.Null; });
+            AddN("InterlockedAdd", 2, 3, (state, rv, args) => { InterlockedRMW32(state, rv, args, (a, b) => a + b); return ScalarValue.Null; });
+            AddN("InterlockedMin", 2, 3, (state, rv, args) => { InterlockedRMW32(state, rv, args, (a, b) => (int)a < (int)b ? a : b); return ScalarValue.Null; });
+            AddN("InterlockedMax", 2, 3, (state, rv, args) => { InterlockedRMW32(state, rv, args, (a, b) => (int)a > (int)b ? a : b); return ScalarValue.Null; });
+            AddN("InterlockedAnd", 2, 3, (state, rv, args) => { InterlockedRMW32(state, rv, args, (a, b) => a & b); return ScalarValue.Null; });
+            AddN("InterlockedOr", 2, 3, (state, rv, args) => { InterlockedRMW32(state, rv, args, (a, b) => a | b); return ScalarValue.Null; });
+            AddN("InterlockedXor", 2, 3, (state, rv, args) => { InterlockedRMW32(state, rv, args, (a, b) => a ^ b); return ScalarValue.Null; });
+            AddN("InterlockedAdd64", 2, 3, (state, rv, args) => { InterlockedRMW64(state, rv, args, (a, b) => a + b); return ScalarValue.Null; });
+            AddN("InterlockedMin64", 2, 3, (state, rv, args) => { InterlockedRMW64(state, rv, args, (a, b) => (long)a < (long)b ? a : b); return ScalarValue.Null; });
+            AddN("InterlockedMax64", 2, 3, (state, rv, args) => { InterlockedRMW64(state, rv, args, (a, b) => (long)a > (long)b ? a : b); return ScalarValue.Null; });
+            AddN("InterlockedAnd64", 2, 3, (state, rv, args) => { InterlockedRMW64(state, rv, args, (a, b) => a & b); return ScalarValue.Null; });
+            AddN("InterlockedOr64", 2, 3, (state, rv, args) => { InterlockedRMW64(state, rv, args, (a, b) => a | b); return ScalarValue.Null; });
+            AddN("InterlockedXor64", 2, 3, (state, rv, args) => { InterlockedRMW64(state, rv, args, (a, b) => a ^ b); return ScalarValue.Null; });
+            Add("InterlockedExchange", 3, (state, rv, args) => { InterlockedRMW32(state, rv, args, (_, b) => b); return ScalarValue.Null; });
+            Add("InterlockedExchange64", 3, (state, rv, args) => { InterlockedRMW64(state, rv, args, (_, b) => b); return ScalarValue.Null; });
+            Add("InterlockedExchangeFloat", 3, (state, rv, args) => { InterlockedExchangeFloat(state, rv, args); return ScalarValue.Null; });
+            Add("InterlockedCompareStore", 3, (state, rv, args) => { InterlockedCmpStore32(state, rv, args); return ScalarValue.Null; });
+            Add("InterlockedCompareStore64", 3, (state, rv, args) => { InterlockedCmpStore64(state, rv, args); return ScalarValue.Null; });
+            Add("InterlockedCompareStoreFloatBitwise", 3, (state, rv, args) => { InterlockedCmpStoreFloat(state, rv, args); return ScalarValue.Null; });
+            Add("InterlockedCompareExchange", 4, (state, rv, args) => { InterlockedCmpStore32(state, rv, args); return ScalarValue.Null; });
+            Add("InterlockedCompareExchange64", 4, (state, rv, args) => { InterlockedCmpStore64(state, rv, args); return ScalarValue.Null; });
+            Add("InterlockedCompareExchangeFloatBitwise", 4, (state, rv, args) => { InterlockedCmpStoreFloat(state, rv, args); return ScalarValue.Null; });
 
             // === Misc stuff ===
             Add("IncrementCounter", 0, (state, rv, args) => (NumericValue)(uint)rv.Counter++);
@@ -244,7 +244,19 @@ namespace UnityShaderParser.Test
         public static bool IsResourceMethodInoutParameter(ResourceValue rv, string methodName, int argCount, int paramIndex)
         {
             if (methodName == "GetDimensions")
-                return true;
+            {
+                // For read-only (non-RW, non-MS) textures the mip+levels overload has arg 0
+                // as an INPUT mip level; every other arg is an OUT param.
+                // For RW textures, buffers, and MS textures every arg is OUT.
+                if (rv.IsTexture && !rv.IsWriteable && !IsMSTexture(rv))
+                {
+                    // The out-only overload has one slot per spatial dimension plus one for array slices.
+                    int outOnlyCount = rv.Dimension + (rv.IsArray ? 1 : 0);
+                    if (argCount > outOnlyCount)
+                        return paramIndex > 0;   // arg 0 is the mip input; the rest are OUT
+                }
+                return true;  // RW / buffer / MS or out-only overload — all args are OUT
+            }
 
             if (paramIndex == argCount - 1)
             {
@@ -353,7 +365,7 @@ namespace UnityShaderParser.Test
         }
 
         // res[coord] = value
-        public static void ResourceSubscriptWrite(ResourceValue rv, NumericValue coord, NumericValue value)
+        public static void ResourceSubscriptWrite(HLSLExecutionState executionState, ResourceValue rv, NumericValue coord, NumericValue value)
         {
             int dim = rv.Dimension;
             int coordCount = dim + (rv.IsArray ? 1 : 0);
@@ -362,6 +374,7 @@ namespace UnityShaderParser.Test
             int threadCount = Math.Max(vecCoord.ThreadCount, value.ThreadCount);
             for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
             {
+                if (!executionState.IsThreadActive(threadIndex)) continue;
                 int x = dim >= 1 ? Convert.ToInt32(scalarCoord[0].GetThreadValue(threadIndex)) : 0;
                 int y = dim >= 2 ? Convert.ToInt32(scalarCoord[1].GetThreadValue(threadIndex)) : 0;
                 int z = dim >= 3 ? Convert.ToInt32(scalarCoord[2].GetThreadValue(threadIndex)) : 0;
@@ -405,13 +418,14 @@ namespace UnityShaderParser.Test
         }
 
         // Stores N uints
-        private static void StoreN(ResourceValue rv, NumericValue byteOffset, NumericValue value, int count)
+        private static void StoreN(HLSLExecutionState state, ResourceValue rv, NumericValue byteOffset, NumericValue value, int count)
         {
             var scalarOff = CastToScalar(byteOffset.Cast(ScalarType.Int));
             var vec = CastToVector(value.Cast(ScalarType.Uint), count);
             int threadCount = scalarOff.ThreadCount;
             for (int thread = 0; thread < threadCount; thread++)
             {
+                if (!state.IsThreadActive(thread)) continue;
                 int baseOff = Convert.ToInt32(scalarOff.GetThreadValue(thread));
                 for (int i = 0; i < count; i++)
                 {
@@ -446,7 +460,7 @@ namespace UnityShaderParser.Test
         }
 
         // Read-modify-write for 32-bit atomics.
-        private static void InterlockedRMW32(ResourceValue rv, HLSLValue[] args, Func<uint, uint, uint> op)
+        private static void InterlockedRMW32(HLSLExecutionState state, ResourceValue rv, HLSLValue[] args, Func<uint, uint, uint> op)
         {
             var scalarOff = CastToScalar(((NumericValue)args[0]).Cast(ScalarType.Int));
             var scalarVal = CastToScalar(((NumericValue)args[1]).Cast(ScalarType.Uint));
@@ -459,14 +473,15 @@ namespace UnityShaderParser.Test
                 uint old = ReadUint32(rv, off);
                 uint val = Convert.ToUInt32(scalarVal.GetThreadValue(thread));
                 if (originals is not null) originals[thread] = new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR(old));
-                WriteUint32(rv, off, op(old, val));
+                if (state.IsThreadActive(thread))
+                    WriteUint32(rv, off, op(old, val));
             }
             if (originals is not null)
                 ((ReferenceValue)args[2]).Set((NumericValue)HLSLValueUtils.MergeThreadValues(originals));
         }
 
         // Read-modify-write for 64-bit atomics.
-        private static void InterlockedRMW64(ResourceValue rv, HLSLValue[] args, Func<ulong, ulong, ulong> op)
+        private static void InterlockedRMW64(HLSLExecutionState state, ResourceValue rv, HLSLValue[] args, Func<ulong, ulong, ulong> op)
         {
             var scalarOff = CastToScalar(((NumericValue)args[0]).Cast(ScalarType.Int));
             var valVec = CastToVector(((NumericValue)args[1]).Cast(ScalarType.Uint), 2);
@@ -483,13 +498,14 @@ namespace UnityShaderParser.Test
                     originals[thread] = VectorValue.FromScalars(
                         new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR((uint)(old & 0xFFFFFFFF))),
                         new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR((uint)(old >> 32))));
-                WriteUint64(rv, off, op(old, val));
+                if (state.IsThreadActive(thread))
+                    WriteUint64(rv, off, op(old, val));
             }
             if (originals is not null)
                 ((ReferenceValue)args[2]).Set((NumericValue)HLSLValueUtils.MergeThreadValues(originals));
         }
 
-        private static void InterlockedExchangeFloat(ResourceValue rv, HLSLValue[] args)
+        private static void InterlockedExchangeFloat(HLSLExecutionState state, ResourceValue rv, HLSLValue[] args)
         {
             var scalarOff = CastToScalar(((NumericValue)args[0]).Cast(ScalarType.Int));
             var scalarVal = CastToScalar(((NumericValue)args[1]).Cast(ScalarType.Float));
@@ -501,13 +517,14 @@ namespace UnityShaderParser.Test
                 float old = BitConverter.UInt32BitsToSingle(ReadUint32(rv, off));
                 float val = Convert.ToSingle(scalarVal.GetThreadValue(thread));
                 originals[thread] = new ScalarValue(ScalarType.Float, HLSLValueUtils.MakeScalarSGPR(old));
-                WriteUint32(rv, off, BitConverter.SingleToUInt32Bits(val));
+                if (state.IsThreadActive(thread))
+                    WriteUint32(rv, off, BitConverter.SingleToUInt32Bits(val));
             }
             if (args[2] is ReferenceValue outRef)
                 outRef.Set((NumericValue)HLSLValueUtils.MergeThreadValues(originals));
         }
 
-        private static void InterlockedCmpStore32(ResourceValue rv, HLSLValue[] args)
+        private static void InterlockedCmpStore32(HLSLExecutionState state, ResourceValue rv, HLSLValue[] args)
         {
             var scalarOff = CastToScalar(((NumericValue)args[0]).Cast(ScalarType.Int));
             var scalarCmp = CastToScalar(((NumericValue)args[1]).Cast(ScalarType.Uint));
@@ -522,13 +539,13 @@ namespace UnityShaderParser.Test
                 uint cmp = Convert.ToUInt32(scalarCmp.GetThreadValue(thread));
                 uint val = Convert.ToUInt32(scalarVal.GetThreadValue(thread));
                 if (originals is not null) originals[thread] = new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR(old));
-                if (old == cmp) WriteUint32(rv, off, val);
+                if (state.IsThreadActive(thread) && old == cmp) WriteUint32(rv, off, val);
             }
             if (originals is not null)
                 ((ReferenceValue)args[3]).Set((NumericValue)HLSLValueUtils.MergeThreadValues(originals));
         }
 
-        private static void InterlockedCmpStore64(ResourceValue rv, HLSLValue[] args)
+        private static void InterlockedCmpStore64(HLSLExecutionState state, ResourceValue rv, HLSLValue[] args)
         {
             var scalarOff = CastToScalar(((NumericValue)args[0]).Cast(ScalarType.Int));
             var cmpVec = CastToVector(((NumericValue)args[1]).Cast(ScalarType.Uint), 2);
@@ -546,13 +563,13 @@ namespace UnityShaderParser.Test
                     originals[thread] = VectorValue.FromScalars(
                         new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR((uint)(old & 0xFFFFFFFF))),
                         new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR((uint)(old >> 32))));
-                if (old == cmp) WriteUint64(rv, off, val);
+                if (state.IsThreadActive(thread) && old == cmp) WriteUint64(rv, off, val);
             }
             if (originals is not null)
                 ((ReferenceValue)args[3]).Set((NumericValue)HLSLValueUtils.MergeThreadValues(originals));
         }
 
-        private static void InterlockedCmpStoreFloat(ResourceValue rv, HLSLValue[] args)
+        private static void InterlockedCmpStoreFloat(HLSLExecutionState state, ResourceValue rv, HLSLValue[] args)
         {
             var scalarOff = CastToScalar(((NumericValue)args[0]).Cast(ScalarType.Int));
             var scalarCmp = CastToScalar(((NumericValue)args[1]).Cast(ScalarType.Float));
@@ -568,7 +585,7 @@ namespace UnityShaderParser.Test
                 uint valBits = BitConverter.SingleToUInt32Bits(Convert.ToSingle(scalarVal.GetThreadValue(thread)));
                 if (originals is not null)
                     originals[thread] = new ScalarValue(ScalarType.Float, HLSLValueUtils.MakeScalarSGPR(BitConverter.UInt32BitsToSingle(oldBits)));
-                if (oldBits == cmpBits) WriteUint32(rv, off, valBits);
+                if (state.IsThreadActive(thread) && oldBits == cmpBits) WriteUint32(rv, off, valBits);
             }
             if (originals is not null)
                 ((ReferenceValue)args[3]).Set((NumericValue)HLSLValueUtils.MergeThreadValues(originals));
@@ -1002,59 +1019,69 @@ namespace UnityShaderParser.Test
             return (VectorValue)HLSLValueUtils.MergeThreadValues(results);
         }
 
-        private static HLSLValue GetDimensions(ResourceValue rv, HLSLValue[] args)
+        private static HLSLValue GetDimensions(HLSLExecutionState state, ResourceValue rv, HLSLValue[] args)
         {
-            int idx = 0;
-
             // The first argument is a mip-level input if it is not a ReferenceValue (out param).
             // Only non-RW textures support mip queries in GetDimensions.
-            int mipLevel = 0;
             bool hasMipInput = args.Length > 0 && args[0] is not ReferenceValue
                 && rv.IsTexture && !rv.IsWriteable;
+
+            ScalarValue scalarMip = null;
+            int firstOutArgIdx = 0;
+            int threadCount = 1;
             if (hasMipInput)
             {
-                mipLevel = Convert.ToInt32(CastToScalar((NumericValue)args[0]).GetThreadValue(0));
-                idx = 1;
+                scalarMip = CastToScalar((NumericValue)args[0]);
+                threadCount = scalarMip.ThreadCount;
+                firstOutArgIdx = 1;
             }
 
-            float scale = MathF.Pow(2, mipLevel);
-            uint w = (uint)Math.Max(1, (int)(rv.SizeX / scale));
-            uint h = (uint)Math.Max(1, (int)(rv.SizeY / scale));
-            uint d = (uint)Math.Max(1, (int)(rv.SizeZ / scale));
+            // Count the out params and allocate per-thread storage.
+            int outCount = args.Length - firstOutArgIdx;
+            var collected = new uint[outCount][];
+            for (int o = 0; o < outCount; o++)
+                collected[o] = new uint[threadCount];
 
-            void Write(uint value)
+            for (int thread = 0; thread < threadCount; thread++)
             {
-                if (idx < args.Length && args[idx] is ReferenceValue r)
-                    r.Set((NumericValue)value);
-                idx++;
+                int mipLevel = hasMipInput ? Convert.ToInt32(scalarMip.GetThreadValue(thread)) : 0;
+                float scale = MathF.Pow(2, mipLevel);
+                uint w = (uint)Math.Max(1, (int)(rv.SizeX / scale));
+                uint h = (uint)Math.Max(1, (int)(rv.SizeY / scale));
+                uint d = (uint)Math.Max(1, (int)(rv.SizeZ / scale));
+
+                int o = 0;
+                // Width — all resource types have a width.
+                collected[o++][thread] = w;
+                // Height — 2D+ non-buffer resources.
+                if (!rv.IsBuffer && rv.Dimension >= 2) collected[o++][thread] = h;
+                // Depth or array element count — 3D textures and array textures.
+                if (rv.Dimension >= 3 || rv.IsArray) collected[o++][thread] = d;
+                // Sample count — MS textures (we report 1 since we don't track per-sample data).
+                if (IsMSTexture(rv)) collected[o++][thread] = 1;
+                // Element stride — StructuredBuffer types: size of the first template argument.
+                if (rv.Type == PredefinedObjectType.StructuredBuffer ||
+                    rv.Type == PredefinedObjectType.RWStructuredBuffer ||
+                    rv.Type == PredefinedObjectType.AppendStructuredBuffer ||
+                    rv.Type == PredefinedObjectType.ConsumeStructuredBuffer ||
+                    rv.Type == PredefinedObjectType.RasterizerOrderedStructuredBuffer)
+                    collected[o++][thread] = (uint)HLSLValueUtils.GetTypeSize(rv.TemplateArguments[0]);
+                // Mip level count — only when a mip input was given.
+                if (hasMipInput) collected[o++][thread] = (uint)rv.MipCount;
             }
 
-            // Width — all resource types have a width.
-            Write(w);
-
-            // Height — 2D+ non-buffer resources.
-            if (!rv.IsBuffer && rv.Dimension >= 2)
-                Write(h);
-
-            // Depth or array element count — 3D textures and array textures.
-            if (rv.Dimension >= 3 || rv.IsArray)
-                Write(d);
-
-            // Sample count — MS textures (we report 1 since we don't track per-sample data).
-            if (IsMSTexture(rv))
-                Write(1);
-
-            // Element stride — StructuredBuffer types: size of the first template argument.
-            if (rv.Type == PredefinedObjectType.StructuredBuffer ||
-                rv.Type == PredefinedObjectType.RWStructuredBuffer ||
-                rv.Type == PredefinedObjectType.AppendStructuredBuffer ||
-                rv.Type == PredefinedObjectType.ConsumeStructuredBuffer ||
-                rv.Type == PredefinedObjectType.RasterizerOrderedStructuredBuffer)
-                Write((uint)HLSLValueUtils.GetTypeSize(rv.TemplateArguments[0]));
-
-            // Mip level count — only when a mip input was given.
-            if (hasMipInput)
-                Write((uint)rv.MipCount);
+            // Write per-thread values to each out param.
+            for (int o = 0; o < outCount; o++)
+            {
+                int argIdx = firstOutArgIdx + o;
+                if (argIdx < args.Length && args[argIdx] is ReferenceValue r)
+                {
+                    var perThread = new HLSLValue[threadCount];
+                    for (int thread = 0; thread < threadCount; thread++)
+                        perThread[thread] = new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR(collected[o][thread]));
+                    r.Set((NumericValue)HLSLValueUtils.MergeThreadValues(perThread));
+                }
+            }
 
             return ScalarValue.Null;
         }

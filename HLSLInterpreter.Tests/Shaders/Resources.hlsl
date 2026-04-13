@@ -97,3 +97,36 @@ void MockResource_LoadAtCoord([MockResource(MockTex2D)] RWTexture2D<float4> tex,
     ASSERT(val.x == float(y * 4 + x));
     ASSERT(val.w == 1.0);
 }
+
+// Subscript writes inside a divergent branch must only affect active threads.
+// Thread 0 writes 99 to tex[0,0]. Thread 1 is inactive in that branch, but without an
+// active-thread guard ResourceSubscriptWrite will write the pre-masked (original) value
+// back to tex[0,0], clobbering thread 0's result.
+[Test]
+[WarpSize(2, 1)]
+void MockResource_VaryingStore_OnlyActiveThreadsWrite([MockResource(MockTex2D)] RWTexture2D<float4> tex)
+{
+    uint tid = WaveGetLaneIndex();
+    if (tid == 0)
+    {
+        tex[int2(0, 0)] = float4(99, 0, 0, 1);
+    }
+    // After the branch both threads are active; tex[0,0] must reflect thread 0's write.
+    float4 val = tex.Load(int2(0, 0));
+    ASSERT(val.x == 99.0);
+}
+
+// GetDimensions must use each thread's mip-level argument, not always thread 0's.
+// MockTex2D_Sized: SizeX=SizeY=8, MipCount=4.
+// Mip k has dimensions 8>>k * 8>>k.
+[Test]
+[WarpSize(2, 1)]
+void MockResource_GetDimensions_VaryingMip([MockResource(MockTex2D_Sized)] Texture2D<float4> tex)
+{
+    uint tid = WaveGetLaneIndex();  // 0 or 1
+    uint w, h, levels;
+    tex.GetDimensions(tid, w, h, levels);  // thread 0: mip 0 (8x8), thread 1: mip 1 (4x4)
+    uint expectedW = 8u >> tid;
+    ASSERT(w == expectedW);
+    ASSERT(h == expectedW);
+}
