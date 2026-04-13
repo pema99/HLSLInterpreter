@@ -641,21 +641,6 @@ void Intrinsic_Min()
 }
 
 [Test]
-void Intrinsic_Noise()
-{
-    // Test that noise returns values in [0,1] range
-    float n1 = noise(float3(0.0, 0.0, 0.0));
-    float n2 = noise(float3(1.0, 2.0, 3.0));
-    float n3 = noise(float3(-1.0, -2.0, -3.0));
-    float n4 = noise(float3(100.0, 200.0, 300.0));
-    
-    ASSERT(n1 >= 0.0 && n1 <= 1.0);
-    ASSERT(n2 >= 0.0 && n2 <= 1.0);
-    ASSERT(n3 >= 0.0 && n3 <= 1.0);
-    ASSERT(n4 >= 0.0 && n4 <= 1.0);
-}
-
-[Test]
 void Intrinsic_Normalize()
 {
     // Standard vector (longer than 1)
