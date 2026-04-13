@@ -213,7 +213,7 @@
                         'WavePrefixCountBits','WavePrefixProduct','WavePrefixSum',
                         'WaveReadLaneFirst','WaveReadLaneAt',
                         // Test runner helpers
-                        'ASSERT','ASSERT_MSG','PASS_TEST','FAIL_TEST','PRINTF',
+                        'ASSERT','ASSERT_MSG','PASS_TEST','FAIL_TEST','PRINTF','MOCK_RESOURCE',
                     ],
 
                     tokenizer: {
@@ -294,7 +294,7 @@
                         'WaveGetLaneCount','WaveGetLaneIndex','WaveIsFirstLane',
                         'WavePrefixCountBits','WavePrefixProduct','WavePrefixSum',
                         'WaveReadLaneFirst','WaveReadLaneAt',
-                        'ASSERT','ASSERT_MSG','PASS_TEST','FAIL_TEST','PRINTF',
+                        'ASSERT','ASSERT_MSG','PASS_TEST','FAIL_TEST','PRINTF','MOCK_RESOURCE',
                     ];
                     // Intrinsics that take no arguments (no cursor inside parens needed)
                     const noArgIntrinsics = new Set([
@@ -448,8 +448,8 @@
                         { token: 'keyword.literal',   foreground: '569cd6' },   // blue    – true/false
                         { token: 'keyword.directive', foreground: '9b9b9b' },   // grey    – #define/#include
                         { token: 'support.function',  foreground: 'dcdcaa' },   // yellow  – intrinsics
-                        { token: 'annotation',        foreground: 'c8c8c8', fontStyle: 'italic' },
-                        { token: 'annotation.bracket',foreground: 'c8c8c8', fontStyle: 'italic' },
+                        { token: 'annotation',        foreground: 'c8c8c8' },
+                        { token: 'annotation.bracket',foreground: 'c8c8c8' },
                         { token: 'number',            foreground: 'b5cea8' },
                         { token: 'number.float',      foreground: 'b5cea8' },
                         { token: 'number.hex',        foreground: 'b5cea8' },
