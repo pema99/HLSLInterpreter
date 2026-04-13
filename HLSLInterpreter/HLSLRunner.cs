@@ -40,6 +40,8 @@ namespace UnityShaderParser.Test
         {
             public string TestName;
             public string FunctionName;
+            public string Description;
+            public string Category;
             public bool UsesCustomWarpSize;
             public int WarpSizeX;
             public int WarpSizeY;
@@ -392,6 +394,14 @@ namespace UnityShaderParser.Test
                                 var inputs = attribute.Arguments.Select(a => interpreter.EvaluateExpression(a)).ToList();
                                 testCases.Add((inputs, $"{testRun.FunctionName}({string.Join(", ", inputs)})"));
                             }
+                            break;
+                        case "description":
+                            if (attribute.Arguments.Count > 0)
+                                testRun.Description = (interpreter.EvaluateExpression(attribute.Arguments[0]) as ScalarValue)?.Value.Get(0) as string ?? "";
+                            break;
+                        case "category":
+                            if (attribute.Arguments.Count > 0)
+                                testRun.Category = (interpreter.EvaluateExpression(attribute.Arguments[0]) as ScalarValue)?.Value.Get(0) as string ?? "";
                             break;
                         default: break;
                     }
