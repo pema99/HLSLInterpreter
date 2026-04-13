@@ -322,3 +322,52 @@ void LegacySampler_texCUBElod_FaceY()
     float4 val = texCUBElod(g_legacySamplerCube, float4(0, 1, 0, 0));
     ASSERT(val.x == 2.0);
 }
+
+// ============================================================
+// Interlocked ops on RWTexture2D elements
+// ============================================================
+
+struct MockIntTex2D
+{
+    int data[16];
+
+    void Initialize()
+    {
+        for (int i = 0; i < 16; i++)
+            data[i] = 0;
+    }
+
+    int Read(int x, int y, int z, int w, int mipLevel) { return data[y * 4 + x]; }
+    void Write(int x, int y, int z, int w, int mipLevel, int value) { data[y * 4 + x] = value; }
+    int SizeX() { return 4; }
+    int SizeY() { return 4; }
+};
+
+[Test]
+[WarpSize(1,1)]
+void Interlocked_Add_ResourceElement([MockResource(MockIntTex2D)] RWTexture2D<int> tex)
+{
+    InterlockedAdd(tex[uint2(1,2)], 7);
+    ASSERT(tex[uint2(1,2)] == 7);
+    ASSERT(tex[uint2(0,0)] == 0);
+}
+
+[Test]
+[WarpSize(1,1)]
+void Interlocked_Exchange_ResourceElement([MockResource(MockIntTex2D)] RWTexture2D<int> tex)
+{
+    int orig;
+    InterlockedExchange(tex[uint2(3,3)], 42, orig);
+    ASSERT(orig == 0);
+    ASSERT(tex[uint2(3,3)] == 42);
+}
+
+[Test]
+[WarpSize(1,1)]
+void Interlocked_CompareExchange_ResourceElement([MockResource(MockIntTex2D)] RWTexture2D<int> tex)
+{
+    int orig;
+    InterlockedCompareExchange(tex[uint2(2,1)], 0, 99, orig);
+    ASSERT(orig == 0);
+    ASSERT(tex[uint2(2,1)] == 99);
+}

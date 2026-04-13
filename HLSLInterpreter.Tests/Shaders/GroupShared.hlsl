@@ -296,3 +296,176 @@ void GroupShared_Reduction_Array()
 
     ASSERT(ReductionBuffer2[0] == 0+1+2+3);
 }
+
+// ============================================================
+// Interlocked intrinsics on groupshared variables
+// ============================================================
+
+groupshared int  gs_IntVal;
+groupshared uint gs_UintVal;
+
+[Test]
+[WarpSize(1,1)]
+void Interlocked_Add()
+{
+    gs_IntVal = 10;
+    InterlockedAdd(gs_IntVal, 5);
+    ASSERT(gs_IntVal == 15);
+}
+
+[Test]
+[WarpSize(1,1)]
+void Interlocked_Add_ReturnsOriginal()
+{
+    gs_IntVal = 10;
+    int orig;
+    InterlockedAdd(gs_IntVal, 3, orig);
+    ASSERT(orig == 10);
+    ASSERT(gs_IntVal == 13);
+}
+
+[Test]
+[WarpSize(1,1)]
+void Interlocked_And()
+{
+    gs_UintVal = 0xF0u;
+    InterlockedAnd(gs_UintVal, 0x3Cu);
+    ASSERT(gs_UintVal == 0x30u);
+}
+
+[Test]
+[WarpSize(1,1)]
+void Interlocked_Or()
+{
+    gs_UintVal = 0x0Fu;
+    InterlockedOr(gs_UintVal, 0xF0u);
+    ASSERT(gs_UintVal == 0xFFu);
+}
+
+[Test]
+[WarpSize(1,1)]
+void Interlocked_Xor()
+{
+    gs_UintVal = 0xFFu;
+    InterlockedXor(gs_UintVal, 0x0Fu);
+    ASSERT(gs_UintVal == 0xF0u);
+}
+
+[Test]
+[WarpSize(1,1)]
+void Interlocked_Min()
+{
+    gs_IntVal = 10;
+    InterlockedMin(gs_IntVal, 3);
+    ASSERT(gs_IntVal == 3);
+    InterlockedMin(gs_IntVal, 99);
+    ASSERT(gs_IntVal == 3);
+}
+
+[Test]
+[WarpSize(1,1)]
+void Interlocked_Max()
+{
+    gs_IntVal = 10;
+    InterlockedMax(gs_IntVal, 20);
+    ASSERT(gs_IntVal == 20);
+    InterlockedMax(gs_IntVal, 5);
+    ASSERT(gs_IntVal == 20);
+}
+
+[Test]
+[WarpSize(1,1)]
+void Interlocked_Exchange()
+{
+    gs_IntVal = 42;
+    int orig;
+    InterlockedExchange(gs_IntVal, 7, orig);
+    ASSERT(orig == 42);
+    ASSERT(gs_IntVal == 7);
+}
+
+[Test]
+[WarpSize(1,1)]
+void Interlocked_CompareStore_Matches()
+{
+    gs_UintVal = 5u;
+    InterlockedCompareStore(gs_UintVal, 5u, 99u);
+    ASSERT(gs_UintVal == 99u);
+}
+
+[Test]
+[WarpSize(1,1)]
+void Interlocked_CompareStore_NoMatch()
+{
+    gs_UintVal = 5u;
+    InterlockedCompareStore(gs_UintVal, 9u, 99u);
+    ASSERT(gs_UintVal == 5u);
+}
+
+[Test]
+[WarpSize(1,1)]
+void Interlocked_CompareExchange()
+{
+    gs_UintVal = 5u;
+    uint orig;
+    InterlockedCompareExchange(gs_UintVal, 5u, 99u, orig);
+    ASSERT(orig == 5u);
+    ASSERT(gs_UintVal == 99u);
+}
+
+// Only the first lane performs the add; final value should be 10 + 3 = 13.
+[Test]
+void Interlocked_Add_DivergentWrite_OnlyActiveThreadWrites()
+{
+    gs_IntVal = 10;
+    if (WaveIsFirstLane())
+        InterlockedAdd(gs_IntVal, 3);
+    ASSERT(gs_IntVal == 13);
+}
+
+// Each lane adds its own lane index; with 4 lanes: 0+1+2+3 = 6, so 10+6 = 16.
+[Test]
+[WarpSize(4, 1)]
+void Interlocked_Add_VaryingOperand()
+{
+    gs_IntVal = 10;
+    InterlockedAdd(gs_IntVal, (int)WaveGetLaneIndex());
+    ASSERT(gs_IntVal == 16);
+}
+
+// Capture originals: each lane reads the value before its own add.
+// Lane 0 reads 10, writes 10+0=10. Lane 1 reads 10, writes 11. Lane 2 reads 11, writes 13. Lane 3 reads 13, writes 16.
+[Test]
+[WarpSize(4, 1)]
+void Interlocked_Add_VaryingOperand_OriginalPerThread()
+{
+    gs_IntVal = 10;
+    int orig;
+    InterlockedAdd(gs_IntVal, (int)WaveGetLaneIndex(), orig);
+    ASSERT(WaveReadLaneAt(orig, 0) == 10);
+    ASSERT(WaveReadLaneAt(orig, 1) == 10);
+    ASSERT(WaveReadLaneAt(orig, 2) == 11);
+    ASSERT(WaveReadLaneAt(orig, 3) == 13);
+    ASSERT(gs_IntVal == 16);
+}
+
+// Only the first lane runs; the exchange should only happen once.
+[Test]
+void Interlocked_Exchange_DivergentWrite_OnlyActiveThreadWrites()
+{
+    gs_IntVal = 42;
+    int orig;
+    if (WaveIsFirstLane())
+        InterlockedExchange(gs_IntVal, 7, orig);
+    ASSERT(gs_IntVal == 7);
+}
+
+[Test]
+void Interlocked_BarrierSyncVariants_AreNoOps()
+{
+    gs_IntVal = 1;
+    AllMemoryBarrierWithGroupSync();
+    DeviceMemoryBarrierWithGroupSync();
+    GroupMemoryBarrierWithGroupSync();
+    ASSERT(gs_IntVal == 1);
+}

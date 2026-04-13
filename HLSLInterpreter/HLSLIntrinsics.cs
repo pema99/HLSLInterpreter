@@ -239,6 +239,21 @@ namespace UnityShaderParser.Test
                 case "frexp" when paramIndex == 1: return true;
                 case "sincos" when paramIndex == 1 || paramIndex == 2: return true;
                 case "asuint" when paramIndex == 1 || paramIndex == 2: return true;
+                case "InterlockedAdd":
+                case "InterlockedMin":
+                case "InterlockedMax":
+                case "InterlockedAnd":
+                case "InterlockedOr":
+                case "InterlockedXor":
+                    return paramIndex == 0 || paramIndex == 2;
+                case "InterlockedExchange":
+                    return paramIndex == 0 || paramIndex == 2;
+                case "InterlockedCompareStore":
+                case "InterlockedCompareStoreFloatBitwise":
+                    return paramIndex == 0;
+                case "InterlockedCompareExchange":
+                case "InterlockedCompareExchangeFloatBitwise":
+                    return paramIndex == 0 || paramIndex == 3;
                 default: return false;
             }
         }
@@ -1307,7 +1322,46 @@ namespace UnityShaderParser.Test
                 case "AllMemoryBarrier":
                 case "DeviceMemoryBarrier":
                 case "GroupMemoryBarrier":
+                case "AllMemoryBarrierWithGroupSync":
+                case "DeviceMemoryBarrierWithGroupSync":
+                case "GroupMemoryBarrierWithGroupSync":
                     System.Threading.Thread.MemoryBarrier();
+                    result = ScalarValue.Null;
+                    return true;
+
+                case "InterlockedAdd":
+                    InterlockedRMW(executionState, args, (a, b) => a + b);
+                    result = ScalarValue.Null;
+                    return true;
+                case "InterlockedAnd":
+                    InterlockedRMW(executionState, args, (a, b) => HLSLOperators.BitAnd(a, b));
+                    result = ScalarValue.Null;
+                    return true;
+                case "InterlockedOr":
+                    InterlockedRMW(executionState, args, (a, b) => HLSLOperators.BitOr(a, b));
+                    result = ScalarValue.Null;
+                    return true;
+                case "InterlockedXor":
+                    InterlockedRMW(executionState, args, (a, b) => HLSLOperators.BitXor(a, b));
+                    result = ScalarValue.Null;
+                    return true;
+                case "InterlockedMin":
+                    InterlockedRMW(executionState, args, (a, b) => Min(a, b));
+                    result = ScalarValue.Null;
+                    return true;
+                case "InterlockedMax":
+                    InterlockedRMW(executionState, args, (a, b) => Max(a, b));
+                    result = ScalarValue.Null;
+                    return true;
+                case "InterlockedExchange":
+                    InterlockedRMW(executionState, args, (_, b) => b);
+                    result = ScalarValue.Null;
+                    return true;
+                case "InterlockedCompareStore":
+                case "InterlockedCompareStoreFloatBitwise":
+                case "InterlockedCompareExchange":
+                case "InterlockedCompareExchangeFloatBitwise":
+                    InterlockedCAS(executionState, args);
                     result = ScalarValue.Null;
                     return true;
 
@@ -1399,6 +1453,51 @@ namespace UnityShaderParser.Test
                     result = null;
                     return false;
             }
+        }
+
+        // Interlocked op helper
+        private static void InterlockedOp(HLSLExecutionState state, HLSLValue[] args, int outArgIndex, Func<NumericValue, int, NumericValue> computeNewValue)
+        {
+            var refVal = (ReferenceValue)args[0];
+            bool hasOut = outArgIndex < args.Length && args[outArgIndex] is ReferenceValue;
+            int threadCount = state.GetThreadCount();
+            var originals = hasOut ? new HLSLValue[threadCount] : null;
+
+            for (int thread = 0; thread < threadCount; thread++)
+            {
+                var cur = (NumericValue)HLSLValueUtils.Scalarize(refVal.Get(), thread);
+                if (hasOut) originals[thread] = cur;
+                if (!state.IsThreadActive(thread))
+                    continue;
+
+                var newVal = computeNewValue(cur, thread);
+                if (newVal is not null)
+                    refVal.Set(HLSLValueUtils.CastForAssignment(cur, newVal));
+            }
+
+            if (hasOut)
+                ((ReferenceValue)args[outArgIndex]).Set((NumericValue)HLSLValueUtils.MergeThreadValues(originals));
+        }
+
+        // Read-modify-write
+        private static void InterlockedRMW(HLSLExecutionState state, HLSLValue[] args, Func<NumericValue, NumericValue, NumericValue> op)
+        {
+            var operand = (NumericValue)args[1];
+            InterlockedOp(state, args, 2, (cur, t) =>
+            {
+                return op(cur, operand.Scalarize(t));
+            });
+        }
+
+        // Compare-and-swap
+        private static void InterlockedCAS(HLSLExecutionState state, HLSLValue[] args)
+        {
+            var compare = (NumericValue)args[1];
+            var value = (NumericValue)args[2];
+            InterlockedOp(state, args, 3, (cur, t) =>
+            {
+                return Convert.ToBoolean((cur == compare.Scalarize(t)).GetThreadValue(0)) ? value.Scalarize(t) : null;
+            });
         }
 
         public static void Printf(HLSLExecutionState executionState, HLSLValue[] args)
