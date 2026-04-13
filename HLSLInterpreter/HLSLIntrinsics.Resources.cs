@@ -262,7 +262,7 @@ namespace UnityShaderParser.Test
                     if (argCount > outOnlyCount)
                         return paramIndex > 0;   // arg 0 is the mip input; the rest are OUT
                 }
-                return true;  // RW / buffer / MS or out-only overload — all args are OUT
+                return true;  // RW / buffer / MS or out-only overload, all args are OUT
             }
 
             if (paramIndex == argCount - 1)
@@ -1148,22 +1148,22 @@ namespace UnityShaderParser.Test
                 uint d = (uint)Math.Max(1, (int)(rv.SizeZ / scale));
 
                 int o = 0;
-                // Width — all resource types have a width.
+                // Width, all resource types have a width.
                 collected[o++][thread] = w;
-                // Height — 2D+ non-buffer resources.
+                // Height, 2D+ non-buffer resources.
                 if (!rv.IsBuffer && outDim >= 2) collected[o++][thread] = h;
-                // Depth or array element count — 3D textures and array textures.
+                // Depth or array element count, 3D textures and array textures.
                 if (outDim >= 3 || rv.IsArray) collected[o++][thread] = d;
-                // Sample count — MS textures (we report 1 since we don't track per-sample data).
+                // Sample count, MS textures (we report 1 since we don't track per-sample data).
                 if (IsMSTexture(rv)) collected[o++][thread] = 1;
-                // Element stride — StructuredBuffer types: size of the first template argument.
+                // Element stride, StructuredBuffer types: size of the first template argument.
                 if (rv.Type == PredefinedObjectType.StructuredBuffer ||
                     rv.Type == PredefinedObjectType.RWStructuredBuffer ||
                     rv.Type == PredefinedObjectType.AppendStructuredBuffer ||
                     rv.Type == PredefinedObjectType.ConsumeStructuredBuffer ||
                     rv.Type == PredefinedObjectType.RasterizerOrderedStructuredBuffer)
                     collected[o++][thread] = (uint)HLSLValueUtils.GetTypeSize(rv.TemplateArguments[0]);
-                // Mip level count — only when a mip input was given.
+                // Mip level count, only when a mip input was given.
                 if (hasMipInput) collected[o++][thread] = (uint)rv.MipCount;
             }
 
