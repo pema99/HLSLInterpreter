@@ -98,6 +98,17 @@ foreach (var result in runner.RunTests())
 
 You can pass a regex string to `RunTests()` to filter which tests are run by name.
 
+> **Note:** The `ProcessCode(string)` overloads automatically define `__HLSL_TEST_RUNNER__` before parsing, which is what activates the macros in `HLSLTest.hlsl`. If you pre-parse the code yourself (e.g. via `ShaderParser.ParseTopLevelDeclarations`) and pass the resulting nodes to `ProcessCode(IEnumerable<HLSLSyntaxNode>)`, you must define it manually in the `HLSLParserConfig`:
+> ```cs
+> var config = new HLSLParserConfig
+> {
+>     BasePath = Path.GetDirectoryName(filePath),
+>     Defines = new Dictionary<string, string> { ["__HLSL_TEST_RUNNER__"] = "1" },
+> };
+> var nodes = ShaderParser.ParseTopLevelDeclarations(File.ReadAllText(filePath), config);
+> runner.ProcessCode(nodes);
+> ```
+
 ### Basic test assertions
 
 `ASSERT(expr)` is the basic assertion macro. It fails the test if `expr` evaluates to false on any active thread:
