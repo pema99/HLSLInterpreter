@@ -72,14 +72,14 @@ void TestFramework_AssertVarying()
 [Ignore("not implemented yet")]
 void TestFramework_Ignored_WithReason()
 {
-    FAIL_TEST();
+    FAIL_TEST;
 }
 
 [Test]
 [Ignore]
 void TestFramework_Ignored_NoReason()
 {
-    FAIL_TEST();
+    FAIL_TEST;
 }
 
 void GenerateCases()
@@ -89,7 +89,7 @@ void GenerateCases()
 }
 
 [Test]
-[TestCaseSource(GenerateCases)]
+[TestCaseSource("GenerateCases")]
 void TestFramework_TestCaseSource(int a, float b)
 {
     ASSERT(a < b);
@@ -108,7 +108,7 @@ void GenerateB()
 }
 
 [Test]
-void TestFramework_ValueSource([ValueSource(GenerateA)] int a, [ValueSource(GenerateB)] float b)
+void TestFramework_ValueSource([ValueSource("GenerateA")] int a, [ValueSource("GenerateB")] float b)
 {
     ASSERT(a < b);
 }
@@ -120,14 +120,13 @@ void TestFramework_Values([Values(1, 2)] int a, [Values(3.5, 2.5)] float b)
 }
 
 [Test]
-void TestFramework_MixValuesAndValueSource([Values(1, 2)] int a, [ValueSource(GenerateB)] float b)
+void TestFramework_MixValuesAndValueSource([Values(1, 2)] int a, [ValueSource("GenerateB")] float b)
 {
     ASSERT(a < b);
 }
 
 namespace Foobar
 {
-    [Test]
     void TestFramework_Test_InNamespace()
     {
     }
@@ -148,8 +147,8 @@ void GenerateMixCases()
 }
 
 [Test]
-[TestCaseSource(GenerateMixCases)]
-void TestFramework_MixTestCaseSourceAndValueSource([ValueSource(GenerateA)] int a, [ValueSource(GenerateB)] float b)
+[TestCaseSource("GenerateMixCases")]
+void TestFramework_MixTestCaseSourceAndValueSource([ValueSource("GenerateA")] int a, [ValueSource("GenerateB")] float b)
 {
     ASSERT(a < b);
 }

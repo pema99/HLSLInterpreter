@@ -16,14 +16,14 @@
         #define ASSERT_NEAR(a, b, eps)
         #define ASSERT_UNIFORM(x)
         #define ASSERT_VARYING(x)
-        #define PASS_TEST()
+        #define PASS_TEST
         #define PASS_TEST_MSG(msg)
-        #define FAIL_TEST()
+        #define FAIL_TEST
         #define FAIL_TEST_MSG(msg)
-        #define IGNORE_TEST()
+        #define IGNORE_TEST
         #define IGNORE_TEST_MSG(msg)
         #define MOCK_RESOURCE(res, mock)
-        #define TEST_NAME()
+        #define TEST_NAME "Test"
         #define TEST_CASE
         #define TEST_VALUE(x)
     #endif
