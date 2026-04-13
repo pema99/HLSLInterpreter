@@ -117,7 +117,8 @@ The `ASSERT_MSG()` macro can used to attach an error message to an assert.
 [Test]
 void AssertSomeMsg()
 {
-    ASSERT_MSG(false, "Oh no! The assert has fired!");
+    float result = sqrt(4.0);
+    ASSERT_MSG(result == 2.0, "Expected sqrt(4) to be 2");
 }
 ```
 
@@ -127,7 +128,7 @@ The `ASSERT_EQUAL(a, b)` macro checks that two values are equal and prints both 
 [Test]
 void CheckResult()
 {
-    float3 result = myFunction();
+    float3 result = normalize(float3(1, 0, 0));
     ASSERT_EQUAL(result, float3(1, 0, 0));
 }
 ```
@@ -162,12 +163,12 @@ The `_MSG` variants take an additional string argument that is shown in the test
 
 ```hlsl
 [Test]
-void CheckSign(float x)
+void CheckSign()
 {
-    if (x >= 0)
-        PASS_TEST_MSG("value is non-negative");
+    if (sqrt(4.0) == 2.0)
+        PASS_TEST_MSG("sqrt is exact");
     else
-        FAIL_TEST_MSG("value is negative");
+        FAIL_TEST_MSG("unexpected sqrt result");
 }
 ```
 
@@ -219,7 +220,7 @@ void CheckUniformity()
 void PrintTheNumber()
 {
     int theNumber = 42;
-    PRINTF("The number is %d!", 42);
+    PRINTF("The number is %d!", theNumber);
 }
 ```
 
@@ -317,6 +318,8 @@ ScaleIsPositive(2, 2)
 `[Description]` and `[Category]` attach metadata to a test function. The description and category are surfaced in the test runner output and can be used for filtering or reporting:
 
 ```hlsl
+float SphereSDF(float3 pos, float r) { return length(pos) - r; }
+
 [Test]
 [Description("Verifies the sign of the SDF at points inside and outside the sphere")]
 [Category("SDF")]
