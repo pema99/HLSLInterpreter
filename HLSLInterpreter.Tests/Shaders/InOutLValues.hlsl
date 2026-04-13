@@ -37,6 +37,11 @@ void Double(inout float2 v)
     v *= 2;
 }
 
+void Double(inout float4 v)
+{
+    v *= 2;
+}
+
 void Double1Thread(inout float2 v)
 {
     if (WaveGetLaneIndex() == 0)
@@ -111,20 +116,9 @@ void InoutVectorSwizzle_WritesBackToOriginalVector()
 }
 
 [Test]
-void InoutVectorSwizzle_WritesBackToOriginalVector()
-{
-    float4 v = float4(1, 2, 3, 4);
-    Double(v.xy);
-    ASSERT(v.x == 2);
-    ASSERT(v.y == 4);
-    ASSERT(v.z == 3);
-    ASSERT(v.w == 4);
-}
-
-[Test]
 void InoutVectorSwizzleInsideFunction_WritesBackToOriginalVector()
 {
-    float4 v = float4(1, 2);
+    float2 v = float2(1, 2);
     Swap(v);
     ASSERT(v.x == 2);
     ASSERT(v.y == 1);

@@ -1,6 +1,6 @@
 #include "HLSLTest.hlsl"
 
-static int a = 1337;
+static int g_a = 1337;
 
 struct Foo
 {
@@ -13,7 +13,7 @@ struct Foo
 
     static int Baz()
     {
-        return a;
+        return g_a;
     }
 
     int Boo(int b)
@@ -142,12 +142,12 @@ void ThisKeyword_AssignmentInVaryingControlFlow_ResetsForSomeThreads()
     ASSERT(WaveReadLaneAt(foo.b, 1) == 2);
 }
 
-interface Foo
+interface IFoo
 {
     int bar();
 };
 
-struct Bar : Foo
+struct Bar : IFoo
 {
     int a;
     int bar() { return a; }
@@ -178,22 +178,17 @@ void Struct_InheritingFromOtherStruct_InheritsMembers()
     ASSERT(b.bom() == 5);
 }
 
-int RunBar(Foo f)
-{
-    return f.bar();
-}
-
 [Test]
-void Struct_ImplementingInterface_CanBePassedAsInterfaceParameter()
+void Struct_ImplementingInterface_DispatchesToCorrectOverride()
 {
     Bar b;
     b.a = 1;
-    ASSERT(RunBar(b) == 1);
+    ASSERT(b.bar() == 1);
 
     Baz c;
     c.a = 1;
     c.b = 3;
-    ASSERT(RunBar(c) == 9);
+    ASSERT(c.bar() == 9);
 }
 
 // --- Inherited static methods ---

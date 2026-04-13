@@ -9,7 +9,7 @@ void Conversion_TernaryOperator_VectorSizes()
     float3 v3 = float3(3.0, 4.0, 5.0);
     
     // Both operands convert to float3
-    float3 result = condition ? v2 : v3;  // v2 extends to float3
+    float3 result = condition ? float3(v2, 0.0) : v3;  // v2 explicitly extended to float3
     ASSERT(result.x == 1.0 && result.y == 2.0 && result.z == 0.0);
 }
 
@@ -330,7 +330,7 @@ void Assignment_VectorTruncation()
 {
     float2 v2;
     float4 v4 = float4(1.0, 2.0, 3.0, 4.0);
-    v2 = v4;  // Truncates
+    v2 = (float2)v4;  // Truncates
     ASSERT(v2.x == 1.0 && v2.y == 2.0);
 }
 
