@@ -3,6 +3,9 @@
 #ifndef __HLSL_TEST_INCLUDED__
 #define __HLSL_TEST_INCLUDED__
 
+    #pragma warning (disable : 3081)
+    #pragma warning (disable : 3554)
+
     // These should do nothing when not running tests.
     #ifndef __HLSL_TEST_RUNNER__
         #define printf
@@ -22,7 +25,7 @@
         #define MOCK_RESOURCE(res, mock)
         #define TEST_NAME()
         #define TEST_CASE
-        #define TEST_VALUE
+        #define TEST_VALUE(x)
     #endif
 
 #endif
