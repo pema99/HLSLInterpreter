@@ -426,7 +426,7 @@ void Texture_Write_Global()
 | `[ValueSource(Generator)]` | Parameter | Like `[Values]`, but values are emitted by `Generator` via `TEST_VALUE()`. |
 | `[MockResource(MockType)]` | Parameter | Injects a mock resource of the given struct type before each test call. |
 | `[WarpSize(x, y)]` | Function | Sets the warp size for the test. Required for tests using wave intrinsics or `ddx()/ddy()`. |
-| `[Ignore]` / `[Ignore("reason")]` | Function | Unconditionally skips the test, with an optional reason shown in the output. |
+| `[Ignore]`<br>`[Ignore("reason")]` | Function | Unconditionally skips the test, with an optional reason shown in the output. |
 | `[Description("text")]` | Function | Attaches a human-readable description to the test. |
 | `[Category("name")]` | Function | Assigns the test to a category for filtering and reporting. |
 
@@ -434,14 +434,14 @@ void Texture_Write_Global()
 
 | Macro | Description |
 |-------|-------------|
-| `ASSERT(expr)` / `ASSERT_MSG(expr, msg)` | Fails if `expr` is false on any active thread. |
+| `ASSERT(expr)`<br>`ASSERT_MSG(expr, msg)` | Fails if `expr` is false on any active thread. |
 | `ASSERT_EQUAL(a, b)` | Fails if `a != b`, printing both values in the failure message. |
 | `ASSERT_NEAR(a, b, eps)` | Fails if `\|a - b\| > eps`. |
 | `ASSERT_UNIFORM(expr)` | Fails if `expr` is stored in a vector register (may differ across threads). |
 | `ASSERT_VARYING(expr)` | Fails if `expr` is stored in a uniform register (same across all threads). |
-| `PASS_TEST()` / `PASS_TEST_MSG(msg)` | Immediately passes the test. |
-| `FAIL_TEST()` / `FAIL_TEST_MSG(msg)` | Immediately fails the test. |
-| `IGNORE_TEST()` / `IGNORE_TEST_MSG(msg)` | Skips the test at runtime. |
+| `PASS_TEST()`<br>`PASS_TEST_MSG(msg)` | Immediately passes the test. |
+| `FAIL_TEST()`<br>`FAIL_TEST_MSG(msg)` | Immediately fails the test. |
+| `IGNORE_TEST()`<br>`IGNORE_TEST_MSG(msg)` | Skips the test at runtime. |
 | `PRINTF(fmt, ...)` | Prints to the console. Prints once per active thread when data is varying. |
 | `TEST_NAME()` | Returns the name of the currently running test as a string. |
 | `TEST_CASE(args...)` | Emits a test case from a `[TestCaseSource]` generator function. |
