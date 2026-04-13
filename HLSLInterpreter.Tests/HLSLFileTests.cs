@@ -37,8 +37,12 @@ namespace HLSLInterpreter.Tests
                 HLSLRunner.TestRun[] tests = LoadFile(file).DiscoverTests();
                 foreach (var test in tests)
                 {
-                    yield return new TestCaseData(file, test)
-                        .SetName($"{fileName}.{test.TestName}");
+                    var data = new TestCaseData(file, test).SetName($"{fileName}.{test.TestName}");
+                    if (!string.IsNullOrEmpty(test.Description))
+                        data = data.SetDescription(test.Description);
+                    if (!string.IsNullOrEmpty(test.Category))
+                        data = data.SetDescription(test.Category);
+                    yield return data;
                 }
             }
         }
