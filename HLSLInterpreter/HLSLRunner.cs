@@ -162,6 +162,39 @@ namespace UnityShaderParser.Test
             return newConfig;
         }
 
+        private bool TryBuildMockResourceFactories(FunctionDefinitionNode func, out Func<HLSLValue>[] factories)
+        {
+            bool any = false;
+            factories = new Func<HLSLValue>[func.Parameters.Count];
+
+            for (int i = 0; i < func.Parameters.Count; i++)
+            {
+                var param = func.Parameters[i];
+                foreach (var attr in param.Attributes)
+                {
+                    if (attr.Name.Identifier.ToLower() != "mockresource" || attr.Arguments.Count == 0)
+                        continue;
+
+                    string mockStructName = (attr.Arguments[0] as IdentifierExpressionNode)?.GetName();
+                    if (mockStructName == null)
+                        continue;
+
+                    if (param.ParamType is not PredefinedObjectTypeNode resourceTypeNode)
+                        continue;
+
+                    any = true;
+                    var capturedStructName = mockStructName;
+                    var capturedKind = resourceTypeNode.Kind;
+                    var capturedTemplateArgs = resourceTypeNode.TemplateArguments.ToArray();
+
+                    factories[i] = () => interpreter.CreateMockResource(capturedStructName, capturedKind, capturedTemplateArgs);
+                }
+
+            }
+
+            return any;
+        }
+
         public void ProcessCode(string code) =>
             interpreter.VisitMany(ShaderParser.ParseTopLevelDeclarations(code, AddTestRunnerDefine(new HLSLParserConfig())));
         public void ProcessCode(string code, HLSLParserConfig config) =>
@@ -193,6 +226,10 @@ namespace UnityShaderParser.Test
                 testRun.FunctionName = func.Name.GetName();
                 testRun.TestName = func.Name.GetName();
 
+                // Detect [MockResource] params first so [TestCase] knows how many args to expect.
+                bool hasMocks = TryBuildMockResourceFactories(func, out var mockFactories);
+                int nonMockCount = mockFactories.Count(f => f == null);
+
                 foreach (var attribute in func.Attributes)
                 {
                     string lexeme = attribute.Name.Identifier.ToLower();
@@ -216,7 +253,7 @@ namespace UnityShaderParser.Test
                             }
                             break;
                         case "testcase":
-                            if (attribute.Arguments.Count == func.Parameters.Count)
+                            if (attribute.Arguments.Count == nonMockCount)
                             {
                                 var inputs = attribute.Arguments.Select(a => interpreter.EvaluateExpression(a)).ToList();
                                 testCases.Add((inputs, $"{testRun.FunctionName}({string.Join(", ", inputs)})"));
@@ -230,15 +267,34 @@ namespace UnityShaderParser.Test
                 {
                     if (testCases.Count == 0)
                     {
+                        if (hasMocks)
+                            testRun.GetInputs = () => mockFactories.Select(f => f?.Invoke()).ToList();
                         testsToRun.Add(testRun);
                     }
                     else
                     {
-                        foreach (var (inputs, formattedName) in testCases)
+                        foreach (var (caseInputs, formattedName) in testCases)
                         {
                             var caseRun = testRun;
                             caseRun.TestName = formattedName;
-                            caseRun.GetInputs = () => inputs;
+                            if (hasMocks)
+                            {
+                                var capturedCaseInputs = caseInputs;
+                                caseRun.GetInputs = () =>
+                                {
+                                    var merged = new List<HLSLValue>(mockFactories.Length);
+                                    int caseIdx = 0;
+                                    foreach (var factory in mockFactories)
+                                    {
+                                        merged.Add(factory != null ? factory() : capturedCaseInputs[caseIdx++]);
+                                    }
+                                    return merged;
+                                };
+                            }
+                            else
+                            {
+                                caseRun.GetInputs = () => caseInputs;
+                            }
                             testsToRun.Add(caseRun);
                         }
                     }
