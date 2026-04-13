@@ -98,7 +98,7 @@ foreach (var result in runner.RunTests())
 
 You can pass a regex string to `RunTests()` to filter which tests are run by name.
 
-> **Note:** The `ProcessCode(string)` overloads automatically define `__HLSL_TEST_RUNNER__` before parsing, which is what activates the macros in `HLSLTest.hlsl`. If you pre-parse the code yourself (e.g. via `ShaderParser.ParseTopLevelDeclarations`) and pass the resulting nodes to `ProcessCode(IEnumerable<HLSLSyntaxNode>)`, you must define it manually in the `HLSLParserConfig`:
+> **Note:** The `ProcessCode(string)` overloads automatically define `__HLSL_TEST_RUNNER__` before parsing, which is what activates the macros in `HLSLTest.hlsl`. If you parse the code yourself (for example via `ShaderParser.ParseTopLevelDeclarations`) and pass the resulting nodes to `ProcessCode(IEnumerable<HLSLSyntaxNode>)`, you must define it manually in the `HLSLParserConfig`:
 > ```cs
 > var config = new HLSLParserConfig
 > {
