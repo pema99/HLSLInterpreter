@@ -52,7 +52,7 @@ To run it, you can use `HLSLRunner.RunTests()`, optionally passing a string to f
 For some more examples, check the test files in [this folder](https://github.com/pema99/HLSLInterpreter/tree/master/HLSLInterpreter.Tests/Shaders). The section about [advanced testing features](#advanced-testing-features) shows more interesting things you can do in tests.
 
 ## Feature overview
-I estimate that the interpreter supports around 80% of the HLSL language, though several features are still missing. Here's a rough overview of what works:
+The interpreter supports the majority of the HLSL language, though a few niche features are missing or don't translate to CPU execution. Here's a rough overview of what works:
 - Every arithmetic [operator](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-operators) including casts.
 - Every [intrinsic](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-intrinsic-functions) which can be mapped reasonably to CPU execution.
   - This includes intrinsics that require simulating multiple threads, like `ddx()/ddy()` and wave intrinsics.
