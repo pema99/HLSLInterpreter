@@ -30,7 +30,7 @@ Then you can use `HLSLRunner.CallFunction()` to call HLSL functions:
 HLSLValue result = runner.CallFunction("add", (NumericValue)1, (NumericValue)3);
 Console.WriteLine(result); // Prints "4"
 ```
-Alternatively, you can use `HLSLRunner.RunTests()` to automatically find and run HLSL functions marked with the `[Test]` attribute as tests.
+Alternatively, you can use `HLSLRunner.RunTests()` to automatically find and run HLSL functions marked with the `[Test]` attribute as tests. See the [Shader testing framework](#shader-testing-framework) section for more info.
 
 For more advanced usages, check the API exposed by by [`HLSLRunner`](https://github.com/pema99/HLSLInterpreter/blob/master/HLSLInterpreter/HLSLRunner.cs). It serves as the main entry point for the interpreter.
 
