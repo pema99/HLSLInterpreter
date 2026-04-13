@@ -44,37 +44,9 @@ namespace UnityShaderParser.Test
 
         public void AddCallback(string name, Func<HLSLExecutionState, ExpressionNode[], HLSLValue> callback) => expressionEvaluator.AddCallback(name, callback);
         public void RemoveCallback(string name) => expressionEvaluator.RemoveCallback(name);
+
         public HLSLValue CallFunction(string name, params HLSLValue[] args) => expressionEvaluator.CallFunction(name, args);
-
-        public HLSLValue CallFunction(string name, params object[] args)
-        {
-            List<ExpressionNode> exprArgs = new List<ExpressionNode>();
-            for (int i = 0; i < args.Length; i++)
-            {
-                LiteralKind kind;
-                switch (args[i])
-                {
-                    case string _: kind = LiteralKind.String; break;
-                    case float _: kind = LiteralKind.Float; break;
-                    case int _: kind = LiteralKind.Integer; break;
-                    case char _: kind = LiteralKind.Character; break;
-                    case bool _: kind = LiteralKind.Boolean; break;
-                    default: kind = LiteralKind.Null; break;
-                }
-
-                exprArgs.Add(new LiteralExpressionNode(null)
-                {
-                    Kind = kind,
-                    Lexeme = args[i].ToString(),
-                });
-            }
-
-            return expressionEvaluator.Visit(new FunctionCallExpressionNode(null)
-            {
-                Name = new IdentifierExpressionNode(null) { Name = new IdentifierNode(null) { Identifier = name } },
-                Arguments = exprArgs
-            });
-        }
+        public FunctionDefinitionNode GetFunction(string name, HLSLValue[] args) => context.GetFunction(expressionEvaluator, name, args);
 
         public FunctionDefinitionNode[] GetFunctions() => context.GetFunctions();
 

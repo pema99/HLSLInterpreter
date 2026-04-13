@@ -46,12 +46,13 @@ namespace HLSLInterpreter.Tests
         [TestCaseSource(nameof(DiscoverTests))]
         public void RunTest(string filePath, HLSLRunner.TestRun testRun)
         {
-            if (testRun.IsIgnored)
-                Assert.Ignore(testRun.IgnoreReason);
-
             HLSLRunner.TestResult result = LoadFile(filePath).RunTests(new[] { testRun }).Single();
 
-            if (!result.Pass)
+            if (result.Status == HLSLRunner.TestStatus.Ignored)
+            {
+                Assert.Ignore(result.Message);
+            }
+            else if (result.Status == HLSLRunner.TestStatus.Fail)
             {
                 string message = string.IsNullOrEmpty(result.Message)
                     ? $"Test failed: {result.TestName}"
