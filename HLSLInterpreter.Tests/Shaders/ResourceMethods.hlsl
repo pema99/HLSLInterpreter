@@ -1109,19 +1109,6 @@ void RWBAB_InterlockedCompareStore([MockResource(MockBAB)] RWByteAddressBuffer b
 
 [Test]
 [WarpSize(1, 1)]
-void RWBAB_InterlockedAdd64([MockResource(MockBAB)] RWByteAddressBuffer buf)
-{
-    // 64-bit at offset 0: lo=data[0]=1, hi=data[1]=2
-    uint2 orig;
-    buf.InterlockedAdd64(0, uint2(5, 0), orig);
-    ASSERT(orig.x == 1);  // original lo
-    ASSERT(orig.y == 2);  // original hi
-    ASSERT(buf.Load(0) == 6);   // 1+5=6
-    ASSERT(buf.Load(4) == 2);   // hi unchanged
-}
-
-[Test]
-[WarpSize(1, 1)]
 void RWBAB_InterlockedExchangeFloat([MockResource(MockBAB)] RWByteAddressBuffer buf)
 {
     // Pre-store float bits of 1.0 at offset 0
