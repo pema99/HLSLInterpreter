@@ -5,7 +5,6 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using UnityShaderParser.Common;
 using UnityShaderParser.HLSL;
-using UnityShaderParser.HLSL.PreProcessor;
 
 namespace UnityShaderParser.Test
 {
@@ -27,6 +26,8 @@ namespace UnityShaderParser.Test
             public TestPassException(string message, Exception innerException) : base(message, innerException) { }
         }
 
+        public enum TestStatus { Pass, Fail, Ignored }
+
         public struct TestRun
         {
             public string TestName;
@@ -35,14 +36,12 @@ namespace UnityShaderParser.Test
             public int WarpSizeX;
             public int WarpSizeY;
             public Func<List<HLSLValue>> GetInputs;
-            public bool IsIgnored;
-            public string IgnoreReason;
         }
 
         public struct TestResult
         {
             public string TestName;
-            public bool Pass;
+            public TestStatus Status;
             public string Message;
             public string Log;
         }
@@ -264,6 +263,19 @@ namespace UnityShaderParser.Test
             return any;
         }
 
+        private bool IsIgnored(string functionName, List<HLSLValue> inputs, out string reason)
+        {
+            reason = null;
+            var func = interpreter.GetFunction(functionName, inputs.ToArray());
+            foreach (var attr in func.Attributes.Where(x => x.Name.Identifier.ToLower() == "ignore"))
+            {
+                if (attr.Arguments.Count > 0)
+                    reason = interpreter.EvaluateExpression(attr.Arguments[0]).ToString();
+                return true;
+            }
+            return false;
+        }
+
         public void ProcessCode(string code) =>
             interpreter.VisitMany(ShaderParser.ParseTopLevelDeclarations(code, AddTestRunnerDefine(new HLSLParserConfig())));
         public void ProcessCode(string code, HLSLParserConfig config) =>
@@ -328,11 +340,6 @@ namespace UnityShaderParser.Test
                                 testCases.Add((inputs, $"{testRun.FunctionName}({string.Join(", ", inputs)})"));
                             }
                             break;
-                        case "ignore":
-                            testRun.IsIgnored = true;
-                            if (attribute.Arguments.Count > 0)
-                                testRun.IgnoreReason = (interpreter.EvaluateExpression(attribute.Arguments[0]) as ScalarValue)?.Value.Get(0) as string ?? "";
-                            break;
                         default: break;
                     }
                 }
@@ -386,42 +393,76 @@ namespace UnityShaderParser.Test
 
             for (int i = 0; i < testsToRun.Count; i++)
             {
-                runBeforeTest?.Invoke(testsToRun[i]);
-
+                // Setup
+                if (testsToRun[i].UsesCustomWarpSize)
+                    interpreter.SetWarpSize(testsToRun[i].WarpSizeX, testsToRun[i].WarpSizeY);
                 var sw = new StringWriter();
                 Console.SetOut(sw);
 
+                // Get inputs
+                List<HLSLValue> inputs = new List<HLSLValue>();
                 try
                 {
-                    if (testsToRun[i].UsesCustomWarpSize)
-                        interpreter.SetWarpSize(testsToRun[i].WarpSizeX, testsToRun[i].WarpSizeY);
-
                     if (testsToRun[i].GetInputs != null)
                     {
-                        var inputs = testsToRun[i].GetInputs();
-                        interpreter.CallFunction(testsToRun[i].FunctionName, inputs.ToArray());
+                        inputs = testsToRun[i].GetInputs();
                     }
-                    else
-                    {
-                        interpreter.CallFunction(testsToRun[i].FunctionName, Array.Empty<object>());
-                    }
-                    results[i] = new TestResult { TestName = testsToRun[i].TestName, Pass = true, Log = sw.ToString() };
                 }
-                catch (TestFailException ex)
+                catch (Exception ex)
                 {
-                    results[i] = new TestResult { TestName = testsToRun[i].TestName, Pass = false, Log = sw.ToString(), Message = ex.Message };
+                    results[i] = new TestResult { TestName = testsToRun[i].TestName, Status = TestStatus.Fail, Log = sw.ToString(), Message = $"Error during test input generation: {ex.Message}" };
+                }
+
+                // Check if test ignored
+                if (IsIgnored(testsToRun[i].FunctionName, inputs, out string reason))
+                {
+                    results[i] = new TestResult { TestName = testsToRun[i].TestName, Status = TestStatus.Ignored, Log = sw.ToString(), Message = reason };
+                    continue;
+                }
+
+                // Run pre-amble
+                try
+                {
+                    runBeforeTest?.Invoke(testsToRun[i]);
+                }
+                catch (Exception ex)
+                {
+                    results[i] = new TestResult { TestName = testsToRun[i].TestName, Status = TestStatus.Fail, Log = sw.ToString(), Message = $"Error during test setup: {ex.Message}" };
+                }
+
+                // Run test
+                try
+                {
+                    interpreter.CallFunction(testsToRun[i].FunctionName, inputs.ToArray());
+                    results[i] = new TestResult { TestName = testsToRun[i].TestName, Status = TestStatus.Pass, Log = sw.ToString() };
                 }
                 catch (TestPassException ex)
                 {
-                    results[i] = new TestResult { TestName = testsToRun[i].TestName, Pass = true, Log = sw.ToString(), Message = ex.Message };
+                    results[i] = new TestResult { TestName = testsToRun[i].TestName, Status = TestStatus.Pass, Log = sw.ToString(), Message = ex.Message };
+                }
+                catch (TestFailException ex)
+                {
+                    results[i] = new TestResult { TestName = testsToRun[i].TestName, Status = TestStatus.Fail, Log = sw.ToString(), Message = ex.Message };
+                }
+                catch (Exception ex)
+                {
+                    results[i] = new TestResult { TestName = testsToRun[i].TestName, Status = TestStatus.Fail, Log = sw.ToString(), Message = $"Error during test run: {ex.Message}" };
                 }
 
-                Console.SetOut(oldConsoleOut);
+                // Run post-amble
+                try
+                {
+                    runAfterTest?.Invoke(testsToRun[i], results[i]);
+                }
+                catch (Exception ex)
+                {
+                    results[i] = new TestResult { TestName = testsToRun[i].TestName, Status = TestStatus.Fail, Log = sw.ToString(), Message = $"Error during test cleanup: {ex.Message}" };
+                }
 
+                // Cleanup
+                Console.SetOut(oldConsoleOut);
                 if (testsToRun[i].UsesCustomWarpSize)
                     interpreter.SetWarpSize(2, 2);
-
-                runAfterTest?.Invoke(testsToRun[i], results[i]);
             }
             return results;
         }
