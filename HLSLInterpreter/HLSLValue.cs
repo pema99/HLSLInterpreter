@@ -955,9 +955,9 @@ namespace UnityShaderParser.Test
         public TextureAddressMode AddressU { get; set; }
         public TextureAddressMode AddressV { get; set; }
         public TextureAddressMode AddressW { get; set; }
-        public float MinimumLod { get; set; }
-        public float MaximumLod { get; set; }
-        public float MipLodBias { get; set; }
+        public float MinimumLod { get; set; } = 0f;
+        public float MaximumLod { get; set; } = float.MaxValue;
+        public float MipLodBias { get; set; } = 0f;
         public int MaximumAnisotropy { get; set; }
         public ComparisonMode Comparison { get; set; }
         public (float r, float g, float b, float a) BorderColor { get; set; }
