@@ -117,6 +117,44 @@ void AssertSomeMsg()
 }
 ```
 
+The `ASSERT_EQUAL(a, b)` macro checks that two values are equal and prints both values in the failure message:
+
+```hlsl
+[Test]
+void CheckResult()
+{
+    float3 result = myFunction();
+    ASSERT_EQUAL(result, float3(1, 0, 0));
+}
+```
+
+The `ASSERT_NEAR(a, b, eps)` macro checks that two values are within `eps` of each other:
+
+```hlsl
+[Test]
+void CheckApproximateResult()
+{
+    ASSERT_NEAR(sqrt(2.0), 1.41421356, 0.0001);
+    ASSERT_NEAR(normalize(float3(1,1,1)), float3(0.57735027, 0.57735027, 0.57735027), 0.0001);
+}
+```
+
+The `ASSERT_UNIFORM(expr)` and `ASSERT_VARYING(expr)` macros check whether a value is stored in a scalar register (same across all threads) or vector register (differs per thread):
+
+```hlsl
+[Test]
+[WarpSize(2, 2)]
+void CheckUniformity()
+{
+    // Constants and expressions computed without per-thread input are uniform
+    ASSERT_UNIFORM(42.0);
+
+    // WaveGetLaneIndex() returns a different value on every thread
+    int lane = WaveGetLaneIndex();
+    ASSERT_VARYING(lane);
+}
+```
+
 If you just want to log some information from a test, you can use `PRINTF()`:
 
 ```hlsl
@@ -210,5 +248,16 @@ void Texture_Write_Global()
     g_tex[int2(3, 0)] = float4(77, 0, 0, 1);
     float4 val = g_tex.Load(int2(3, 0));
     ASSERT(val.x == 77.0);
+}
+```
+
+To skip a test without deleting it, use `[Ignore]`. An optional string argument is shown in the test runner output as the skip reason:
+
+```hlsl
+[Test]
+[Ignore("floor() precision not implemented yet")]
+void CheckFloorEdgeCase()
+{
+    ASSERT_EQUAL(floor(-0.0), 0.0);
 }
 ```
