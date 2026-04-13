@@ -26,6 +26,14 @@ namespace UnityShaderParser.Test
             public TestPassException(string message, Exception innerException) : base(message, innerException) { }
         }
 
+        [Serializable]
+        private class TestIgnoreException : Exception
+        {
+            public TestIgnoreException() { }
+            public TestIgnoreException(string message) : base(message) { }
+            public TestIgnoreException(string message, Exception innerException) : base(message, innerException) { }
+        }
+
         public enum TestStatus { Pass, Fail, Ignored }
 
         public struct TestRun
@@ -169,6 +177,15 @@ namespace UnityShaderParser.Test
             {
                 if (state.IsAnyThreadActive())
                 {
+                    throw new TestPassException();
+                }
+                return ScalarValue.Null;
+            });
+
+            interpreter.AddCallback("PASS_TEST_MSG", (state, args) =>
+            {
+                if (state.IsAnyThreadActive())
+                {
                     if (args.Length > 0)
                         throw new TestPassException(interpreter.EvaluateExpression(args[0]).ToString());
                     else
@@ -181,10 +198,40 @@ namespace UnityShaderParser.Test
             {
                 if (state.IsAnyThreadActive())
                 {
+                    throw new TestFailException();
+                }
+                return ScalarValue.Null;
+            });
+
+            interpreter.AddCallback("FAIL_TEST_MSG", (state, args) =>
+            {
+                if (state.IsAnyThreadActive())
+                {
                     if (args.Length > 0)
                         throw new TestFailException(interpreter.EvaluateExpression(args[0]).ToString());
                     else
                         throw new TestFailException();
+                }
+                return ScalarValue.Null;
+            });
+
+            interpreter.AddCallback("IGNORE_TEST", (state, args) =>
+            {
+                if (state.IsAnyThreadActive())
+                {
+                    throw new TestIgnoreException();
+                }
+                return ScalarValue.Null;
+            });
+
+            interpreter.AddCallback("IGNORE_TEST_MSG", (state, args) =>
+            {
+                if (state.IsAnyThreadActive())
+                {
+                    if (args.Length > 0)
+                        throw new TestIgnoreException(interpreter.EvaluateExpression(args[0]).ToString());
+                    else
+                        throw new TestIgnoreException();
                 }
                 return ScalarValue.Null;
             });
@@ -443,6 +490,10 @@ namespace UnityShaderParser.Test
                 catch (TestFailException ex)
                 {
                     results[i] = new TestResult { TestName = testsToRun[i].TestName, Status = TestStatus.Fail, Log = sw.ToString(), Message = ex.Message };
+                }
+                catch (TestIgnoreException ex)
+                {
+                    results[i] = new TestResult { TestName = testsToRun[i].TestName, Status = TestStatus.Ignored, Log = sw.ToString(), Message = ex.Message };
                 }
                 catch (Exception ex)
                 {
