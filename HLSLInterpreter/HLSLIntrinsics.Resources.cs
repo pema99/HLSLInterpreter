@@ -144,7 +144,7 @@ namespace UnityShaderParser.Test
                 AddN(gName, 2, 4, (state, rv, args) =>
                 {
                     var offset = args.Length >= 3 && args[2] is not ReferenceValue ? (NumericValue)args[2] : null;
-                    return GatherCore(rv, (NumericValue)args[1], ch, uniformOffset: offset);
+                    return GatherCore(rv, (NumericValue)args[1], ch, uniformOffset: offset, sampler: (SamplerStateValue)args[0]);
                 });
                 // 4-offset variant, each corner gets its own offset
                 if (has4Offset)
@@ -152,7 +152,8 @@ namespace UnityShaderParser.Test
                     AddN(gName, 6, 7, (state, rv, args) =>
                         GatherCore(rv, (NumericValue)args[1], ch,
                             cornerOffsets: new[] { (NumericValue)args[2], (NumericValue)args[3],
-                                                   (NumericValue)args[4], (NumericValue)args[5] }));
+                                                   (NumericValue)args[4], (NumericValue)args[5] },
+                            sampler: (SamplerStateValue)args[0]));
                 }
             }
 
@@ -171,7 +172,7 @@ namespace UnityShaderParser.Test
                 {
                     var offset = args.Length >= 4 && args[3] is not ReferenceValue ? (NumericValue)args[3] : null;
                     return GatherCore(rv, (NumericValue)args[1], ch, uniformOffset: offset,
-                        comparisonSampler: (SamplerStateValue)args[0], comparisonValue: (NumericValue)args[2]);
+                        sampler: (SamplerStateValue)args[0], comparisonValue: (NumericValue)args[2]);
                 });
                 if (has4Offset)
                 {
@@ -179,7 +180,7 @@ namespace UnityShaderParser.Test
                         GatherCore(rv, (NumericValue)args[1], ch,
                             cornerOffsets: new[] { (NumericValue)args[3], (NumericValue)args[4],
                                                    (NumericValue)args[5], (NumericValue)args[6] },
-                            comparisonSampler: (SamplerStateValue)args[0], comparisonValue: (NumericValue)args[2]));
+                            sampler: (SamplerStateValue)args[0], comparisonValue: (NumericValue)args[2]));
                 }
             }
 
@@ -654,11 +655,45 @@ namespace UnityShaderParser.Test
             return HLSLValueUtils.MergeThreadValues(results);
         }
 
+        private static bool IsLinearFilter(SamplerStateValue.FilterMode filter) => filter switch
+        {
+            SamplerStateValue.FilterMode.MinMagMipPoint => false,
+            SamplerStateValue.FilterMode.MinMagPointMipLinear => false,
+            SamplerStateValue.FilterMode.ComparisonMinMagMipPoint => false,
+            SamplerStateValue.FilterMode.ComparisonMinMagPointMipLinear => false,
+            _ => true,
+        };
+
+        private static NumericValue ApplyAddressMode(
+            NumericValue uv,
+            SamplerStateValue.TextureAddressMode mode,
+            ref NumericValue borderMask)
+        {
+            switch (mode)
+            {
+                case SamplerStateValue.TextureAddressMode.Wrap:
+                    return Frac(uv);
+                case SamplerStateValue.TextureAddressMode.Mirror:
+                    return 1.0f - Abs(Frac(uv * 0.5f) * 2.0f - 1.0f);
+                case SamplerStateValue.TextureAddressMode.MirrorOnce:
+                    return Clamp(Abs(uv), 0f, 1f);
+                case SamplerStateValue.TextureAddressMode.Border:
+                    borderMask = borderMask * ToFloatLike((uv >= 0.0f) * (uv <= 1.0f));
+                    return Clamp(uv, 0f, 1f);
+                default:
+                    return Clamp(uv, 0f, 1f);
+            }
+        }
+
         public static NumericValue SampleLevel(ResourceValue rv, SamplerStateValue sampler, NumericValue location, NumericValue lod, NumericValue offset = null, Func<NumericValue, NumericValue> perTexel = null)
         {
+            // Apply MipLodBias then clamp to [MinimumLod, MaximumLod].
+            lod = ToFloatLike(lod) + sampler.MipLodBias;
+            lod = Clamp(lod, sampler.MinimumLod, sampler.MaximumLod);
+
             // Cube maps use face selection + per-face bilinear sampling; offset is not applicable.
             if (rv.IsCube)
-                return SampleLevelCube(rv, location, lod, perTexel);
+                return SampleLevelCube(rv, sampler, location, lod, perTexel);
 
             int dim = rv.Dimension;
             var scalarLod = CastToScalar(lod);
@@ -676,90 +711,92 @@ namespace UnityShaderParser.Test
                 spatialLocation = locVec.BroadcastToVector(dim);  // truncate to spatial dims
             }
 
+            // Apply address modes to each UV axis independently.
+            var addressModes = new[]
+            {
+                sampler.AddressU,
+                sampler.AddressV,
+                sampler.AddressW,
+            };
+            NumericValue borderMask = (NumericValue)1.0f;
+            var uvVec = CastToVector(spatialLocation, dim);
+            ScalarValue[] wrappedUV = new ScalarValue[dim];
+            for (int i = 0; i < dim; i++)
+                wrappedUV[i] = (ScalarValue)ApplyAddressMode(uvVec[i], addressModes[i], ref borderMask);
+
+            spatialLocation = dim == 1 ? wrappedUV[0]
+                            : dim == 2 ? VectorValue.FromScalars(wrappedUV[0], wrappedUV[1])
+                            : VectorValue.FromScalars(wrappedUV[0], wrappedUV[1], wrappedUV[2]);
+
             var texelPos = CastToVector(spatialLocation, dim).BroadcastToVector(dim) * size - 0.5f;
             if (offset is not null)
                 texelPos = texelPos + CastToVector(offset, dim);
 
-            var basePos = Floor(texelPos).Cast(ScalarType.Int);
-            var frac = (VectorValue)Frac(texelPos);
-
-            NumericValue Fetch(NumericValue loadArgs)
+            NumericValue FetchAt(ScalarValue x, ScalarValue y, ScalarValue z)
             {
-                var v = (NumericValue)Load(rv, loadArgs);
+                NumericValue coord = dim switch
+                {
+                    1 => rv.IsArray ? VectorValue.FromScalars(x, arrSlice, scalarLod) : VectorValue.FromScalars(x, scalarLod),
+                    2 => rv.IsArray ? VectorValue.FromScalars(x, y, arrSlice, scalarLod) : VectorValue.FromScalars(x, y, scalarLod),
+                    _ => VectorValue.FromScalars(x, y, z, scalarLod),
+                };
+                var v = (NumericValue)Load(rv, coord);
                 return perTexel != null ? perTexel(v) : v;
             }
 
-            if (dim == 1)
+            bool linear = IsLinearFilter(sampler.Filter);
+            NumericValue result;
+            ScalarValue zero = (ScalarValue)0;
+
+            // Point
+            if (!linear)
             {
-                // Linear interpolation
-                var p0 = (VectorValue)Clamp(basePos, 0, size - 1);
-                var p1 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(1), 0, size - 1);
-
-                var c0 = rv.IsArray
-                    ? Fetch(VectorValue.FromScalars(p0.x, arrSlice, scalarLod))
-                    : Fetch(VectorValue.FromScalars(p0.x, scalarLod));
-                var c1 = rv.IsArray
-                    ? Fetch(VectorValue.FromScalars(p1.x, arrSlice, scalarLod))
-                    : Fetch(VectorValue.FromScalars(p1.x, scalarLod));
-
-                return Lerp(c0, c1, frac.x);
+                var p = (VectorValue)Clamp(Round(texelPos).Cast(ScalarType.Int), 0, size - 1);
+                result = FetchAt(p.x, dim >= 2 ? p.y : zero, dim >= 3 ? p.z : zero);
             }
-            else if (dim == 2)
-            {
-                // Bilinear interpolation
-                var p00 = (VectorValue)Clamp(basePos, 0, size - 1);
-                var p10 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(1, 0), 0, size - 1);
-                var p01 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(0, 1), 0, size - 1);
-                var p11 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(1, 1), 0, size - 1);
-
-                var c00 = rv.IsArray
-                    ? Fetch(VectorValue.FromScalars(p00.x, p00.y, arrSlice, scalarLod))
-                    : Fetch(VectorValue.FromScalars(p00.x, p00.y, scalarLod));
-                var c10 = rv.IsArray
-                    ? Fetch(VectorValue.FromScalars(p10.x, p10.y, arrSlice, scalarLod))
-                    : Fetch(VectorValue.FromScalars(p10.x, p10.y, scalarLod));
-                var c01 = rv.IsArray
-                    ? Fetch(VectorValue.FromScalars(p01.x, p01.y, arrSlice, scalarLod))
-                    : Fetch(VectorValue.FromScalars(p01.x, p01.y, scalarLod));
-                var c11 = rv.IsArray
-                    ? Fetch(VectorValue.FromScalars(p11.x, p11.y, arrSlice, scalarLod))
-                    : Fetch(VectorValue.FromScalars(p11.x, p11.y, scalarLod));
-
-                var cx0 = Lerp(c00, c10, frac.x);
-                var cx1 = Lerp(c01, c11, frac.x);
-                return Lerp(cx0, cx1, frac.y);
-            }
+            // Linear
             else
             {
-                // Trilinear interpolation (3D textures; arrays not applicable for Texture3D)
-                var p000 = (VectorValue)Clamp(basePos, 0, size - 1);
-                var p100 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(1, 0, 0), 0, size - 1);
-                var p010 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(0, 1, 0), 0, size - 1);
-                var p110 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(1, 1, 0), 0, size - 1);
-                var p001 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(0, 0, 1), 0, size - 1);
-                var p101 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(1, 0, 1), 0, size - 1);
-                var p011 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(0, 1, 1), 0, size - 1);
-                var p111 = (VectorValue)Clamp(basePos + VectorValue.FromScalars(1, 1, 1), 0, size - 1);
+                var basePos = (VectorValue)Floor(texelPos).Cast(ScalarType.Int);
+                var sizeVec = (VectorValue)size;
+                var frac = (VectorValue)Frac(texelPos);
 
-                var c000 = Fetch(VectorValue.FromScalars(p000.x, p000.y, p000.z, scalarLod));
-                var c100 = Fetch(VectorValue.FromScalars(p100.x, p100.y, p100.z, scalarLod));
-                var c010 = Fetch(VectorValue.FromScalars(p010.x, p010.y, p010.z, scalarLod));
-                var c110 = Fetch(VectorValue.FromScalars(p110.x, p110.y, p110.z, scalarLod));
-                var c001 = Fetch(VectorValue.FromScalars(p001.x, p001.y, p001.z, scalarLod));
-                var c101 = Fetch(VectorValue.FromScalars(p101.x, p101.y, p101.z, scalarLod));
-                var c011 = Fetch(VectorValue.FromScalars(p011.x, p011.y, p011.z, scalarLod));
-                var c111 = Fetch(VectorValue.FromScalars(p111.x, p111.y, p111.z, scalarLod));
+                NumericValue WrapU(NumericValue x) => WrapTexelCoord(x, sizeVec[0], sampler.AddressU);
+                NumericValue WrapV(NumericValue y) => WrapTexelCoord(y, sizeVec[1], sampler.AddressV);
+                NumericValue WrapW(NumericValue z) => WrapTexelCoord(z, sizeVec[2], sampler.AddressW);
 
-                var cx00 = Lerp(c000, c100, frac.x);
-                var cx10 = Lerp(c010, c110, frac.x);
-                var cx01 = Lerp(c001, c101, frac.x);
-                var cx11 = Lerp(c011, c111, frac.x);
-
-                var cxy0 = Lerp(cx00, cx10, frac.y);
-                var cxy1 = Lerp(cx01, cx11, frac.y);
-
-                return Lerp(cxy0, cxy1, frac.z);
+                var x0 = (ScalarValue)WrapU(basePos.x); var x1 = (ScalarValue)WrapU(basePos.x + 1);
+                if (dim == 1)
+                {
+                    result = Lerp(FetchAt(x0, zero, zero), FetchAt(x1, zero, zero), frac.x);
+                }
+                else if (dim == 2)
+                {
+                    var y0 = (ScalarValue)WrapV(basePos.y); var y1 = (ScalarValue)WrapV(basePos.y + 1);
+                    result = Lerp(
+                        Lerp(FetchAt(x0, y0, zero), FetchAt(x1, y0, zero), frac.x),
+                        Lerp(FetchAt(x0, y1, zero), FetchAt(x1, y1, zero), frac.x),
+                        frac.y);
+                }
+                else
+                {
+                    var y0 = (ScalarValue)WrapV(basePos.y); var y1 = (ScalarValue)WrapV(basePos.y + 1);
+                    var z0 = (ScalarValue)WrapW(basePos.z); var z1 = (ScalarValue)WrapW(basePos.z + 1);
+                    result = Lerp(
+                        Lerp(Lerp(FetchAt(x0, y0, z0), FetchAt(x1, y0, z0), frac.x), Lerp(FetchAt(x0, y1, z0), FetchAt(x1, y1, z0), frac.x), frac.y),
+                        Lerp(Lerp(FetchAt(x0, y0, z1), FetchAt(x1, y0, z1), frac.x), Lerp(FetchAt(x0, y1, z1), FetchAt(x1, y1, z1), frac.x), frac.y),
+                        frac.z);
+                }
             }
+
+            // Border address mode
+            bool hasBorder = sampler.AddressU == SamplerStateValue.TextureAddressMode.Border
+                || (dim >= 2 && sampler.AddressV == SamplerStateValue.TextureAddressMode.Border)
+                || (dim >= 3 && sampler.AddressW == SamplerStateValue.TextureAddressMode.Border);
+            if (hasBorder)
+                result = result * borderMask;
+
+            return result;
         }
 
         // Converts a float3 direction to a cube face index
@@ -789,11 +826,12 @@ namespace UnityShaderParser.Test
             v = (tc / ma + 1f) * 0.5f;
         }
 
-        // Samples a cube map or cube map array using face selection and per-face bilinear interpolation.
-        private static NumericValue SampleLevelCube(ResourceValue rv, NumericValue location, NumericValue lod, Func<NumericValue, NumericValue> perTexel = null)
+        // Samples a cube map or cube map array using face selection and per-face interpolation.
+        private static NumericValue SampleLevelCube(ResourceValue rv, SamplerStateValue sampler, NumericValue location, NumericValue lod, Func<NumericValue, NumericValue> perTexel = null)
         {
             var dir = CastToVector(location, rv.IsArray ? 4 : 3);
             var scalarLod = CastToScalar(lod);
+            bool linear = IsLinearFilter(sampler.Filter);
             int threadCount = dir.ThreadCount;
             HLSLValue[] results = new HLSLValue[threadCount];
 
@@ -813,11 +851,6 @@ namespace UnityShaderParser.Test
 
                 float texelU = u * faceSize - 0.5f;
                 float texelV = v * faceSize - 0.5f;
-                int baseX = (int)MathF.Floor(texelU), baseY = (int)MathF.Floor(texelV);
-                float fracU = texelU - baseX, fracV = texelV - baseY;
-
-                int x0 = Math.Clamp(baseX, 0, maxC), x1 = Math.Clamp(baseX + 1, 0, maxC);
-                int y0 = Math.Clamp(baseY, 0, maxC), y1 = Math.Clamp(baseY + 1, 0, maxC);
 
                 NumericValue Fetch(int x, int y)
                 {
@@ -825,53 +858,46 @@ namespace UnityShaderParser.Test
                     return perTexel != null ? perTexel(raw) : raw;
                 }
 
-                var c00 = Fetch(x0, y0);
-                var c10 = Fetch(x1, y0);
-                var c01 = Fetch(x0, y1);
-                var c11 = Fetch(x1, y1);
+                if (!linear)
+                {
+                    int nx = Math.Clamp((int)MathF.Round(texelU, MidpointRounding.AwayFromZero), 0, maxC);
+                    int ny = Math.Clamp((int)MathF.Round(texelV, MidpointRounding.AwayFromZero), 0, maxC);
+                    results[thread] = Fetch(nx, ny);
+                }
+                else
+                {
+                    int baseX = (int)MathF.Floor(texelU), baseY = (int)MathF.Floor(texelV);
+                    float fracU = texelU - baseX, fracV = texelV - baseY;
+                    int x0 = Math.Clamp(baseX, 0, maxC), x1 = Math.Clamp(baseX + 1, 0, maxC);
+                    int y0 = Math.Clamp(baseY, 0, maxC), y1 = Math.Clamp(baseY + 1, 0, maxC);
 
-                var cx0 = Lerp(c00, c10, (ScalarValue)fracU);
-                var cx1 = Lerp(c01, c11, (ScalarValue)fracU);
-                results[thread] = Lerp(cx0, cx1, (ScalarValue)fracV);
+                    var c00 = Fetch(x0, y0);
+                    var c10 = Fetch(x1, y0);
+                    var c01 = Fetch(x0, y1);
+                    var c11 = Fetch(x1, y1);
+
+                    var cx0 = Lerp(c00, c10, (ScalarValue)fracU);
+                    var cx1 = Lerp(c01, c11, (ScalarValue)fracU);
+                    results[thread] = Lerp(cx0, cx1, (ScalarValue)fracV);
+                }
             }
 
             return (NumericValue)HLSLValueUtils.MergeThreadValues(results);
         }
 
-        public static NumericValue CalculateLevelOfDetail(HLSLExecutionState executionState, ResourceValue rv, SamplerStateValue sampler, NumericValue location)
-        {
-            var rho = CalculateRho(executionState, rv, location);
-            float maxDim = MathF.Max(rv.SizeX, MathF.Max(rv.SizeY, rv.SizeZ));
-            return Clamp(Log2(rho), 0.0f, MathF.Log(maxDim) / MathF.Log(2) + 1);
-        }
-
         public static NumericValue CalculateLevelOfDetailUnclamped(HLSLExecutionState executionState, ResourceValue rv, SamplerStateValue sampler, NumericValue location)
-        {
-            return Log2(CalculateRho(executionState, rv, location));
-        }
+            => Log2(CalculateRho(executionState, rv, location));
+
+        public static NumericValue CalculateLevelOfDetail(HLSLExecutionState executionState, ResourceValue rv, SamplerStateValue sampler, NumericValue location)
+            => Clamp(CalculateLevelOfDetailUnclamped(executionState, rv, sampler, location), 0.0f, MaxLodForResource(rv));
 
         // Computes rho from two gradient vectors already in texel space.
         private static NumericValue RhoFromGradients(VectorValue gradX, VectorValue gradY)
-        {
-            int dim = gradX.Size;
-            NumericValue lengthX, lengthY;
-            if (dim == 1)
-            {
-                lengthX = Abs(gradX.x);
-                lengthY = Abs(gradY.x);
-            }
-            else if (dim == 2)
-            {
-                lengthX = Sqrt(gradX.x * gradX.x + gradX.y * gradX.y);
-                lengthY = Sqrt(gradY.x * gradY.x + gradY.y * gradY.y);
-            }
-            else
-            {
-                lengthX = Sqrt(gradX.x * gradX.x + gradX.y * gradX.y + gradX.z * gradX.z);
-                lengthY = Sqrt(gradY.x * gradY.x + gradY.y * gradY.y + gradY.z * gradY.z);
-            }
-            return Max(lengthX, lengthY);
-        }
+            => Max(Length(gradX), Length(gradY));
+
+        // Upper bound on meaningful LOD for a resource, used to clamp computed LODs.
+        private static float MaxLodForResource(ResourceValue rv)
+            => MathF.Log2(MathF.Max(rv.SizeX, MathF.Max(rv.SizeY, rv.SizeZ))) + 1;
 
         // Returns face-local UV in [0, 1] per thread. Used by CalculateRho to get face-space derivatives.
         private static VectorValue CubeDirectionToFaceUV(VectorValue dir)
@@ -922,8 +948,7 @@ namespace UnityShaderParser.Test
             var gradX = CastToVector(ddx, rv.Dimension) * sizeVec;
             var gradY = CastToVector(ddy, rv.Dimension) * sizeVec;
 
-            float maxDim = MathF.Max(rv.SizeX, MathF.Max(rv.SizeY, rv.SizeZ));
-            var lod = Clamp(Log2(RhoFromGradients(gradX, gradY)), 0.0f, MathF.Log(maxDim) / MathF.Log(2) + 1);
+            var lod = Clamp(Log2(RhoFromGradients(gradX, gradY)), 0.0f, MaxLodForResource(rv));
             if (clamp is not null)
                 lod = Min(lod, ToFloatLike(clamp));
             return SampleLevel(rv, sampler, location, lod, offset, perTexel);
@@ -964,17 +989,62 @@ namespace UnityShaderParser.Test
             return HLSLValueUtils.Map2(depth, cmp, (a, b) => CompareScalars(sampler, Convert.ToSingle(a), Convert.ToSingle(b)));
         }
 
+        private static NumericValue WrapTexelCoord(NumericValue coord, NumericValue mipSize, SamplerStateValue.TextureAddressMode mode)
+        {
+            var sizeI = Floor(mipSize).Cast(ScalarType.Int);
+            switch (mode)
+            {
+                case SamplerStateValue.TextureAddressMode.Wrap:
+                    return ((coord % sizeI) + sizeI) % sizeI;
+                case SamplerStateValue.TextureAddressMode.MirrorOnce:
+                    return Clamp(Abs(coord), 0, sizeI - 1);
+                case SamplerStateValue.TextureAddressMode.Mirror:
+                    {
+                        var period = sizeI * 2;
+                        var c = ((coord % period) + period) % period;
+                        var inLower = ToFloatLike(c < sizeI);
+                        return (c * inLower + (period - 1 - c) * (1.0f - inLower)).Cast(ScalarType.Int);
+                    }
+                default: // Clamp, Border
+                    return Clamp(coord, 0, sizeI - 1);
+            }
+        }
+
+        private static int WrapTexelCoord(int coord, int size, SamplerStateValue.TextureAddressMode mode)
+        {
+            switch (mode)
+            {
+                case SamplerStateValue.TextureAddressMode.Wrap:
+                    return ((coord % size) + size) % size;
+                case SamplerStateValue.TextureAddressMode.Mirror:
+                    {
+                        int period = 2 * size;
+                        int c = ((coord % period) + period) % period;
+                        return c < size ? c : period - 1 - c;
+                    }
+                case SamplerStateValue.TextureAddressMode.MirrorOnce:
+                    return Math.Clamp(Math.Abs(coord), 0, size - 1);
+                case SamplerStateValue.TextureAddressMode.Border:
+                    return (coord < 0 || coord >= size) ? -1 : coord;
+                default: // Clamp
+                    return Math.Clamp(coord, 0, size - 1);
+            }
+        }
+
         private static VectorValue GatherCore(
             ResourceValue rv, NumericValue location, int channelIndex,
             NumericValue uniformOffset = null,
             NumericValue[] cornerOffsets = null,
-            SamplerStateValue comparisonSampler = null,
+            SamplerStateValue sampler = null,
             NumericValue comparisonValue = null)
         {
             int spatialDim = rv.Dimension;
             int locComponents = spatialDim + (rv.IsArray ? 1 : 0);
             var loc = CastToVector(location.Cast(ScalarType.Float), locComponents);
             var scalarCmp = comparisonValue is not null ? CastToScalar(ToFloatLike(comparisonValue)) : null;
+
+            var addrU = sampler?.AddressU ?? SamplerStateValue.TextureAddressMode.Clamp;
+            var addrV = sampler?.AddressV ?? SamplerStateValue.TextureAddressMode.Clamp;
 
             int threadCount = loc.ThreadCount;
             HLSLValue[] results = new HLSLValue[threadCount];
@@ -985,11 +1055,10 @@ namespace UnityShaderParser.Test
                 float v = spatialDim >= 2 ? Convert.ToSingle(loc[1].GetThreadValue(thread)) : 0f;
                 int arraySlice = rv.IsArray ? Convert.ToInt32(loc[spatialDim].GetThreadValue(thread)) : 0;
 
-                // Bilinear footprint base coordinates (mip 0, no LOD scaling).
                 int baseX = (int)MathF.Floor(u * rv.SizeX - 0.5f);
                 int baseY = (int)MathF.Floor(v * rv.SizeY - 0.5f);
 
-                // HLSL Gather output order: .x=(u0,v1), .y=(u1,v1), .z=(u1,v0), .w=(u0,v0)
+                // Gather output order: .x=(u0,v1), .y=(u1,v1), .z=(u1,v0), .w=(u0,v0)
                 int[] cornerX = { baseX, baseX + 1, baseX + 1, baseX };
                 int[] cornerY = { baseY + 1, baseY + 1, baseY, baseY };
 
@@ -998,7 +1067,6 @@ namespace UnityShaderParser.Test
                 float[] components = new float[4];
                 for (int i = 0; i < 4; i++)
                 {
-                    // Resolve offset for this corner (per-corner or uniform).
                     NumericValue offSrc = cornerOffsets is not null ? cornerOffsets[i] : uniformOffset;
                     int ox = 0, oy = 0;
                     if (offSrc is not null)
@@ -1015,28 +1083,24 @@ namespace UnityShaderParser.Test
                         }
                     }
 
-                    // Clamp to texture bounds (clamp addressing mode).
-                    int x = Math.Clamp(cornerX[i] + ox, 0, (int)rv.SizeX - 1);
+                    int x = WrapTexelCoord(cornerX[i] + ox, rv.SizeX, addrU);
                     int y, z;
                     if (rv.IsArray && spatialDim == 1) { y = arraySlice; z = 0; }
-                    else { y = Math.Clamp(cornerY[i] + oy, 0, (int)rv.SizeY - 1); z = rv.IsArray ? arraySlice : 0; }
+                    else { y = WrapTexelCoord(cornerY[i] + oy, rv.SizeY, addrV); z = rv.IsArray ? arraySlice : 0; }
 
-                    // Fetch the texel and extract the requested channel.
+                    if (x == -1 || y == -1)
+                    {
+                        components[i] = comparisonValue != null ? CompareScalars(sampler, 0f, cmpV) : 0f;
+                        continue;
+                    }
+
                     var texel = rv.Get(x, y, z, 0, 0);
-                    float texelCh;
-                    if (texel is VectorValue vv)
-                    {
-                        int idx = Math.Min(channelIndex, vv.Size - 1);
-                        texelCh = Convert.ToSingle(vv[idx].GetThreadValue(thread));
-                    }
-                    else
-                    {
-                        texelCh = Convert.ToSingle(CastToScalar((NumericValue)texel).GetThreadValue(thread));
-                    }
+                    float texelCh = texel is VectorValue vv
+                        ? Convert.ToSingle(vv[Math.Min(channelIndex, vv.Size - 1)].GetThreadValue(thread))
+                        : Convert.ToSingle(CastToScalar((NumericValue)texel).GetThreadValue(thread));
 
-                    // Apply comparison for GatherCmp* (returns 1.0 if passes, 0.0 if fails).
-                    if (comparisonSampler != null)
-                        texelCh = CompareScalars(comparisonSampler, texelCh, cmpV);
+                    if (comparisonValue != null)
+                        texelCh = CompareScalars(sampler, texelCh, cmpV);
 
                     components[i] = texelCh;
                 }

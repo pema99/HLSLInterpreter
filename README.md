@@ -76,7 +76,6 @@ I estimate that the interpreter supports around 80% of the HLSL language, though
 The main limitation of the interpreter is that it is very slow - think hundreds or thousands of time slower than running on a GPU. The interpreter is written primarily with correctness in mind, and I've made no attempt to optimize it more than necessary. Don't expect to run interesting shaders at high resolutions without waiting several seconds for a frame! The thread count is configurable, and most usecases will want to run just a few threads.
 
 Here is a list of features I have yet to implement:
-- Custom Sampler modes like Wrap/Clamp, Bilinear/Point, etc.
 - Legacy texture functions like `tex2D()` and `tex3D()`.
 
 There might be some more things I missed, and the library is still very much work in progress - bugs be plenty!
