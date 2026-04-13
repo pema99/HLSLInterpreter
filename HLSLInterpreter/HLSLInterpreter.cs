@@ -6,12 +6,6 @@ using UnityShaderParser.HLSL;
 
 namespace UnityShaderParser.Test
 {
-    // TODO:
-    //
-    // Semantics support
-    // More test attributes
-    // Texture/StructuredBuffer
-
     public class HLSLInterpreter : HLSLSyntaxVisitor
     {
         protected HLSLInterpreterContext context;
