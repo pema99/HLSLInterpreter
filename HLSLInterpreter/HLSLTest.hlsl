@@ -9,6 +9,10 @@
         #define PRINTF
         #define ASSERT(x)
         #define ASSERT_MSG(x, msg)
+        #define ASSERT_EQUAL(a, b)
+        #define ASSERT_NEAR(a, b, eps)
+        #define ASSERT_UNIFORM(x)
+        #define ASSERT_VARYING(x)
         #define PASS_TEST()
         #define FAIL_TEST()
         #define MOCK_RESOURCE(res, mock)

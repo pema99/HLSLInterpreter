@@ -35,6 +35,8 @@ namespace UnityShaderParser.Test
             public int WarpSizeX;
             public int WarpSizeY;
             public Func<List<HLSLValue>> GetInputs;
+            public bool IsIgnored;
+            public string IgnoreReason;
         }
 
         public struct TestResult
@@ -52,6 +54,38 @@ namespace UnityShaderParser.Test
             interpreter = new HLSLInterpreter(defaultThreadsX, defaultThreadsY);
 
             // Add magic callbacks for test running
+
+            // Check that every active thread and every component of 'val' is truthy.
+            void CheckAllTrue(HLSLExecutionState state, HLSLValue val, string failMsg)
+            {
+                if (val is ScalarValue sv)
+                {
+                    for (int i = 0; i < sv.ThreadCount; i++)
+                        if (state.IsThreadActive(i) && !Convert.ToBoolean(sv.Value.Get(i)))
+                            throw new TestFailException(failMsg);
+                }
+                else if (val is VectorValue vv)
+                {
+                    for (int i = 0; i < vv.ThreadCount; i++)
+                        if (state.IsThreadActive(i))
+                            foreach (var b in vv.Values.Get(i))
+                                if (!Convert.ToBoolean(b))
+                                    throw new TestFailException(failMsg);
+                }
+                else if (val is MatrixValue mv)
+                {
+                    for (int i = 0; i < mv.ThreadCount; i++)
+                        if (state.IsThreadActive(i))
+                            foreach (var b in mv.Values.Get(i))
+                                if (!Convert.ToBoolean(b))
+                                    throw new TestFailException(failMsg);
+                }
+                else
+                {
+                    throw new TestFailException(failMsg);
+                }
+            }
+
             ScalarValue Assert(HLSLExecutionState state, ExpressionNode[] args)
             {
                 if (args.Length > 0)
@@ -61,46 +95,7 @@ namespace UnityShaderParser.Test
                         message = (interpreter.EvaluateExpression(args[1]) as ScalarValue).Value.Get(0) as string;
 
                     HLSLValue val = interpreter.EvaluateExpression(args[0]);
-                    if (val is ScalarValue sv)
-                    {
-                        for (int i = 0; i < sv.ThreadCount; i++)
-                        {
-                            if (state.IsThreadActive(i) && !Convert.ToBoolean(sv.Value.Get(i)))
-                            {
-                                throw new TestFailException(message ?? $"Assertion failed: {args[0].GetPrettyPrintedCode()}");
-                            }
-                        }
-                    }
-                    else if (val is VectorValue vv)
-                    {
-                        for (int i = 0; i < vv.ThreadCount; i++)
-                        {
-                            foreach (var b in vv.Values.Get(i))
-                            {
-                                if (state.IsThreadActive(i) && !Convert.ToBoolean(b))
-                                {
-                                    throw new TestFailException(message ?? $"Assertion failed: {args[0].GetPrettyPrintedCode()}");
-                                }
-                            }
-                        }
-                    }
-                    else if (val is MatrixValue mv)
-                    {
-                        for (int i = 0; i < mv.ThreadCount; i++)
-                        {
-                            foreach (var b in mv.Values.Get(i))
-                            {
-                                if (state.IsThreadActive(i) && !Convert.ToBoolean(b))
-                                {
-                                    throw new TestFailException(message ?? $"Assertion failed: {args[0].GetPrettyPrintedCode()}");
-                                }
-                            }
-                        }
-                    }
-                    else
-                    {
-                        throw new TestFailException("Argument to ASSERT should be a boolean value.");
-                    }
+                    CheckAllTrue(state, val, message ?? $"Assertion failed: {args[0].GetPrettyPrintedCode()}");
                 }
                 return ScalarValue.Null;
             }
@@ -113,6 +108,62 @@ namespace UnityShaderParser.Test
             interpreter.AddCallback("ASSERT_MSG", (state, args) =>
             {
                 return Assert(state, args);
+            });
+
+            interpreter.AddCallback("ASSERT_EQUAL", (state, args) =>
+            {
+                if (args.Length >= 2)
+                {
+                    var lhsVal = interpreter.EvaluateExpression(args[0]);
+                    var rhsVal = interpreter.EvaluateExpression(args[1]);
+
+                    if (lhsVal is not NumericValue a || rhsVal is not NumericValue b)
+                        throw new TestFailException("ASSERT_EQUAL: arguments must be numeric values.");
+
+                    string failMsg = $"ASSERT_EQUAL failed: {args[0].GetPrettyPrintedCode()} [{a}] != {args[1].GetPrettyPrintedCode()} [{b}]";
+                    CheckAllTrue(state, a == b, failMsg);
+                }
+                return ScalarValue.Null;
+            });
+
+            interpreter.AddCallback("ASSERT_NEAR", (state, args) =>
+            {
+                if (args.Length >= 3)
+                {
+                    var lhsVal = interpreter.EvaluateExpression(args[0]);
+                    var rhsVal = interpreter.EvaluateExpression(args[1]);
+                    var epsVal = interpreter.EvaluateExpression(args[2]);
+
+                    if (lhsVal is not NumericValue a || rhsVal is not NumericValue b || epsVal is not NumericValue eps)
+                        throw new TestFailException("ASSERT_NEAR: arguments must be numeric values.");
+
+                    var diff = HLSLIntrinsics.Abs(a - b);
+                    string failMsg = $"ASSERT_NEAR failed: |{args[0].GetPrettyPrintedCode()} - {args[1].GetPrettyPrintedCode()}| = {diff} > {eps}";
+                    CheckAllTrue(state, diff <= eps, failMsg);
+                }
+                return ScalarValue.Null;
+            });
+
+            interpreter.AddCallback("ASSERT_UNIFORM", (state, args) =>
+            {
+                if (args.Length > 0 && state.IsAnyThreadActive())
+                {
+                    var val = interpreter.EvaluateExpression(args[0]);
+                    if (val.IsVarying)
+                        throw new TestFailException($"ASSERT_UNIFORM failed: '{args[0].GetPrettyPrintedCode()}' is varying across threads.");
+                }
+                return ScalarValue.Null;
+            });
+
+            interpreter.AddCallback("ASSERT_VARYING", (state, args) =>
+            {
+                if (args.Length > 0 && state.IsAnyThreadActive())
+                {
+                    var val = interpreter.EvaluateExpression(args[0]);
+                    if (val.IsUniform)
+                        throw new TestFailException($"ASSERT_VARYING failed: '{args[0].GetPrettyPrintedCode()}' is uniform across threads.");
+                }
+                return ScalarValue.Null;
             });
 
             interpreter.AddCallback("PASS_TEST", (state, args) =>
@@ -276,6 +327,11 @@ namespace UnityShaderParser.Test
                                 var inputs = attribute.Arguments.Select(a => interpreter.EvaluateExpression(a)).ToList();
                                 testCases.Add((inputs, $"{testRun.FunctionName}({string.Join(", ", inputs)})"));
                             }
+                            break;
+                        case "ignore":
+                            testRun.IsIgnored = true;
+                            if (attribute.Arguments.Count > 0)
+                                testRun.IgnoreReason = (interpreter.EvaluateExpression(attribute.Arguments[0]) as ScalarValue)?.Value.Get(0) as string ?? "";
                             break;
                         default: break;
                     }
