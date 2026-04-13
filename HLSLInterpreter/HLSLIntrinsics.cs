@@ -103,8 +103,6 @@ namespace UnityShaderParser.Test
             "EvaluateAttributeCentroid",
             "EvaluateAttributeAtSample",
             "EvaluateAttributeSnapped",
-            "GetRenderTargetSampleCount",
-            "GetRenderTargetSamplePosition",
             "Process2DQuadTessFactorsAvg",
             "Process2DQuadTessFactorsMax",
             "Process2DQuadTessFactorsMin",
@@ -132,21 +130,6 @@ namespace UnityShaderParser.Test
 
         private static readonly Dictionary<string, (int arity, BasicIntrinsic fn)> basicIntrinsics = new Dictionary<string, (int arity, BasicIntrinsic fn)>()
         {
-            // Need multi-group support:
-            //AllMemoryBarrierWithGroupSync
-            //DeviceMemoryBarrierWithGroupSync
-            //GroupMemoryBarrierWithGroupSync
-
-            // Need atomic support:
-            //InterlockedAdd
-            //InterlockedAnd
-            //InterlockedCompareExchange
-            //InterlockedCompareStore
-            //InterlockedExchange
-            //InterlockedMax
-            //InterlockedMin
-            //InterlockedOr
-            //InterlockedXor
 
             // Need texture support:
             //tex1/2/3D/CUBE

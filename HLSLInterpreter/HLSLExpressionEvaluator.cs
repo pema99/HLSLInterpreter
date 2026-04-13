@@ -685,7 +685,6 @@ namespace UnityShaderParser.Test
             var right = Visit(node.Right);
             right = HLSLValueUtils.CastForAssignment(left, right);
 
-            // TODO: StructuredBuffer/Resource writes
             HLSLValue SetValue(HLSLValue value)
             {
                 // lhs = rhs
