@@ -29,6 +29,10 @@
     <None Update="Shaders\*.hlsl">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="..\HLSLInterpreter\HLSLTest.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>Shaders\HLSLTest.hlsl</Link>
+    </None>
   </ItemGroup>
 
 </Project>

@@ -1,3 +1,5 @@
+#include "HLSLTest.hlsl"
+
 static int a = 1337;
 
 struct Foo

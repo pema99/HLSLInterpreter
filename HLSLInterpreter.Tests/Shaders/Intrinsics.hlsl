@@ -1,3 +1,5 @@
+#include "HLSLTest.hlsl"
+
 [Test]
 void Intrinsic_Abs()
 {

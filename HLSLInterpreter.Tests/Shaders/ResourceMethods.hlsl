@@ -1,3 +1,4 @@
+#include "HLSLTest.hlsl"
 
 // ResourceMethods.hlsl
 // One test per method family per resource type, using [MockResource].

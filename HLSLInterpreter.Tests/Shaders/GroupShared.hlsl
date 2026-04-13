@@ -1,3 +1,5 @@
+#include "HLSLTest.hlsl"
+
 groupshared uint4 GroupSharedUint4;
 
 [Test]

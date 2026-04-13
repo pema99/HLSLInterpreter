@@ -1,3 +1,4 @@
+#include "HLSLTest.hlsl"
 
 
 [Test]

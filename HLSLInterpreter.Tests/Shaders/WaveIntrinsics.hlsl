@@ -1,3 +1,5 @@
+#include "HLSLTest.hlsl"
+
 [Test]
 [WarpSize(2, 2)]
 void Intrinsic_QuadReadAcrossDiagonal()

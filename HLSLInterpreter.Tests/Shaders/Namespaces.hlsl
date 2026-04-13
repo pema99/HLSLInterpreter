@@ -1,3 +1,5 @@
+#include "HLSLTest.hlsl"
+
 // Basic namespace declaration and access
 namespace Math
 {

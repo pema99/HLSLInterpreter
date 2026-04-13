@@ -1,3 +1,4 @@
+#include "HLSLTest.hlsl"
 
 // Basic scalar typedef
 typedef float MyFloat;
