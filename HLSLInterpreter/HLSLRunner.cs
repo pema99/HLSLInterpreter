@@ -55,6 +55,7 @@ namespace UnityShaderParser.Test
         }
 
         protected HLSLInterpreter interpreter;
+        protected TestRun currentTest;
 
         public HLSLRunner(int defaultThreadsX = 2, int defaultThreadsY = 2)
         {
@@ -259,6 +260,11 @@ namespace UnityShaderParser.Test
                 interpreter.SetVariable(resourceName, mock);
                 return ScalarValue.Null;
             });
+
+            interpreter.AddCallback("TEST_NAME", (state, args) =>
+            {
+                return new ScalarValue(ScalarType.String, HLSLValueUtils.MakeScalarSGPR(currentTest.TestName));
+            });
         }
 
         private HLSLParserConfig AddTestRunnerDefine(HLSLParserConfig config)
@@ -440,9 +446,11 @@ namespace UnityShaderParser.Test
 
             for (int i = 0; i < testsToRun.Count; i++)
             {
+                currentTest = testsToRun[i];
+
                 // Setup
-                if (testsToRun[i].UsesCustomWarpSize)
-                    interpreter.SetWarpSize(testsToRun[i].WarpSizeX, testsToRun[i].WarpSizeY);
+                if (currentTest.UsesCustomWarpSize)
+                    interpreter.SetWarpSize(currentTest.WarpSizeX, currentTest.WarpSizeY);
                 var sw = new StringWriter();
                 Console.SetOut(sw);
 
@@ -450,69 +458,69 @@ namespace UnityShaderParser.Test
                 List<HLSLValue> inputs = new List<HLSLValue>();
                 try
                 {
-                    if (testsToRun[i].GetInputs != null)
+                    if (currentTest.GetInputs != null)
                     {
-                        inputs = testsToRun[i].GetInputs();
+                        inputs = currentTest.GetInputs();
                     }
                 }
                 catch (Exception ex)
                 {
-                    results[i] = new TestResult { TestName = testsToRun[i].TestName, Status = TestStatus.Fail, Log = sw.ToString(), Message = $"Error during test input generation: {ex.Message}" };
+                    results[i] = new TestResult { TestName = currentTest.TestName, Status = TestStatus.Fail, Log = sw.ToString(), Message = $"Error during test input generation: {ex.Message}" };
                 }
 
                 // Check if test ignored
-                if (IsIgnored(testsToRun[i].FunctionName, inputs, out string reason))
+                if (IsIgnored(currentTest.FunctionName, inputs, out string reason))
                 {
-                    results[i] = new TestResult { TestName = testsToRun[i].TestName, Status = TestStatus.Ignored, Log = sw.ToString(), Message = reason };
+                    results[i] = new TestResult { TestName = currentTest.TestName, Status = TestStatus.Ignored, Log = sw.ToString(), Message = reason };
                     continue;
                 }
 
                 // Run pre-amble
                 try
                 {
-                    runBeforeTest?.Invoke(testsToRun[i]);
+                    runBeforeTest?.Invoke(currentTest);
                 }
                 catch (Exception ex)
                 {
-                    results[i] = new TestResult { TestName = testsToRun[i].TestName, Status = TestStatus.Fail, Log = sw.ToString(), Message = $"Error during test setup: {ex.Message}" };
+                    results[i] = new TestResult { TestName = currentTest.TestName, Status = TestStatus.Fail, Log = sw.ToString(), Message = $"Error during test setup: {ex.Message}" };
                 }
 
                 // Run test
                 try
                 {
-                    interpreter.CallFunction(testsToRun[i].FunctionName, inputs.ToArray());
-                    results[i] = new TestResult { TestName = testsToRun[i].TestName, Status = TestStatus.Pass, Log = sw.ToString() };
+                    interpreter.CallFunction(currentTest.FunctionName, inputs.ToArray());
+                    results[i] = new TestResult { TestName = currentTest.TestName, Status = TestStatus.Pass, Log = sw.ToString() };
                 }
                 catch (TestPassException ex)
                 {
-                    results[i] = new TestResult { TestName = testsToRun[i].TestName, Status = TestStatus.Pass, Log = sw.ToString(), Message = ex.Message };
+                    results[i] = new TestResult { TestName = currentTest.TestName, Status = TestStatus.Pass, Log = sw.ToString(), Message = ex.Message };
                 }
                 catch (TestFailException ex)
                 {
-                    results[i] = new TestResult { TestName = testsToRun[i].TestName, Status = TestStatus.Fail, Log = sw.ToString(), Message = ex.Message };
+                    results[i] = new TestResult { TestName = currentTest.TestName, Status = TestStatus.Fail, Log = sw.ToString(), Message = ex.Message };
                 }
                 catch (TestIgnoreException ex)
                 {
-                    results[i] = new TestResult { TestName = testsToRun[i].TestName, Status = TestStatus.Ignored, Log = sw.ToString(), Message = ex.Message };
+                    results[i] = new TestResult { TestName = currentTest.TestName, Status = TestStatus.Ignored, Log = sw.ToString(), Message = ex.Message };
                 }
                 catch (Exception ex)
                 {
-                    results[i] = new TestResult { TestName = testsToRun[i].TestName, Status = TestStatus.Fail, Log = sw.ToString(), Message = $"Error during test run: {ex.Message}" };
+                    results[i] = new TestResult { TestName = currentTest.TestName, Status = TestStatus.Fail, Log = sw.ToString(), Message = $"Error during test run: {ex.Message}" };
                 }
 
                 // Run post-amble
                 try
                 {
-                    runAfterTest?.Invoke(testsToRun[i], results[i]);
+                    runAfterTest?.Invoke(currentTest, results[i]);
                 }
                 catch (Exception ex)
                 {
-                    results[i] = new TestResult { TestName = testsToRun[i].TestName, Status = TestStatus.Fail, Log = sw.ToString(), Message = $"Error during test cleanup: {ex.Message}" };
+                    results[i] = new TestResult { TestName = currentTest.TestName, Status = TestStatus.Fail, Log = sw.ToString(), Message = $"Error during test cleanup: {ex.Message}" };
                 }
 
                 // Cleanup
                 Console.SetOut(oldConsoleOut);
-                if (testsToRun[i].UsesCustomWarpSize)
+                if (currentTest.UsesCustomWarpSize)
                     interpreter.SetWarpSize(2, 2);
             }
             return results;
