@@ -18,7 +18,6 @@ namespace UnityShaderParser.Test
         {
             var table = new Dictionary<string, List<(int, ResourceMethodHandler)>>(StringComparer.Ordinal);
 
-            // Register one handler for an arg count.
             void Add(string name, int argCount, ResourceMethodHandler handler)
             {
                 if (!table.TryGetValue(name, out var list))
@@ -26,7 +25,6 @@ namespace UnityShaderParser.Test
                 list.Add((argCount, handler));
             }
 
-            // Register one handler for each arg count in [minArgs, maxArgs].
             void AddN(string name, int minArgs, int maxArgs, ResourceMethodHandler handler)
             {
                 for (int n = minArgs; n <= maxArgs; n++)
@@ -146,7 +144,6 @@ namespace UnityShaderParser.Test
                     var offset = args.Length >= 3 && args[2] is not ReferenceValue ? (NumericValue)args[2] : null;
                     return GatherCore(rv, (NumericValue)args[1], ch, uniformOffset: offset, sampler: (SamplerStateValue)args[0]);
                 });
-                // 4-offset variant, each corner gets its own offset
                 if (has4Offset)
                 {
                     AddN(gName, 6, 7, (state, rv, args) =>
@@ -262,7 +259,7 @@ namespace UnityShaderParser.Test
                     if (argCount > outOnlyCount)
                         return paramIndex > 0;   // arg 0 is the mip input; the rest are OUT
                 }
-                return true;  // RW / buffer / MS or out-only overload — all args are OUT
+                return true;  // RW / buffer / MS or out-only overload, all args are OUT
             }
 
             if (paramIndex == argCount - 1)
@@ -347,7 +344,6 @@ namespace UnityShaderParser.Test
             return false;
         }
 
-        // res[coord]
         public static HLSLValue ResourceSubscriptRead(ResourceValue rv, NumericValue coord)
         {
             int dim = rv.Dimension;
@@ -371,7 +367,6 @@ namespace UnityShaderParser.Test
             return HLSLValueUtils.MergeThreadValues(results);
         }
 
-        // res[coord] = value
         public static void ResourceSubscriptWrite(HLSLExecutionState executionState, ResourceValue rv, NumericValue coord, NumericValue value)
         {
             int dim = rv.Dimension;
@@ -400,7 +395,6 @@ namespace UnityShaderParser.Test
         public static HLSLValue LoadMS(ResourceValue rv, NumericValue location, NumericValue offset = null)
             => LoadCore(rv, location, offset, hasMip: false);
 
-        // Load N uints
         private static NumericValue LoadN(ResourceValue rv, NumericValue byteOffset, int count)
         {
             var scalarOff = CastToScalar(byteOffset.Cast(ScalarType.Int));
@@ -424,7 +418,6 @@ namespace UnityShaderParser.Test
             return (NumericValue)HLSLValueUtils.MergeThreadValues(results);
         }
 
-        // Stores N uints
         private static void StoreN(HLSLExecutionState state, ResourceValue rv, NumericValue byteOffset, NumericValue value, int count)
         {
             var scalarOff = CastToScalar(byteOffset.Cast(ScalarType.Int));
@@ -466,7 +459,6 @@ namespace UnityShaderParser.Test
             WriteUint32(rv, byteOffset + 4, (uint)(value >> 32));
         }
 
-        // Read-modify-write for 32-bit atomics.
         private static void InterlockedRMW32(HLSLExecutionState state, ResourceValue rv, HLSLValue[] args, Func<uint, uint, uint> op)
         {
             var scalarOff = CastToScalar(((NumericValue)args[0]).Cast(ScalarType.Int));
@@ -487,7 +479,6 @@ namespace UnityShaderParser.Test
                 ((ReferenceValue)args[2]).Set((NumericValue)HLSLValueUtils.MergeThreadValues(originals));
         }
 
-        // Read-modify-write for 64-bit atomics.
         private static void InterlockedRMW64(HLSLExecutionState state, ResourceValue rv, HLSLValue[] args, Func<ulong, ulong, ulong> op)
         {
             var scalarOff = CastToScalar(((NumericValue)args[0]).Cast(ScalarType.Int));
@@ -619,7 +610,6 @@ namespace UnityShaderParser.Test
 
             for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
             {
-                // Read spatial coordinate i (with optional offset).
                 int CoordWithOffset(int i)
                 {
                     int v = Convert.ToInt32(scalarLoc[i].GetThreadValue(threadIndex));
@@ -627,7 +617,6 @@ namespace UnityShaderParser.Test
                         v += Convert.ToInt32(scalarOff[i].GetThreadValue(threadIndex));
                     return v;
                 }
-                // Read a raw (non-offset) coordinate.
                 int RawCoord(int i) => Convert.ToInt32(scalarLoc[i].GetThreadValue(threadIndex));
 
                 int x = rv.Dimension >= 1 ? CoordWithOffset(0) : 0;
@@ -635,17 +624,13 @@ namespace UnityShaderParser.Test
                 int z = rv.Dimension >= 3 ? CoordWithOffset(2) : 0;
                 int mip = 0;
 
-                // Array slice follows the spatial dimensions, no offset applied.
                 if (rv.IsArray)
                 {
                     int slice = RawCoord(rv.Dimension);
-                    // 1D arrays: slice goes into the y parameter of Get.
-                    // 2D arrays: slice goes into the z parameter of Get.
                     if (rv.Dimension == 1) y = slice;
                     else z = slice;
                 }
 
-                // Mip level is the very last component (non-RW textures only).
                 if (hasMip)
                     mip = RawCoord(rv.Dimension + (rv.IsArray ? 1 : 0));
 
@@ -687,11 +672,9 @@ namespace UnityShaderParser.Test
 
         public static NumericValue SampleLevel(ResourceValue rv, SamplerStateValue sampler, NumericValue location, NumericValue lod, NumericValue offset = null, Func<NumericValue, NumericValue> perTexel = null)
         {
-            // Apply MipLodBias then clamp to [MinimumLod, MaximumLod].
             lod = ToFloatLike(lod) + sampler.MipLodBias;
             lod = Clamp(lod, sampler.MinimumLod, sampler.MaximumLod);
 
-            // Cube maps use face selection + per-face bilinear sampling; offset is not applicable.
             if (rv.IsCube)
                 return SampleLevelCube(rv, sampler, location, lod, perTexel);
 
@@ -700,7 +683,6 @@ namespace UnityShaderParser.Test
             var size = VectorValue.FromScalars(rv.SizeX, rv.SizeY, rv.SizeZ).BroadcastToVector(dim) / (lod + 1);
 
             // For array textures the location vector is (spatial_coords..., arraySlice).
-            // Extract the spatial part and remember the slice for Fetch.
             ScalarValue arrSlice = null;
             NumericValue spatialLocation = location;
             if (rv.IsArray)
@@ -708,10 +690,9 @@ namespace UnityShaderParser.Test
                 var locVec = CastToVector(location, dim + 1);
                 var locScalars = locVec.ToScalars();
                 arrSlice = locScalars[dim];
-                spatialLocation = locVec.BroadcastToVector(dim);  // truncate to spatial dims
+                spatialLocation = locVec.BroadcastToVector(dim);
             }
 
-            // Apply address modes to each UV axis independently.
             var addressModes = new[]
             {
                 sampler.AddressU,
@@ -748,13 +729,11 @@ namespace UnityShaderParser.Test
             NumericValue result;
             ScalarValue zero = (ScalarValue)0;
 
-            // Point
             if (!linear)
             {
                 var p = (VectorValue)Clamp(Round(texelPos).Cast(ScalarType.Int), 0, size - 1);
                 result = FetchAt(p.x, dim >= 2 ? p.y : zero, dim >= 3 ? p.z : zero);
             }
-            // Linear
             else
             {
                 var basePos = (VectorValue)Floor(texelPos).Cast(ScalarType.Int);
@@ -789,7 +768,6 @@ namespace UnityShaderParser.Test
                 }
             }
 
-            // Border address mode
             bool hasBorder = sampler.AddressU == SamplerStateValue.TextureAddressMode.Border
                 || (dim >= 2 && sampler.AddressV == SamplerStateValue.TextureAddressMode.Border)
                 || (dim >= 3 && sampler.AddressW == SamplerStateValue.TextureAddressMode.Border);
@@ -799,7 +777,6 @@ namespace UnityShaderParser.Test
             return result;
         }
 
-        // Converts a float3 direction to a cube face index
         private static void ProjectCubeDirection(float x, float y, float z, out int face, out float u, out float v)
         {
             float ax = MathF.Abs(x), ay = MathF.Abs(y), az = MathF.Abs(z);
@@ -826,7 +803,6 @@ namespace UnityShaderParser.Test
             v = (tc / ma + 1f) * 0.5f;
         }
 
-        // Samples a cube map or cube map array using face selection and per-face interpolation.
         private static NumericValue SampleLevelCube(ResourceValue rv, SamplerStateValue sampler, NumericValue location, NumericValue lod, Func<NumericValue, NumericValue> perTexel = null)
         {
             var dir = CastToVector(location, rv.IsArray ? 4 : 3);
@@ -1090,7 +1066,7 @@ namespace UnityShaderParser.Test
 
                     if (x == -1 || y == -1)
                     {
-                        components[i] = comparisonValue != null ? CompareScalars(sampler, 0f, cmpV) : 0f;
+                        components[i] = comparisonValue is not null ? CompareScalars(sampler, 0f, cmpV) : 0f;
                         continue;
                     }
 
@@ -1099,7 +1075,7 @@ namespace UnityShaderParser.Test
                         ? Convert.ToSingle(vv[Math.Min(channelIndex, vv.Size - 1)].GetThreadValue(thread))
                         : Convert.ToSingle(CastToScalar((NumericValue)texel).GetThreadValue(thread));
 
-                    if (comparisonValue != null)
+                    if (comparisonValue is not null)
                         texelCh = CompareScalars(sampler, texelCh, cmpV);
 
                     components[i] = texelCh;
@@ -1148,22 +1124,22 @@ namespace UnityShaderParser.Test
                 uint d = (uint)Math.Max(1, (int)(rv.SizeZ / scale));
 
                 int o = 0;
-                // Width — all resource types have a width.
+                // Width, all resource types have a width.
                 collected[o++][thread] = w;
-                // Height — 2D+ non-buffer resources.
+                // Height, 2D+ non-buffer resources.
                 if (!rv.IsBuffer && outDim >= 2) collected[o++][thread] = h;
-                // Depth or array element count — 3D textures and array textures.
+                // Depth or array element count, 3D textures and array textures.
                 if (outDim >= 3 || rv.IsArray) collected[o++][thread] = d;
-                // Sample count — MS textures (we report 1 since we don't track per-sample data).
+                // Sample count, MS textures (we report 1 since we don't track per-sample data).
                 if (IsMSTexture(rv)) collected[o++][thread] = 1;
-                // Element stride — StructuredBuffer types: size of the first template argument.
+                // Element stride, StructuredBuffer types: size of the first template argument.
                 if (rv.Type == PredefinedObjectType.StructuredBuffer ||
                     rv.Type == PredefinedObjectType.RWStructuredBuffer ||
                     rv.Type == PredefinedObjectType.AppendStructuredBuffer ||
                     rv.Type == PredefinedObjectType.ConsumeStructuredBuffer ||
                     rv.Type == PredefinedObjectType.RasterizerOrderedStructuredBuffer)
                     collected[o++][thread] = (uint)HLSLValueUtils.GetTypeSize(rv.TemplateArguments[0]);
-                // Mip level count — only when a mip input was given.
+                // Mip level count, only when a mip input was given.
                 if (hasMipInput) collected[o++][thread] = (uint)rv.MipCount;
             }
 
