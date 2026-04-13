@@ -1335,6 +1335,83 @@ namespace UnityShaderParser.Test
                     result = VectorValue.FromScalars(0.5, 0.5f);
                     return true;
 
+                // Legacy combined-sampler tex* intrinsics from dx9
+                case "tex1D" when args.Length == 2:
+                    result = Sample(executionState, (ResourceValue)args[0], new SamplerStateValue(), (NumericValue)args[1]);
+                    return true;
+                case "tex1D" when args.Length == 4:
+                    result = SampleGrad((ResourceValue)args[0], new SamplerStateValue(), (NumericValue)args[1], (NumericValue)args[2], (NumericValue)args[3]);
+                    return true;
+                case "tex1Dbias":
+                    result = SampleBias(executionState, (ResourceValue)args[0], new SamplerStateValue(), (NumericValue)args[1], ((VectorValue)args[1]).w);
+                    return true;
+                case "tex1Dgrad":
+                    result = SampleGrad((ResourceValue)args[0], new SamplerStateValue(), (NumericValue)args[1], (NumericValue)args[2], (NumericValue)args[3]);
+                    return true;
+                case "tex1Dlod":
+                    result = SampleLevel((ResourceValue)args[0], new SamplerStateValue(), (NumericValue)args[1], ((VectorValue)args[1]).w);
+                    return true;
+                case "tex1Dproj":
+                    result = Sample(executionState, (ResourceValue)args[0], new SamplerStateValue(), (NumericValue)args[1] / ((VectorValue)args[1]).w);
+                    return true;
+
+                case "tex2D" when args.Length == 2:
+                    result = Sample(executionState, (ResourceValue)args[0], new SamplerStateValue(), (NumericValue)args[1]);
+                    return true;
+                case "tex2D" when args.Length == 4:
+                    result = SampleGrad((ResourceValue)args[0], new SamplerStateValue(), (NumericValue)args[1], (NumericValue)args[2], (NumericValue)args[3]);
+                    return true;
+                case "tex2Dbias":
+                    result = SampleBias(executionState, (ResourceValue)args[0], new SamplerStateValue(), (NumericValue)args[1], ((VectorValue)args[1]).w);
+                    return true;
+                case "tex2Dgrad":
+                    result = SampleGrad((ResourceValue)args[0], new SamplerStateValue(), (NumericValue)args[1], (NumericValue)args[2], (NumericValue)args[3]);
+                    return true;
+                case "tex2Dlod":
+                    result = SampleLevel((ResourceValue)args[0], new SamplerStateValue(), (NumericValue)args[1], ((VectorValue)args[1]).w);
+                    return true;
+                case "tex2Dproj":
+                    result = Sample(executionState, (ResourceValue)args[0], new SamplerStateValue(), (NumericValue)args[1] / ((VectorValue)args[1]).w);
+                    return true;
+
+                case "tex3D" when args.Length == 2:
+                    result = Sample(executionState, (ResourceValue)args[0], new SamplerStateValue(), (NumericValue)args[1]);
+                    return true;
+                case "tex3D" when args.Length == 4:
+                    result = SampleGrad((ResourceValue)args[0], new SamplerStateValue(), (NumericValue)args[1], (NumericValue)args[2], (NumericValue)args[3]);
+                    return true;
+                case "tex3Dbias":
+                    result = SampleBias(executionState, (ResourceValue)args[0], new SamplerStateValue(), (NumericValue)args[1], ((VectorValue)args[1]).w);
+                    return true;
+                case "tex3Dgrad":
+                    result = SampleGrad((ResourceValue)args[0], new SamplerStateValue(), (NumericValue)args[1], (NumericValue)args[2], (NumericValue)args[3]);
+                    return true;
+                case "tex3Dlod":
+                    result = SampleLevel((ResourceValue)args[0], new SamplerStateValue(), (NumericValue)args[1], ((VectorValue)args[1]).w);
+                    return true;
+                case "tex3Dproj":
+                    result = Sample(executionState, (ResourceValue)args[0], new SamplerStateValue(), (NumericValue)args[1] / ((VectorValue)args[1]).w);
+                    return true;
+
+                case "texCUBE" when args.Length == 2:
+                    result = Sample(executionState, (ResourceValue)args[0], new SamplerStateValue(), (NumericValue)args[1]);
+                    return true;
+                case "texCUBE" when args.Length == 4:
+                    result = SampleGrad((ResourceValue)args[0], new SamplerStateValue(), (NumericValue)args[1], (NumericValue)args[2], (NumericValue)args[3]);
+                    return true;
+                case "texCUBEbias":
+                    result = SampleBias(executionState, (ResourceValue)args[0], new SamplerStateValue(), (NumericValue)args[1], ((VectorValue)args[1]).w);
+                    return true;
+                case "texCUBEgrad":
+                    result = SampleGrad((ResourceValue)args[0], new SamplerStateValue(), (NumericValue)args[1], (NumericValue)args[2], (NumericValue)args[3]);
+                    return true;
+                case "texCUBElod":
+                    result = SampleLevel((ResourceValue)args[0], new SamplerStateValue(), (NumericValue)args[1], ((VectorValue)args[1]).w);
+                    return true;
+                case "texCUBEproj":
+                    result = Sample(executionState, (ResourceValue)args[0], new SamplerStateValue(), (NumericValue)args[1] / ((VectorValue)args[1]).w);
+                    return true;
+
                 default:
                     result = null;
                     return false;

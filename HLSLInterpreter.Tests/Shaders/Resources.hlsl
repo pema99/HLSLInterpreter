@@ -163,3 +163,162 @@ void MockResource_Inline_Dimensions()
     ASSERT(w == 8);
     ASSERT(h == 8);
 }
+
+// ============================================================
+// Legacy combined-sampler tex* intrinsics
+//
+// For a size-N texture with point filtering:
+//   texelPos = UV * N - 0.5
+// UV values chosen so texelPos lands exactly on a texel centre.
+//
+// 4-texel 1D layout:  texel[x].x = x  →  [0, 1, 2, 3]
+// 4x4 2D layout:      texel[x,y].x = y*4+x
+// 2x2x2 3D layout:    texel[x,y,z].x = z*4+y*2+x
+// Cube layout:        returns float4(face, 0, 0, 1)  (z arg encodes face)
+//
+// Mocks must expose SizeX/SizeY/SizeZ so the sampler code knows the texture
+// dimensions for UV-to-texel mapping.
+// ============================================================
+
+struct MockLegacy2D
+{
+    float4 data[16];
+
+    int SizeX() { return 4; }
+    int SizeY() { return 4; }
+    int MipCount() { return 1; }
+
+    void Initialize()
+    {
+        for (int i = 0; i < 16; i++)
+            data[i] = float4(i, 0, 0, 1);
+    }
+
+    float4 Read(int x, int y, int z, int w, int mipLevel)
+    {
+        return data[y * 4 + x];
+    }
+};
+
+struct MockLegacy1D
+{
+    int SizeX() { return 4; }
+    int MipCount() { return 1; }
+    void Initialize() {}
+    float4 Read(int x, int y, int z, int w, int mipLevel) { return float4(float(x), 0, 0, 1); }
+};
+
+struct MockLegacy3D
+{
+    int SizeX() { return 2; }
+    int SizeY() { return 2; }
+    int SizeZ() { return 2; }
+    int MipCount() { return 1; }
+    void Initialize() {}
+    float4 Read(int x, int y, int z, int w, int mipLevel) { return float4(float(z * 4 + y * 2 + x), 0, 0, 1); }
+};
+
+struct MockLegacyCube
+{
+    int SizeX() { return 2; }
+    int SizeY() { return 2; }
+    int MipCount() { return 1; }
+    void Initialize() {}
+    // z encodes face index (0=+X,1=-X,2=+Y,3=-Y,4=+Z,5=-Z)
+    float4 Read(int x, int y, int z, int w, int mipLevel) { return float4(float(z), 0, 0, 1); }
+};
+
+sampler1D  g_legacySampler1D;
+sampler2D  g_legacySampler2D;
+sampler3D  g_legacySampler3D;
+samplerCUBE g_legacySamplerCube;
+
+// tex2Dlod: explicit lod=0, UV=(0.625,0.625) -> texelPos=(2,2) -> pixel(2,2).x=10
+[Test]
+void LegacySampler_tex2Dlod()
+{
+    MOCK_RESOURCE(g_legacySampler2D, MockLegacy2D);
+    float4 val = tex2Dlod(g_legacySampler2D, float4(0.625, 0.625, 0, 0));
+    ASSERT(val.x == 10.0);
+}
+
+// tex2D (2-arg): uniform UV -> derivatives=0 -> lod=0; UV=(0.625,0.375) -> pixel(2,1).x=6
+[Test]
+void LegacySampler_tex2D()
+{
+    MOCK_RESOURCE(g_legacySampler2D, MockLegacy2D);
+    float4 val = tex2D(g_legacySampler2D, float2(0.625, 0.375));
+    ASSERT(val.x == 6.0);
+}
+
+// tex2Dbias: bias=0 -> same lod as tex2D; UV=(0.625,0.375) -> pixel(2,1).x=6
+[Test]
+void LegacySampler_tex2Dbias()
+{
+    MOCK_RESOURCE(g_legacySampler2D, MockLegacy2D);
+    float4 val = tex2Dbias(g_legacySampler2D, float4(0.625, 0.375, 0, 0.0));
+    ASSERT(val.x == 6.0);
+}
+
+// tex2Dgrad: explicit ddx=ddy=0 -> lod=0; UV=(0.625,0.375) -> pixel(2,1).x=6
+[Test]
+void LegacySampler_tex2Dgrad()
+{
+    MOCK_RESOURCE(g_legacySampler2D, MockLegacy2D);
+    float4 val = tex2Dgrad(g_legacySampler2D, float2(0.625, 0.375), float2(0, 0), float2(0, 0));
+    ASSERT(val.x == 6.0);
+}
+
+// tex2Dproj: (u/w, v/w) = (1.25/2, 0.75/2) = (0.625, 0.375) -> pixel(2,1).x=6
+[Test]
+void LegacySampler_tex2Dproj()
+{
+    MOCK_RESOURCE(g_legacySampler2D, MockLegacy2D);
+    float4 val = tex2Dproj(g_legacySampler2D, float4(1.25, 0.75, 0, 2.0));
+    ASSERT(val.x == 6.0);
+}
+
+// tex1Dlod: UV=0.625 -> texelPos=2.0 -> texel[2].x=2
+[Test]
+void LegacySampler_tex1Dlod()
+{
+    MOCK_RESOURCE(g_legacySampler1D, MockLegacy1D);
+    float4 val = tex1Dlod(g_legacySampler1D, float4(0.625, 0, 0, 0));
+    ASSERT(val.x == 2.0);
+}
+
+// tex1D (2-arg): uniform UV -> lod=0; UV=0.375 -> texelPos=1.0 -> texel[1].x=1
+[Test]
+void LegacySampler_tex1D()
+{
+    MOCK_RESOURCE(g_legacySampler1D, MockLegacy1D);
+    float4 val = tex1D(g_legacySampler1D, 0.375);
+    ASSERT(val.x == 1.0);
+}
+
+// tex3Dlod: UV=(0.75,0.25,0.75) -> texelPos=(1,0,1) -> texel(1,0,1).x=5
+[Test]
+void LegacySampler_tex3Dlod()
+{
+    MOCK_RESOURCE(g_legacySampler3D, MockLegacy3D);
+    float4 val = tex3Dlod(g_legacySampler3D, float4(0.75, 0.25, 0.75, 0));
+    ASSERT(val.x == 5.0);
+}
+
+// texCUBElod: direction (1,0,0) -> face 0 (+X) -> Read returns float4(0,0,0,1)
+[Test]
+void LegacySampler_texCUBElod()
+{
+    MOCK_RESOURCE(g_legacySamplerCube, MockLegacyCube);
+    float4 val = texCUBElod(g_legacySamplerCube, float4(1, 0, 0, 0));
+    ASSERT(val.x == 0.0);
+}
+
+// texCUBElod: direction (0,1,0) -> face 2 (+Y) -> Read returns float4(2,0,0,1)
+[Test]
+void LegacySampler_texCUBElod_FaceY()
+{
+    MOCK_RESOURCE(g_legacySamplerCube, MockLegacyCube);
+    float4 val = texCUBElod(g_legacySamplerCube, float4(0, 1, 0, 0));
+    ASSERT(val.x == 2.0);
+}
