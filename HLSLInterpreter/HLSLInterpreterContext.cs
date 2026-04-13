@@ -202,9 +202,12 @@ namespace UnityShaderParser.Test
             return null;
         }
 
-        public FunctionDefinitionNode[] GetFunctions()
+        public (string QualifiedName, FunctionDefinitionNode Func)[] GetFunctions()
         {
-            return environment.SelectMany(s => s.Functions.Values).SelectMany(x => x).ToArray();
+            return environment
+                .SelectMany(s => s.Functions)
+                .SelectMany(kvp => kvp.Value.Select(f => (kvp.Key, f)))
+                .ToArray();
         }
 
         public void AddFunction(string name, FunctionDefinitionNode func)

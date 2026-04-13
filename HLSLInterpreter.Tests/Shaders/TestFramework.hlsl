@@ -81,3 +81,75 @@ void TestFramework_Ignored_NoReason()
 {
     FAIL_TEST();
 }
+
+void GenerateCases()
+{
+    TEST_CASE(1, 3.5);
+    TEST_CASE(2, 2.5);
+}
+
+[Test]
+[TestCaseSource(GenerateCases)]
+void TestFramework_TestCaseSource(int a, float b)
+{
+    ASSERT(a < b);
+}
+
+void GenerateA()
+{
+    TEST_VALUE(1);
+    TEST_VALUE(2);
+}
+
+void GenerateB()
+{
+    TEST_VALUE(3.5);
+    TEST_VALUE(2.5);
+}
+
+[Test]
+void TestFramework_ValueSource([ValueSource(GenerateA)] int a, [ValueSource(GenerateB)] float b)
+{
+    ASSERT(a < b);
+}
+
+[Test]
+void TestFramework_Values([Values(1, 2)] int a, [Values(3.5, 2.5)] float b)
+{
+    ASSERT(a < b);
+}
+
+[Test]
+void TestFramework_MixValuesAndValueSource([Values(1, 2)] int a, [ValueSource(GenerateB)] float b)
+{
+    ASSERT(a < b);
+}
+
+namespace Foobar
+{
+    [Test]
+    void TestFramework_Test_InNamespace()
+    {
+    }
+}
+
+// Mixing tests: combine function-level TestCase with param-level Values
+[Test]
+[TestCase(0, 5.0)]
+void TestFramework_MixTestCaseAndValues([Values(1, 2)] int a, [Values(3.5, 4.5)] float b)
+{
+    ASSERT(a < b);
+}
+
+// Mixing tests: combine function-level TestCaseSource with param-level ValueSource
+void GenerateMixCases()
+{
+    TEST_CASE(0, 10.0);
+}
+
+[Test]
+[TestCaseSource(GenerateMixCases)]
+void TestFramework_MixTestCaseSourceAndValueSource([ValueSource(GenerateA)] int a, [ValueSource(GenerateB)] float b)
+{
+    ASSERT(a < b);
+}
