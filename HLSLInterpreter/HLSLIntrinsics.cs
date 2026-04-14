@@ -65,7 +65,7 @@ namespace UnityShaderParser.Test
         
         private static NumericValue ToFloatLike(NumericValue value)
         {
-            if (HLSLValueUtils.IsFloat(value.Type))
+            if (HLSLTypeUtils.IsFloat(value.Type))
                 return value;
             return value.Cast(ScalarType.Float);
         }
@@ -291,10 +291,10 @@ namespace UnityShaderParser.Test
 
         public static NumericValue Abs(NumericValue x)
         {
-            if (HLSLValueUtils.IsInt(x.Type))
+            if (HLSLTypeUtils.IsInt(x.Type))
                 return x.Map(val => Math.Abs(Convert.ToInt32(val)));
 
-            if (HLSLValueUtils.IsUint(x.Type))
+            if (HLSLTypeUtils.IsUint(x.Type))
                 return x;
 
             return x.Map(val => Math.Abs(Convert.ToSingle(val)));
@@ -350,9 +350,9 @@ namespace UnityShaderParser.Test
             return x.Map(y =>
             {
                 byte[] bytes;
-                if (HLSLValueUtils.IsUint(x.Type))
+                if (HLSLTypeUtils.IsUint(x.Type))
                     bytes = BitConverter.GetBytes(Convert.ToUInt32(y));
-                else if (HLSLValueUtils.IsInt(x.Type))
+                else if (HLSLTypeUtils.IsInt(x.Type))
                     bytes = BitConverter.GetBytes(Convert.ToInt32(y));
                 else
                     return y;
@@ -365,9 +365,9 @@ namespace UnityShaderParser.Test
             return x.Map(y =>
             {
                 byte[] bytes;
-                if (HLSLValueUtils.IsFloat(x.Type))
+                if (HLSLTypeUtils.IsFloat(x.Type))
                     bytes = BitConverter.GetBytes(Convert.ToSingle(y));
-                else if (HLSLValueUtils.IsUint(x.Type))
+                else if (HLSLTypeUtils.IsUint(x.Type))
                     bytes = BitConverter.GetBytes(Convert.ToUInt32(y));
                 else
                     return y;
@@ -380,9 +380,9 @@ namespace UnityShaderParser.Test
             return x.Map(y =>
             {
                 byte[] bytes;
-                if (HLSLValueUtils.IsFloat(x.Type))
+                if (HLSLTypeUtils.IsFloat(x.Type))
                     bytes = BitConverter.GetBytes(Convert.ToSingle(y));
-                else if (HLSLValueUtils.IsInt(x.Type))
+                else if (HLSLTypeUtils.IsInt(x.Type))
                     bytes = BitConverter.GetBytes(Convert.ToInt32(y));
                 else
                     return y;
@@ -417,8 +417,8 @@ namespace UnityShaderParser.Test
         public static NumericValue Select(NumericValue cond, NumericValue a, NumericValue b)
         {
             // Match thread count all args
-            (cond, a) = HLSLValueUtils.PromoteThreadCount(cond, a);
-            (cond, b) = HLSLValueUtils.PromoteThreadCount(cond, b);
+            (cond, a) = HLSLTypeUtils.PromoteThreadCount(cond, a);
+            (cond, b) = HLSLTypeUtils.PromoteThreadCount(cond, b);
 
             // Match shape of all args
             {
@@ -456,7 +456,7 @@ namespace UnityShaderParser.Test
             }
 
             // Match types of branches
-            (a, b) = HLSLValueUtils.PromoteType(a, b, false);
+            (a, b) = HLSLTypeUtils.PromoteType(a, b, false);
 
             return cond.MapThreads((condVal, threadIndex) =>
             {
@@ -869,7 +869,7 @@ namespace UnityShaderParser.Test
         {
             x = ToFloatLike(x);
             y = ToFloatLike(y);
-            (x, y) = HLSLValueUtils.Promote(x, y, false);
+            (x, y) = HLSLTypeUtils.Promote(x, y, false);
             return HLSLValueUtils.Map2(x, y, (fx, fy) => MathF.Pow(Convert.ToSingle(fx), Convert.ToSingle(fy)));
         }
 
@@ -974,7 +974,7 @@ namespace UnityShaderParser.Test
         
         public static NumericValue Dot(NumericValue x, NumericValue y)
         {
-            (x, y) = HLSLValueUtils.Promote(x, y, false);
+            (x, y) = HLSLTypeUtils.Promote(x, y, false);
             VectorValue vx = CastToVector(x);
             VectorValue vy = CastToVector(y);
 
@@ -1008,7 +1008,7 @@ namespace UnityShaderParser.Test
 
         public static NumericValue Min(NumericValue x, NumericValue y)
         {
-            (x, y) = HLSLValueUtils.Promote(x, y, false);
+            (x, y) = HLSLTypeUtils.Promote(x, y, false);
             return HLSLValueUtils.Map2(x, y, Min);
         }
 
@@ -1143,7 +1143,7 @@ namespace UnityShaderParser.Test
 
         public static NumericValue Max(NumericValue x, NumericValue y)
         {
-            (x, y) = HLSLValueUtils.Promote(x, y, false);
+            (x, y) = HLSLTypeUtils.Promote(x, y, false);
             return HLSLValueUtils.Map2(x, y, Max);
         }
 
@@ -1472,7 +1472,7 @@ namespace UnityShaderParser.Test
 
                 var newVal = computeNewValue(cur, thread);
                 if (newVal is not null)
-                    refVal.Set(HLSLValueUtils.CastForAssignment(cur, newVal));
+                    refVal.Set(HLSLTypeUtils.CastForAssignment(cur, newVal));
             }
 
             if (hasOut)
@@ -1886,7 +1886,7 @@ namespace UnityShaderParser.Test
 
                 if (exprFirst is null)
                 {
-                    sum = HLSLValueUtils.GetOneValue(expr).Scalarize(threadIndex);
+                    sum = HLSLTypeUtils.GetOneValue(expr).Scalarize(threadIndex);
                     exprFirst = (NumericValue)HLSLValueUtils.SetThreadValue(expr.Vectorize(executionState.GetThreadCount()), threadIndex, sum);
                     sum = expr.Scalarize(threadIndex);
                 }
@@ -1912,7 +1912,7 @@ namespace UnityShaderParser.Test
 
                 if (exprFirst is null)
                 {
-                    sum = HLSLValueUtils.GetZeroValue(expr).Scalarize(threadIndex);
+                    sum = HLSLTypeUtils.GetZeroValue(expr).Scalarize(threadIndex);
                     exprFirst = (NumericValue)HLSLValueUtils.SetThreadValue(expr.Vectorize(executionState.GetThreadCount()), threadIndex, sum);
                     sum = sum + expr.Scalarize(threadIndex);
                 }

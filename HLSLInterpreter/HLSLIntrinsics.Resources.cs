@@ -961,7 +961,7 @@ namespace UnityShaderParser.Test
         {
             var depth = ToFloatLike(CastToScalar(sampledValue));
             var cmp = ToFloatLike(CastToScalar(cmpVal));
-            (depth, cmp) = HLSLValueUtils.Promote(depth, cmp, false);
+            (depth, cmp) = HLSLTypeUtils.Promote(depth, cmp, false);
             return HLSLValueUtils.Map2(depth, cmp, (a, b) => CompareScalars(sampler, Convert.ToSingle(a), Convert.ToSingle(b)));
         }
 

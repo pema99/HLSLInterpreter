@@ -193,7 +193,7 @@ namespace UnityShaderParser.Test
                 {
                     if (scope.Functions.TryGetValue(candidate, out var funcs))
                     {
-                        var overload = HLSLValueUtils.PickOverload(evaluator, funcs, args);
+                        var overload = HLSLOverloadResolution.PickOverload(evaluator, funcs, args);
                         if (overload != null)
                             return overload;
                     }

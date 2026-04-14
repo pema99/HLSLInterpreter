@@ -300,7 +300,7 @@ namespace UnityShaderParser.Test
 
         public override NumericValue Cast(ScalarType type)
         {
-            return new ScalarValue(type, Value.Map(x => HLSLValueUtils.CastNumeric(type, x)));
+            return new ScalarValue(type, Value.Map(x => HLSLTypeUtils.CastNumeric(type, x)));
         }
 
         public override object GetThreadValue(int threadIndex)
@@ -512,7 +512,7 @@ namespace UnityShaderParser.Test
                     object[] res = new object[size];
                     Array.Copy(x, res, x.Length);
                     for (int i = 0; i < sizeDiff; i++)
-                        res[x.Length + i] = HLSLValueUtils.GetZeroValue(Type);
+                        res[x.Length + i] = HLSLTypeUtils.GetZeroValue(Type);
                     return res;
                 }
                 else if (size < x.Length) // Truncation
@@ -532,7 +532,7 @@ namespace UnityShaderParser.Test
             {
                 object[] res = new object[x.Length];
                 for (int i = 0; i < res.Length; i++)
-                    res[i] = HLSLValueUtils.CastNumeric(type, x[i]);
+                    res[i] = HLSLTypeUtils.CastNumeric(type, x[i]);
                 return res;
             }));
         }
@@ -734,7 +734,7 @@ namespace UnityShaderParser.Test
                         if (row < Rows && col < Columns)
                             newScalars[row * columns + col] = scalars[row * Columns + col];
                         else
-                            newScalars[row * columns + col] = (ScalarValue)HLSLValueUtils.GetZeroValue(scalars[0]);
+                            newScalars[row * columns + col] = (ScalarValue)HLSLTypeUtils.GetZeroValue(scalars[0]);
                     }
                 }
                 return FromScalars(rows, columns, newScalars);
@@ -753,7 +753,7 @@ namespace UnityShaderParser.Test
             {
                 object[] res = new object[x.Length];
                 for (int i = 0; i < res.Length; i++)
-                    res[i] = HLSLValueUtils.CastNumeric(type, x[i]);
+                    res[i] = HLSLTypeUtils.CastNumeric(type, x[i]);
                 return res;
             }));
         }
