@@ -1138,7 +1138,7 @@ namespace UnityShaderParser.Test
                     rv.Type == PredefinedObjectType.AppendStructuredBuffer ||
                     rv.Type == PredefinedObjectType.ConsumeStructuredBuffer ||
                     rv.Type == PredefinedObjectType.RasterizerOrderedStructuredBuffer)
-                    collected[o++][thread] = (uint)HLSLValueUtils.GetTypeSize(rv.TemplateArguments[0]);
+                    collected[o++][thread] = (uint)rv.Stride;
                 // Mip level count, only when a mip input was given.
                 if (hasMipInput) collected[o++][thread] = (uint)rv.MipCount;
             }

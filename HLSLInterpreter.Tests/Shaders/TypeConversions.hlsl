@@ -1,5 +1,7 @@
 #include "HLSLTest.hlsl"
 
+struct FlatInitStruct { float a; float b; };
+struct StructWithArray { int data[2]; float x; };
 
 [Test]
 void Conversion_TernaryOperator_VectorSizes()
@@ -489,4 +491,60 @@ void Cast_VectorArrayToVector()
     float2 arr[2] = {float2(1.0, 2.0), float2(3.0, 4.0)};
     float4 v = (float4)arr;
     ASSERT(v.x == 1.0 && v.y == 2.0 && v.z == 3.0 && v.w == 4.0);
+}
+
+// --- Flattened array initializer lists ---
+// HLSL flattens all scalar components in an initializer and repacks them into the
+// array element type. int4(4,5,6,7) contributes 4 scalars, giving 4 int2 elements.
+
+[Test]
+void ArrayInit_FlattenedImplicitSize()
+{
+    // Implicit size: derived from total scalars / components-per-element = 8 / 2 = 4.
+    int2 arr[] = { int2(0, 1), int2(2, 3), int4(4, 5, 6, 7) };
+    ASSERT(arr[0].x == 0 && arr[0].y == 1);
+    ASSERT(arr[1].x == 2 && arr[1].y == 3);
+    ASSERT(arr[2].x == 4 && arr[2].y == 5);
+    ASSERT(arr[3].x == 6 && arr[3].y == 7);
+}
+
+[Test]
+void ArrayInit_FlattenedExplicitSize()
+{
+    // Same initializer with explicit [4].
+    int2 arr[4] = { int2(0, 1), int2(2, 3), int4(4, 5, 6, 7) };
+    ASSERT(arr[0].x == 0 && arr[0].y == 1);
+    ASSERT(arr[1].x == 2 && arr[1].y == 3);
+    ASSERT(arr[2].x == 4 && arr[2].y == 5);
+    ASSERT(arr[3].x == 6 && arr[3].y == 7);
+}
+
+[Test]
+void ArrayInit_FlattenedScalarElements()
+{
+    // int2 initializers contribute 2 scalars each -> int[4].
+    int arr[] = { int2(0, 1), int2(2, 3) };
+    ASSERT(arr[0] == 0 && arr[1] == 1 && arr[2] == 2 && arr[3] == 3);
+}
+
+[Test]
+void ArrayInit_FlattenedStructElements()
+{
+    // FlatInitStruct has 2 float fields; int4(4,5,6,7) contributes 4 scalars -> 4 elements.
+    FlatInitStruct arr[] = { int2(0, 1), int2(2, 3), int4(4, 5, 6, 7) };
+    ASSERT(arr[0].a == 0.0 && arr[0].b == 1.0);
+    ASSERT(arr[1].a == 2.0 && arr[1].b == 3.0);
+    ASSERT(arr[2].a == 4.0 && arr[2].b == 5.0);
+    ASSERT(arr[3].a == 6.0 && arr[3].b == 7.0);
+}
+
+[Test]
+void ArrayInit_StructWithArrayField()
+{
+    // StructWithArray has int data[2] and float x, so 3 dwords per element.
+    // 9 scalars total -> 3 elements.
+    StructWithArray arr[] = { int3(0, 1, 2), int3(3, 4, 5), int3(6, 7, 8) };
+    ASSERT(arr[0].data[0] == 0 && arr[0].data[1] == 1 && arr[0].x == 2.0);
+    ASSERT(arr[1].data[0] == 3 && arr[1].data[1] == 4 && arr[1].x == 5.0);
+    ASSERT(arr[2].data[0] == 6 && arr[2].data[1] == 7 && arr[2].x == 8.0);
 }

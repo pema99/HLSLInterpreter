@@ -27,6 +27,13 @@ namespace UnityShaderParser.Test
         public void RemoveCallback(string name) => callbacks.Remove(name);
         public IEnumerable<KeyValuePair<string, Func<HLSLExecutionState, ExpressionNode[], HLSLValue>>> GetCallbacks() => callbacks;
 
+        public static HLSLValue EvaluateConstExpr(ExpressionNode node)
+        {
+            HLSLExpressionEvaluator evaluator = new HLSLExpressionEvaluator(
+                null, new HLSLInterpreterContext(), new HLSLExecutionState(2, 2));
+            return evaluator.Visit(node);
+        }
+
         public HLSLValue CallFunction(string name, params HLSLValue[] args)
         {
             FunctionDefinitionNode func = context.GetFunction(this, name, args);
@@ -1103,13 +1110,13 @@ namespace UnityShaderParser.Test
                     {
                         int offset = (i * components);
                         int end = offset + components;
-                        elements[i] = HLSLValueUtils.PackScalarsToNumeric(flattened[offset..end], targetKind);
+                        elements[i] = HLSLValueUtils.PackScalars(context, flattened[offset..end], targetKind);
                     }
                     return new ArrayValue(elements);
                 }
                 else
                 {
-                    return HLSLValueUtils.PackScalarsToNumeric(flattened, targetKind);
+                    return HLSLValueUtils.PackScalars(context, flattened, targetKind);
                 }
             }
 

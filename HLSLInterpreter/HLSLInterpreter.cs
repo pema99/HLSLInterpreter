@@ -97,8 +97,9 @@ namespace UnityShaderParser.Test
                 };
             }
 
+            int stride = templateArgs.Length > 0 ? HLSLValueUtils.GetTypeSizeDwords(context, templateArgs[0]) * 4 : 0;
             return new ResourceValue(
-                resourceType, templateArgs,
+                resourceType, templateArgs, stride,
                 MakeSizeDelegate("SizeX", 2),
                 MakeSizeDelegate("SizeY", 2),
                 MakeSizeDelegate("SizeZ", 2),
@@ -163,7 +164,8 @@ namespace UnityShaderParser.Test
         {
             type = context.ResolveType(type);
             bool isArray = decl.ArrayRanks.Count > 0;
-            int arrayLength = isArray ? Convert.ToInt32(EvaluateNumeric(decl.ArrayRanks[0].Dimension).GetThreadValue(0)) : 0;
+            bool hasImplicitSize = isArray && decl.ArrayRanks[0].Dimension == null;
+            int arrayLength = (isArray && !hasImplicitSize) ? Convert.ToInt32(EvaluateNumeric(decl.ArrayRanks[0].Dimension).GetThreadValue(0)) : 0;
             
             if (decl.Initializer is ValueInitializerNode initializer)
             {
@@ -173,7 +175,7 @@ namespace UnityShaderParser.Test
                     // Array-literal initializer for a vector/matrix: float3 v = {1,2,3}
                     var rawValue = EvaluateExpression(initializer.Expression);
                     if (rawValue is ArrayValue arrayInit)
-                        return HLSLValueUtils.PackScalarsToNumeric(HLSLValueUtils.FlattenToScalars(arrayInit), numericType);
+                        return HLSLValueUtils.PackScalars(context, HLSLValueUtils.FlattenToScalars(arrayInit), numericType);
 
                     // Regular numeric initializer
                     if (rawValue is not NumericValue numericInitializerValue)
@@ -208,18 +210,27 @@ namespace UnityShaderParser.Test
                 {
                     initializerValue = EvaluateExpression(initializer.Expression);
 
-                    // Convert array initializer to struct when assigning to a named struct type
-                    if (!isArray && initializerValue is ArrayValue arrayInitVal)
+                    // HLSL ignores braces and flattens all scalar components in an initializer, then repacks
+                    // into the target element type.
+                    if (initializerValue is ArrayValue flatInitVal)
                     {
-                        StructTypeNode structTypeDef = null;
-                        if (type is NamedTypeNode namedType)
-                            structTypeDef = context.GetStruct(namedType.GetName());
-                        else if (type is QualifiedNamedTypeNode qualNamedType)
-                            structTypeDef = context.GetStruct(qualNamedType.GetName());
-                        else if (type is StructTypeNode inlineStructType)
-                            structTypeDef = inlineStructType;
-                        if (structTypeDef != null)
-                            initializerValue = CreateStructValueFromArray(structTypeDef, arrayInitVal);
+                        int scalarsPerElement = HLSLValueUtils.GetTypeSizeDwords(context, type);
+                        if (scalarsPerElement > 0)
+                        {
+                            var flattened = HLSLValueUtils.FlattenToScalars(flatInitVal);
+                            if (isArray)
+                            {
+                                int count = hasImplicitSize ? flattened.Length / scalarsPerElement : arrayLength;
+                                var elements = new HLSLValue[count];
+                                for (int i = 0; i < count; i++)
+                                    elements[i] = HLSLValueUtils.PackScalars(context, flattened[(i * scalarsPerElement)..((i + 1) * scalarsPerElement)], type);
+                                return new ArrayValue(elements);
+                            }
+                            else
+                            {
+                                return HLSLValueUtils.PackScalars(context, flattened, type);
+                            }
+                        }
                     }
                 }
 
@@ -296,9 +307,11 @@ namespace UnityShaderParser.Test
                                 if (HLSLSyntaxFacts.IsTexture(predefinedObjectType.Kind) || HLSLSyntaxFacts.IsBuffer(predefinedObjectType.Kind))
                                 {
                                     int dim = HLSLSyntaxFacts.GetDimension(predefinedObjectType.Kind);
+                                    var templateArgs = predefinedObjectType.TemplateArguments.ToArray();
+                                    int stride = templateArgs.Length > 0 ? HLSLValueUtils.GetTypeSizeDwords(context, templateArgs[0]) * 4 : 0;
                                     defaultValue = new ResourceValue(
                                         predefinedObjectType.Kind,
-                                        predefinedObjectType.TemplateArguments.ToArray(),
+                                        templateArgs, stride,
                                         dim >= 1 ? 2 : 1,
                                         dim >= 2 ? 2 : 1,
                                         dim >= 3 ? 2 : 1,
@@ -335,33 +348,10 @@ namespace UnityShaderParser.Test
             }
         }
 
-        // Returns all fields in declaration order: inherited fields first (skipping interfaces), then own fields.
-        private IEnumerable<(TypeNode Kind, VariableDeclaratorNode Decl)> GetStructFields(StructTypeNode structType)
-        {
-            foreach (var baseTypeName in structType.Inherits)
-            {
-                var baseStruct = context.GetStruct(baseTypeName.GetName());
-                if (baseStruct != null)
-                {
-                    foreach (var kv in GetStructFields(baseStruct))
-                    {
-                        yield return kv;
-                    }
-                }
-            }
-            foreach (var field in structType.Fields)
-            {
-                foreach (var decl in field.Declarators)
-                {
-                    yield return (field.Kind, decl);
-                }
-            }
-        }
-
         internal StructValue CreateStructValue(StructTypeNode structType)
         {
             Dictionary<string, HLSLValue> members = new Dictionary<string, HLSLValue>();
-            foreach (var (kind, decl) in GetStructFields(structType))
+            foreach (var (kind, decl) in HLSLValueUtils.GetStructFields(structType, context))
             {
                 members[decl.Name] = GetVariableDeclarationInitialValue(kind, decl);
             }
@@ -371,7 +361,7 @@ namespace UnityShaderParser.Test
         internal StructValue CreateStructValueFilledWith(StructTypeNode structType, NumericValue fillValue)
         {
             Dictionary<string, HLSLValue> members = new Dictionary<string, HLSLValue>();
-            foreach (var (kind, decl) in GetStructFields(structType))
+            foreach (var (kind, decl) in HLSLValueUtils.GetStructFields(structType, context))
             {
                 HLSLValue fieldValue;
                 switch (kind)
@@ -394,32 +384,6 @@ namespace UnityShaderParser.Test
                         break;
                 }
                 members[decl.Name] = fieldValue;
-            }
-            return new StructValue(context.GetQualifiedName(structType.Name.GetName()), members);
-        }
-
-        private StructValue CreateStructValueFromArray(StructTypeNode structType, ArrayValue arrayVal)
-        {
-            int offset = 0;
-            return CreateStructValueFromArray(structType, arrayVal.Values, ref offset);
-        }
-
-        private StructValue CreateStructValueFromArray(StructTypeNode structType, HLSLValue[] values, ref int offset)
-        {
-            var members = new Dictionary<string, HLSLValue>();
-            foreach (var (kind, decl) in GetStructFields(structType))
-            {
-                if (kind is UserDefinedNamedTypeNode namedType)
-                {
-                    var nestedStruct = context.GetStruct(namedType.GetName());
-                    members[decl.Name] = CreateStructValueFromArray(nestedStruct, values, ref offset);
-                }
-                else
-                {
-                    members[decl.Name] = offset < values.Length
-                        ? values[offset++]
-                        : GetVariableDeclarationInitialValue(kind, decl);
-                }
             }
             return new StructValue(context.GetQualifiedName(structType.Name.GetName()), members);
         }

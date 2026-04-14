@@ -876,12 +876,16 @@ namespace UnityShaderParser.Test
         public int SizeZ    => GetSizeZ();
         public int MipCount => GetMipCount();
 
-        // For Append/Consume buffer
+        // For StructuredBuffer
+        public readonly int Stride;
+
+        // Atomic counter Append/Consume buffer
         public int Counter;
 
-        public ResourceValue(PredefinedObjectType type, TypeNode[] templateArguments, Func<int> getSizeX, Func<int> getSizeY, Func<int> getSizeZ, Func<int> getMipCount, ResourceGetter get, ResourceSetter set)
+        public ResourceValue(PredefinedObjectType type, TypeNode[] templateArguments, int stride, Func<int> getSizeX, Func<int> getSizeY, Func<int> getSizeZ, Func<int> getMipCount, ResourceGetter get, ResourceSetter set)
             : base(type, templateArguments)
         {
+            Stride = stride;
             GetSizeX = getSizeX;
             GetSizeY = getSizeY;
             GetSizeZ = getSizeZ;
@@ -890,12 +894,12 @@ namespace UnityShaderParser.Test
             Set = set;
         }
 
-        public ResourceValue(PredefinedObjectType type, TypeNode[] templateArguments, int sizeX, int sizeY, int sizeZ, int mipCount, ResourceGetter get, ResourceSetter set)
-            : this(type, templateArguments, () => sizeX, () => sizeY, () => sizeZ, () => mipCount, get, set) { }
+        public ResourceValue(PredefinedObjectType type, TypeNode[] templateArguments, int stride, int sizeX, int sizeY, int sizeZ, int mipCount, ResourceGetter get, ResourceSetter set)
+            : this(type, templateArguments, stride, () => sizeX, () => sizeY, () => sizeZ, () => mipCount, get, set) { }
 
         public override HLSLValue Copy()
         {
-            return new ResourceValue(Type, TemplateArguments, GetSizeX, GetSizeY, GetSizeZ, GetMipCount, Get, Set);
+            return new ResourceValue(Type, TemplateArguments, Stride, GetSizeX, GetSizeY, GetSizeZ, GetMipCount, Get, Set);
         }
 
         public bool IsWriteable => HLSLSyntaxFacts.IsWriteable(Type);
@@ -1763,81 +1767,124 @@ namespace UnityShaderParser.Test
             return result;
         }
 
+        private static int GetDeclaratorArrayLength(IEnumerable<ArrayRankNode> arrayRanks)
+        {
+            int length = 1;
+            foreach (var rank in arrayRanks)
+            {
+                if (rank.Dimension == null)
+                    continue;
+                length *= Convert.ToInt32(((ScalarValue)HLSLExpressionEvaluator.EvaluateConstExpr(rank.Dimension)).Value.Get(0));
+            }
+            return length;
+        }
+
+        public static int GetTypeSizeDwords(HLSLInterpreterContext ctx, TypeNode type, IEnumerable<ArrayRankNode> arrayRanks = null)
+        {
+            type = ctx.ResolveType(type);
+            int elementSize;
+            switch (type)
+            {
+                case ScalarTypeNode st:
+                    elementSize = st.Kind == ScalarType.Void || st.Kind == ScalarType.String || st.Kind == ScalarType.Char ? 0 : 1;
+                    break;
+                case VectorTypeNode vt:
+                    elementSize = vt.Dimension;
+                    break;
+                case MatrixTypeNode mt:
+                    elementSize = mt.FirstDimension * mt.SecondDimension;
+                    break;
+                case StructTypeNode str:
+                    elementSize = GetStructFields(str, ctx).Sum(f => GetTypeSizeDwords(ctx, f.Kind, f.Decl.ArrayRanks));
+                    break;
+                case NamedTypeNode namedType when ctx.GetStruct(namedType.GetName()) is { } s:
+                    elementSize = GetTypeSizeDwords(ctx, s);
+                    break;
+                case QualifiedNamedTypeNode qualType when ctx.GetStruct(qualType.GetName()) is { } s:
+                    elementSize = GetTypeSizeDwords(ctx, s);
+                    break;
+                default:
+                    elementSize = 0;
+                    break;
+            }
+            return elementSize * (arrayRanks != null ? GetDeclaratorArrayLength(arrayRanks) : 1);
+        }
+
         public static ScalarValue[] FlattenToScalars(HLSLValue value)
         {
             if (value is NumericValue num)
                 return num.ToScalars();
             if (value is ArrayValue arr)
                 return arr.Values.SelectMany(x => FlattenToScalars(x)).ToArray();
+            if (value is StructValue sv)
+                return sv.Members.Values.SelectMany(x => FlattenToScalars(x)).ToArray();
             throw new InvalidOperationException();
         }
 
-        public static HLSLValue PackScalarsToNumeric(IEnumerable<ScalarValue> slice, TypeNode targetType)
+        public static HLSLValue PackScalars(HLSLInterpreterContext ctx, ScalarValue[] scalars, TypeNode targetType, IEnumerable<ArrayRankNode> arrayRanks = null)
         {
+            targetType = ctx.ResolveType(targetType);
+            int arrayLen = arrayRanks != null ? GetDeclaratorArrayLength(arrayRanks) : 1;
+            if (arrayLen > 1)
+            {
+                int elementSize = scalars.Length / arrayLen;
+                var elements = new HLSLValue[arrayLen];
+                for (int i = 0; i < arrayLen; i++)
+                {
+                    elements[i] = PackScalars(ctx, scalars[(i * elementSize)..((i + 1) * elementSize)], targetType);
+                }
+                return new ArrayValue(elements);
+            }
             switch (targetType)
             {
                 case ScalarTypeNode st:
-                    return slice.First().Cast(st.Kind);
+                    return scalars[0].Cast(st.Kind);
                 case VectorTypeNode vt:
-                    var castedVec = slice.Select(s => (ScalarValue)s.Cast(vt.Kind)).ToArray();
-                    return VectorValue.FromScalars(castedVec);
+                    return VectorValue.FromScalars(scalars[..vt.Dimension].Select(s => (ScalarValue)s.Cast(vt.Kind)).ToArray());
                 case MatrixTypeNode mt:
-                    var castedMat = slice.Select(s => (ScalarValue)s.Cast(mt.Kind)).ToArray();
-                    return MatrixValue.FromScalars(mt.FirstDimension, mt.SecondDimension, castedMat);
+                    int components = mt.FirstDimension * mt.SecondDimension;
+                    return MatrixValue.FromScalars(mt.FirstDimension, mt.SecondDimension, scalars[..components].Select(s => (ScalarValue)s.Cast(mt.Kind)).ToArray());
+                case StructTypeNode st:
+                {
+                    var members = new Dictionary<string, HLSLValue>();
+                    int offset = 0;
+                    foreach (var (kind, decl) in GetStructFields(st, ctx))
+                    {
+                        int fieldSize = GetTypeSizeDwords(ctx, kind, decl.ArrayRanks);
+                        members[decl.Name] = PackScalars(ctx, scalars[offset..(offset + fieldSize)], kind, decl.ArrayRanks);
+                        offset += fieldSize;
+                    }
+                    return new StructValue(ctx.GetQualifiedName(st.Name.GetName()), members);
+                }
+                case NamedTypeNode namedType:
+                    return PackScalars(ctx, scalars, ctx.GetStruct(namedType.GetName()));
+                case QualifiedNamedTypeNode qualType:
+                    return PackScalars(ctx, scalars, ctx.GetStruct(qualType.GetName()));
                 default:
-                    throw new InvalidOperationException();
+                    throw new NotImplementedException();
             }
         }
 
-        public static int GetTypeSize(TypeNode node)
+        public static IEnumerable<(TypeNode Kind, VariableDeclaratorNode Decl)> GetStructFields(StructTypeNode structType, HLSLInterpreterContext ctx)
         {
-            int ScalarTypeSize(ScalarType type)
+            foreach (var baseTypeName in structType.Inherits)
             {
-                switch (type)
+                var baseStruct = ctx.GetStruct(baseTypeName.GetName());
+                if (baseStruct != null)
                 {
-                    case ScalarType.Void: return 0;
-                    case ScalarType.Bool: return 4;
-                    case ScalarType.Int: return 4;
-                    case ScalarType.Uint: return 4;
-                    case ScalarType.Half: return 2;
-                    case ScalarType.Float: return 4;
-                    case ScalarType.Double: return 8;
-                    case ScalarType.Min16Float: return 4;
-                    case ScalarType.Min10Float: return 4;
-                    case ScalarType.Min16Int: return 4;
-                    case ScalarType.Min12Int: return 4;
-                    case ScalarType.Min16Uint: return 4;
-                    case ScalarType.Min12Uint: return 4;
-                    case ScalarType.String: return 0;
-                    case ScalarType.Char: return 0;
-                    case ScalarType.UNormFloat: return 4;
-                    case ScalarType.SNormFloat: return 4;
-                    default: return 0;
+                    foreach (var kv in GetStructFields(baseStruct, ctx))
+                    {
+                        yield return kv;
+                    }
                 }
             }
-
-            if (node is StructTypeNode str)
+            foreach (var field in structType.Fields)
             {
-                int size = 0;
-                foreach (var member in str.Fields)
+                foreach (var decl in field.Declarators)
                 {
-                    size += GetTypeSize(member.Kind);
+                    yield return (field.Kind, decl);
                 }
-                return size;
             }
-            else if (node is ScalarTypeNode scalar)
-            {
-                return ScalarTypeSize(scalar.Kind);
-            }
-            else if (node is VectorTypeNode vec)
-            {
-                return vec.Dimension * ScalarTypeSize(vec.Kind);
-            }
-            else if (node is MatrixTypeNode mat)
-            {
-                return mat.FirstDimension * mat.SecondDimension * ScalarTypeSize(mat.Kind);
-            }
-            return 0;
         }
     }
 }
