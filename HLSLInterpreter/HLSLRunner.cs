@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 using UnityShaderParser.Common;
 using UnityShaderParser.HLSL;
 
-namespace UnityShaderParser.Test
+namespace HLSLInterpreter
 {
     public class HLSLRunner
     {

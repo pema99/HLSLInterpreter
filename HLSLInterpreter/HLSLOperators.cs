@@ -1,7 +1,7 @@
 ﻿using System;
 using UnityShaderParser.HLSL;
 
-namespace UnityShaderParser.Test
+namespace HLSLInterpreter
 {
     public static class HLSLOperators
     {

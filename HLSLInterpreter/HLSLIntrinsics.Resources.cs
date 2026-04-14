@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityShaderParser.HLSL;
 
-namespace UnityShaderParser.Test
+namespace HLSLInterpreter
 {
     public static partial class HLSLIntrinsics
     {

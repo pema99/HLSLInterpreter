@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using UnityShaderParser.HLSL;
 
-namespace UnityShaderParser.Test
+namespace HLSLInterpreter
 {
     public static partial class HLSLIntrinsics
     {

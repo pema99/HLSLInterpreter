@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityShaderParser.HLSL;
 
-namespace UnityShaderParser.Test
+namespace HLSLInterpreter
 {
     internal static class HLSLSamplerStateBuilder
     {
