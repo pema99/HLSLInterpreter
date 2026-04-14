@@ -97,7 +97,7 @@ namespace UnityShaderParser.Test
                 };
             }
 
-            int stride = templateArgs.Length > 0 ? HLSLValueUtils.GetTypeSizeDwords(context, templateArgs[0]) * 4 : 0;
+            int stride = templateArgs.Length > 0 ? HLSLTypeUtils.GetTypeSizeDwords(context, templateArgs[0]) * 4 : 0;
             return new ResourceValue(
                 resourceType, templateArgs, stride,
                 MakeSizeDelegate("SizeX", 2),
@@ -214,7 +214,7 @@ namespace UnityShaderParser.Test
                     // into the target element type.
                     if (initializerValue is ArrayValue flatInitVal)
                     {
-                        int scalarsPerElement = HLSLValueUtils.GetTypeSizeDwords(context, type);
+                        int scalarsPerElement = HLSLTypeUtils.GetTypeSizeDwords(context, type);
                         if (scalarsPerElement > 0)
                         {
                             var flattened = HLSLValueUtils.FlattenToScalars(flatInitVal);
@@ -252,15 +252,15 @@ namespace UnityShaderParser.Test
                 switch (type)
                 {
                     case ScalarTypeNode scalarType:
-                        defaultValue = new ScalarValue(scalarType.Kind, new HLSLRegister<object>(HLSLValueUtils.GetZeroValue(scalarType.Kind)));
+                        defaultValue = new ScalarValue(scalarType.Kind, new HLSLRegister<object>(HLSLTypeUtils.GetZeroValue(scalarType.Kind)));
                         break;
                     case VectorTypeNode vectorType:
                         defaultValue = new VectorValue(vectorType.Kind,
-                            new HLSLRegister<object[]>(Enumerable.Repeat(HLSLValueUtils.GetZeroValue(vectorType.Kind), vectorType.Dimension).ToArray()));
+                            new HLSLRegister<object[]>(Enumerable.Repeat(HLSLTypeUtils.GetZeroValue(vectorType.Kind), vectorType.Dimension).ToArray()));
                         break;
                     case MatrixTypeNode matrixType:
                         defaultValue = new MatrixValue(matrixType.Kind, matrixType.FirstDimension, matrixType.SecondDimension,
-                            new HLSLRegister<object[]>(Enumerable.Repeat(HLSLValueUtils.GetZeroValue(matrixType.Kind), matrixType.FirstDimension * matrixType.SecondDimension).ToArray()));
+                            new HLSLRegister<object[]>(Enumerable.Repeat(HLSLTypeUtils.GetZeroValue(matrixType.Kind), matrixType.FirstDimension * matrixType.SecondDimension).ToArray()));
                         break;
                     case QualifiedNamedTypeNode qualifiedNamedTypeNodeType:
                         string fullName = qualifiedNamedTypeNodeType.GetName();
@@ -285,13 +285,13 @@ namespace UnityShaderParser.Test
                     case GenericVectorTypeNode genVectorType:
                         int dims = Convert.ToInt32(EvaluateScalar(genVectorType.Dimension).Cast(ScalarType.Int).GetThreadValue(0));
                         defaultValue = new VectorValue(genVectorType.Kind,
-                            new HLSLRegister<object[]>(Enumerable.Repeat(HLSLValueUtils.GetZeroValue(genVectorType.Kind), dims).ToArray()));
+                            new HLSLRegister<object[]>(Enumerable.Repeat(HLSLTypeUtils.GetZeroValue(genVectorType.Kind), dims).ToArray()));
                         break;
                     case GenericMatrixTypeNode genMatrixType:
                         int rows = Convert.ToInt32(EvaluateScalar(genMatrixType.FirstDimension).Cast(ScalarType.Int).GetThreadValue(0));
                         int cols = Convert.ToInt32(EvaluateScalar(genMatrixType.SecondDimension).Cast(ScalarType.Int).GetThreadValue(0));
                         defaultValue = new MatrixValue(genMatrixType.Kind, rows, cols,
-                           new HLSLRegister<object[]>(Enumerable.Repeat(HLSLValueUtils.GetZeroValue(genMatrixType.Kind), rows * cols).ToArray()));
+                           new HLSLRegister<object[]>(Enumerable.Repeat(HLSLTypeUtils.GetZeroValue(genMatrixType.Kind), rows * cols).ToArray()));
                         break;
                     case PredefinedObjectTypeNode predefinedObjectType:
                         switch (predefinedObjectType.Kind)
@@ -308,7 +308,7 @@ namespace UnityShaderParser.Test
                                 {
                                     int dim = HLSLSyntaxFacts.GetDimension(predefinedObjectType.Kind);
                                     var templateArgs = predefinedObjectType.TemplateArguments.ToArray();
-                                    int stride = templateArgs.Length > 0 ? HLSLValueUtils.GetTypeSizeDwords(context, templateArgs[0]) * 4 : 0;
+                                    int stride = templateArgs.Length > 0 ? HLSLTypeUtils.GetTypeSizeDwords(context, templateArgs[0]) * 4 : 0;
                                     defaultValue = new ResourceValue(
                                         predefinedObjectType.Kind,
                                         templateArgs, stride,
@@ -351,7 +351,7 @@ namespace UnityShaderParser.Test
         internal StructValue CreateStructValue(StructTypeNode structType)
         {
             Dictionary<string, HLSLValue> members = new Dictionary<string, HLSLValue>();
-            foreach (var (kind, decl) in HLSLValueUtils.GetStructFields(structType, context))
+            foreach (var (kind, decl) in HLSLTypeUtils.GetStructFields(structType, context))
             {
                 members[decl.Name] = GetVariableDeclarationInitialValue(kind, decl);
             }
@@ -361,7 +361,7 @@ namespace UnityShaderParser.Test
         internal StructValue CreateStructValueFilledWith(StructTypeNode structType, NumericValue fillValue)
         {
             Dictionary<string, HLSLValue> members = new Dictionary<string, HLSLValue>();
-            foreach (var (kind, decl) in HLSLValueUtils.GetStructFields(structType, context))
+            foreach (var (kind, decl) in HLSLTypeUtils.GetStructFields(structType, context))
             {
                 HLSLValue fieldValue;
                 switch (kind)

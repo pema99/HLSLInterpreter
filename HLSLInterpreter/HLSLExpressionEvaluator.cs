@@ -60,7 +60,7 @@ namespace UnityShaderParser.Test
                 {
                     var param = func.Parameters[i];
                     var declarator = param.Declarator;
-                    context.AddVariable(declarator.Name, HLSLValueUtils.CastForParameter(this, args[i], param.ParamType));
+                    context.AddVariable(declarator.Name, HLSLOverloadResolution.CastForParameter(this, args[i], param.ParamType));
                 }
                 interpreter.Visit(func.Body);
 
@@ -448,7 +448,7 @@ namespace UnityShaderParser.Test
                 }
                 for (int i = 0; i < flattened.Count; i++)
                 {
-                    flattened[i] = HLSLValueUtils.CastNumeric(type.Kind, flattened[i]);
+                    flattened[i] = HLSLTypeUtils.CastNumeric(type.Kind, flattened[i]);
                 }
                 lanes[threadIdx] = flattened.ToArray();
             }
@@ -591,7 +591,7 @@ namespace UnityShaderParser.Test
             for (int i = 0; i < method.Parameters.Count; i++)
             {
                 var param = method.Parameters[i];
-                context.AddVariable(param.Declarator.Name, HLSLValueUtils.CastForParameter(this, args[i], param.ParamType));
+                context.AddVariable(param.Declarator.Name, HLSLOverloadResolution.CastForParameter(this, args[i], param.ParamType));
             }
             interpreter.Visit(method.Body);
 
@@ -693,7 +693,7 @@ namespace UnityShaderParser.Test
         {
             var left = Visit(node.Left);
             var right = Visit(node.Right);
-            right = HLSLValueUtils.CastForAssignment(left, right);
+            right = HLSLTypeUtils.CastForAssignment(left, right);
 
             HLSLValue SetValue(HLSLValue value)
             {
