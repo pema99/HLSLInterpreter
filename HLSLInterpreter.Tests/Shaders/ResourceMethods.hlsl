@@ -197,7 +197,7 @@ struct MockSB
 // ============================================================
 
 [Test]
-void Tex1D_Load([MockResource(Mock1D)] Texture1D<float4> tex)
+void Tex1D_Load([MockResource("Mock1D")] Texture1D<float4> tex)
 {
     // int2(x, mip) for non-RW Texture1D.Load
     float4 v = tex.Load(int2(2, 0));
@@ -205,7 +205,7 @@ void Tex1D_Load([MockResource(Mock1D)] Texture1D<float4> tex)
 }
 
 [Test]
-void Tex1D_GetDimensions_NoMip([MockResource(Mock1D)] Texture1D<float4> tex)
+void Tex1D_GetDimensions_NoMip([MockResource("Mock1D")] Texture1D<float4> tex)
 {
     uint w;
     tex.GetDimensions(w);
@@ -213,7 +213,7 @@ void Tex1D_GetDimensions_NoMip([MockResource(Mock1D)] Texture1D<float4> tex)
 }
 
 [Test]
-void Tex1D_GetDimensions_Mip([MockResource(Mock1D)] Texture1D<float4> tex)
+void Tex1D_GetDimensions_Mip([MockResource("Mock1D")] Texture1D<float4> tex)
 {
     uint w, levels;
     tex.GetDimensions(0, w, levels);
@@ -222,7 +222,7 @@ void Tex1D_GetDimensions_Mip([MockResource(Mock1D)] Texture1D<float4> tex)
 }
 
 [Test]
-void Tex1D_Sample([MockResource(Mock1DUniform)] Texture1D<float4> tex)
+void Tex1D_Sample([MockResource("Mock1DUniform")] Texture1D<float4> tex)
 {
     SamplerState s { Filter = MIN_MAG_MIP_POINT; AddressU = Clamp; };
     float4 v = tex.Sample(s, 0.5);
@@ -230,7 +230,7 @@ void Tex1D_Sample([MockResource(Mock1DUniform)] Texture1D<float4> tex)
 }
 
 [Test]
-void Tex1D_SampleLevel([MockResource(Mock1D)] Texture1D<float4> tex)
+void Tex1D_SampleLevel([MockResource("Mock1D")] Texture1D<float4> tex)
 {
     SamplerState s { Filter = MIN_MAG_MIP_POINT; AddressU = Clamp; };
     // UV 0.625 = texel 2 center in 4-texel texture: texelPos = 0.625*4 - 0.5 = 2.0 → data[2].x = 2
@@ -239,7 +239,7 @@ void Tex1D_SampleLevel([MockResource(Mock1D)] Texture1D<float4> tex)
 }
 
 [Test]
-void Tex1D_SampleBias([MockResource(Mock1DUniform)] Texture1D<float4> tex)
+void Tex1D_SampleBias([MockResource("Mock1DUniform")] Texture1D<float4> tex)
 {
     SamplerState s { Filter = MIN_MAG_MIP_POINT; AddressU = Clamp; };
     float4 v = tex.SampleBias(s, 0.5, 0.0);
@@ -247,7 +247,7 @@ void Tex1D_SampleBias([MockResource(Mock1DUniform)] Texture1D<float4> tex)
 }
 
 [Test]
-void Tex1D_SampleGrad([MockResource(Mock1DUniform)] Texture1D<float4> tex)
+void Tex1D_SampleGrad([MockResource("Mock1DUniform")] Texture1D<float4> tex)
 {
     SamplerState s { Filter = MIN_MAG_MIP_POINT; AddressU = Clamp; };
     float4 v = tex.SampleGrad(s, 0.5, 0.0, 0.0);
@@ -255,7 +255,7 @@ void Tex1D_SampleGrad([MockResource(Mock1DUniform)] Texture1D<float4> tex)
 }
 
 [Test]
-void Tex1D_SampleCmp([MockResource(Mock1DDepth)] Texture1D<float4> tex)
+void Tex1D_SampleCmp([MockResource("Mock1DDepth")] Texture1D<float4> tex)
 {
     // depth=0.5, cmpVal=0.6  →  0.5 <= 0.6  → passes → 1.0
     SamplerComparisonState cs { ComparisonFunc = LESS_EQUAL; };
@@ -264,7 +264,7 @@ void Tex1D_SampleCmp([MockResource(Mock1DDepth)] Texture1D<float4> tex)
 }
 
 [Test]
-void Tex1D_SampleCmpLevelZero([MockResource(Mock1DDepth)] Texture1D<float4> tex)
+void Tex1D_SampleCmpLevelZero([MockResource("Mock1DDepth")] Texture1D<float4> tex)
 {
     SamplerComparisonState cs { ComparisonFunc = LESS_EQUAL; };
     float v = tex.SampleCmpLevelZero(cs, 0.5, 0.6);
@@ -272,7 +272,7 @@ void Tex1D_SampleCmpLevelZero([MockResource(Mock1DDepth)] Texture1D<float4> tex)
 }
 
 [Test]
-void Tex1D_CalculateLevelOfDetail([MockResource(Mock1DUniform)] Texture1D<float4> tex)
+void Tex1D_CalculateLevelOfDetail([MockResource("Mock1DUniform")] Texture1D<float4> tex)
 {
     SamplerState s { Filter = MIN_MAG_MIP_LINEAR; };
     // Uniform UV → zero gradient → LOD clamped to 0.
@@ -281,7 +281,7 @@ void Tex1D_CalculateLevelOfDetail([MockResource(Mock1DUniform)] Texture1D<float4
 }
 
 [Test]
-void Tex1D_CalculateLevelOfDetailUnclamped([MockResource(Mock1DUniform)] Texture1D<float4> tex)
+void Tex1D_CalculateLevelOfDetailUnclamped([MockResource("Mock1DUniform")] Texture1D<float4> tex)
 {
     SamplerState s { Filter = MIN_MAG_MIP_LINEAR; };
     float lod = tex.CalculateLevelOfDetailUnclamped(s, 0.5);
@@ -293,7 +293,7 @@ void Tex1D_CalculateLevelOfDetailUnclamped([MockResource(Mock1DUniform)] Texture
 // ============================================================
 
 [Test]
-void Tex1DArr_Load([MockResource(Mock1DArray)] Texture1DArray<float4> tex)
+void Tex1DArr_Load([MockResource("Mock1DArray")] Texture1DArray<float4> tex)
 {
     // int3(x, arraySlice, mip) for Texture1DArray
     float4 v = tex.Load(int3(1, 0, 0));  // slice 0, x=1 → data[0*4+1] = float4(1,0,0,1)
@@ -301,7 +301,7 @@ void Tex1DArr_Load([MockResource(Mock1DArray)] Texture1DArray<float4> tex)
 }
 
 [Test]
-void Tex1DArr_GetDimensions_NoMip([MockResource(Mock1DArray)] Texture1DArray<float4> tex)
+void Tex1DArr_GetDimensions_NoMip([MockResource("Mock1DArray")] Texture1DArray<float4> tex)
 {
     uint w, elements;
     tex.GetDimensions(w, elements);
@@ -310,7 +310,7 @@ void Tex1DArr_GetDimensions_NoMip([MockResource(Mock1DArray)] Texture1DArray<flo
 }
 
 [Test]
-void Tex1DArr_GetDimensions_Mip([MockResource(Mock1DArray)] Texture1DArray<float4> tex)
+void Tex1DArr_GetDimensions_Mip([MockResource("Mock1DArray")] Texture1DArray<float4> tex)
 {
     uint w, elements, levels;
     tex.GetDimensions(0, w, elements, levels);
@@ -320,7 +320,7 @@ void Tex1DArr_GetDimensions_Mip([MockResource(Mock1DArray)] Texture1DArray<float
 }
 
 [Test]
-void Tex1DArr_SampleLevel([MockResource(Mock1DArray)] Texture1DArray<float4> tex)
+void Tex1DArr_SampleLevel([MockResource("Mock1DArray")] Texture1DArray<float4> tex)
 {
     SamplerState s { Filter = MIN_MAG_MIP_POINT; AddressU = Clamp; };
     // float2(u, arraySlice): slice 0, texel 1 center (u=0.375)
@@ -333,7 +333,7 @@ void Tex1DArr_SampleLevel([MockResource(Mock1DArray)] Texture1DArray<float4> tex
 // ============================================================
 
 [Test]
-void Tex2D_SampleLevel([MockResource(Mock2DUniform)] Texture2D<float4> tex)
+void Tex2D_SampleLevel([MockResource("Mock2DUniform")] Texture2D<float4> tex)
 {
     SamplerState s { Filter = MIN_MAG_MIP_POINT; AddressU = Clamp; AddressV = Clamp; };
     float4 v = tex.SampleLevel(s, float2(0.5, 0.5), 0);
@@ -341,7 +341,7 @@ void Tex2D_SampleLevel([MockResource(Mock2DUniform)] Texture2D<float4> tex)
 }
 
 [Test]
-void Tex2D_Sample([MockResource(Mock2DUniform)] Texture2D<float4> tex)
+void Tex2D_Sample([MockResource("Mock2DUniform")] Texture2D<float4> tex)
 {
     SamplerState s { Filter = MIN_MAG_MIP_POINT; AddressU = Clamp; AddressV = Clamp; };
     float4 v = tex.Sample(s, float2(0.5, 0.5));
@@ -349,7 +349,7 @@ void Tex2D_Sample([MockResource(Mock2DUniform)] Texture2D<float4> tex)
 }
 
 [Test]
-void Tex2D_SampleBias([MockResource(Mock2DUniform)] Texture2D<float4> tex)
+void Tex2D_SampleBias([MockResource("Mock2DUniform")] Texture2D<float4> tex)
 {
     SamplerState s { Filter = MIN_MAG_MIP_POINT; AddressU = Clamp; AddressV = Clamp; };
     float4 v = tex.SampleBias(s, float2(0.5, 0.5), 0.0);
@@ -357,7 +357,7 @@ void Tex2D_SampleBias([MockResource(Mock2DUniform)] Texture2D<float4> tex)
 }
 
 [Test]
-void Tex2D_SampleGrad([MockResource(Mock2DUniform)] Texture2D<float4> tex)
+void Tex2D_SampleGrad([MockResource("Mock2DUniform")] Texture2D<float4> tex)
 {
     SamplerState s { Filter = MIN_MAG_MIP_POINT; AddressU = Clamp; AddressV = Clamp; };
     float4 v = tex.SampleGrad(s, float2(0.5, 0.5), float2(0, 0), float2(0, 0));
@@ -365,7 +365,7 @@ void Tex2D_SampleGrad([MockResource(Mock2DUniform)] Texture2D<float4> tex)
 }
 
 [Test]
-void Tex2D_SampleCmp([MockResource(Mock2DDepth)] Texture2D<float4> tex)
+void Tex2D_SampleCmp([MockResource("Mock2DDepth")] Texture2D<float4> tex)
 {
     // All depths 0.5; cmpVal 0.6 → 0.5 <= 0.6 → 1.0
     SamplerComparisonState cs { ComparisonFunc = LESS_EQUAL; };
@@ -374,7 +374,7 @@ void Tex2D_SampleCmp([MockResource(Mock2DDepth)] Texture2D<float4> tex)
 }
 
 [Test]
-void Tex2D_SampleCmpLevel([MockResource(Mock2DDepth)] Texture2D<float4> tex)
+void Tex2D_SampleCmpLevel([MockResource("Mock2DDepth")] Texture2D<float4> tex)
 {
     SamplerComparisonState cs { ComparisonFunc = LESS_EQUAL; };
     float v = tex.SampleCmpLevel(cs, float2(0.5, 0.5), 0.6, 0);
@@ -382,7 +382,7 @@ void Tex2D_SampleCmpLevel([MockResource(Mock2DDepth)] Texture2D<float4> tex)
 }
 
 [Test]
-void Tex2D_SampleCmpLevelZero([MockResource(Mock2DDepth)] Texture2D<float4> tex)
+void Tex2D_SampleCmpLevelZero([MockResource("Mock2DDepth")] Texture2D<float4> tex)
 {
     SamplerComparisonState cs { ComparisonFunc = LESS_EQUAL; };
     float v = tex.SampleCmpLevelZero(cs, float2(0.5, 0.5), 0.6);
@@ -390,7 +390,7 @@ void Tex2D_SampleCmpLevelZero([MockResource(Mock2DDepth)] Texture2D<float4> tex)
 }
 
 [Test]
-void Tex2D_SampleCmpBias([MockResource(Mock2DDepth)] Texture2D<float4> tex)
+void Tex2D_SampleCmpBias([MockResource("Mock2DDepth")] Texture2D<float4> tex)
 {
     SamplerComparisonState cs { ComparisonFunc = LESS_EQUAL; };
     float v = tex.SampleCmpBias(cs, float2(0.5, 0.5), 0.6, 0.0);
@@ -398,7 +398,7 @@ void Tex2D_SampleCmpBias([MockResource(Mock2DDepth)] Texture2D<float4> tex)
 }
 
 [Test]
-void Tex2D_SampleCmpGrad([MockResource(Mock2DDepth)] Texture2D<float4> tex)
+void Tex2D_SampleCmpGrad([MockResource("Mock2DDepth")] Texture2D<float4> tex)
 {
     SamplerComparisonState cs { ComparisonFunc = LESS_EQUAL; };
     float v = tex.SampleCmpGrad(cs, float2(0.5, 0.5), 0.6, float2(0, 0), float2(0, 0));
@@ -406,7 +406,7 @@ void Tex2D_SampleCmpGrad([MockResource(Mock2DDepth)] Texture2D<float4> tex)
 }
 
 [Test]
-void Tex2D_CalculateLevelOfDetail([MockResource(Mock2DUniform)] Texture2D<float4> tex)
+void Tex2D_CalculateLevelOfDetail([MockResource("Mock2DUniform")] Texture2D<float4> tex)
 {
     SamplerState s { Filter = MIN_MAG_MIP_LINEAR; };
     float lod = tex.CalculateLevelOfDetail(s, float2(0.5, 0.5));
@@ -414,7 +414,7 @@ void Tex2D_CalculateLevelOfDetail([MockResource(Mock2DUniform)] Texture2D<float4
 }
 
 [Test]
-void Tex2D_CalculateLevelOfDetailUnclamped([MockResource(Mock2DUniform)] Texture2D<float4> tex)
+void Tex2D_CalculateLevelOfDetailUnclamped([MockResource("Mock2DUniform")] Texture2D<float4> tex)
 {
     SamplerState s { Filter = MIN_MAG_MIP_LINEAR; };
     float lod = tex.CalculateLevelOfDetailUnclamped(s, float2(0.5, 0.5));
@@ -426,7 +426,7 @@ void Tex2D_CalculateLevelOfDetailUnclamped([MockResource(Mock2DUniform)] Texture
 //   Footprint: (1,2),(2,2),(2,1),(1,1) → values 9,10,6,5.
 //   Output order: .x=(u0,v1)=9, .y=(u1,v1)=10, .z=(u1,v0)=6, .w=(u0,v0)=5.
 [Test]
-void Tex2D_Gather([MockResource(Mock2DGather)] Texture2D<float4> tex)
+void Tex2D_Gather([MockResource("Mock2DGather")] Texture2D<float4> tex)
 {
     SamplerState s { Filter = MIN_MAG_MIP_POINT; AddressU = Clamp; AddressV = Clamp; };
     float4 g = tex.Gather(s, float2(0.375, 0.375));
@@ -437,7 +437,7 @@ void Tex2D_Gather([MockResource(Mock2DGather)] Texture2D<float4> tex)
 }
 
 [Test]
-void Tex2D_GatherRed([MockResource(Mock2DGather)] Texture2D<float4> tex)
+void Tex2D_GatherRed([MockResource("Mock2DGather")] Texture2D<float4> tex)
 {
     SamplerState s { Filter = MIN_MAG_MIP_POINT; AddressU = Clamp; AddressV = Clamp; };
     float4 g = tex.GatherRed(s, float2(0.375, 0.375));
@@ -445,7 +445,7 @@ void Tex2D_GatherRed([MockResource(Mock2DGather)] Texture2D<float4> tex)
 }
 
 [Test]
-void Tex2D_GatherGreen([MockResource(Mock2DGather)] Texture2D<float4> tex)
+void Tex2D_GatherGreen([MockResource("Mock2DGather")] Texture2D<float4> tex)
 {
     // All texels have .y == 0
     SamplerState s { Filter = MIN_MAG_MIP_POINT; AddressU = Clamp; AddressV = Clamp; };
@@ -454,7 +454,7 @@ void Tex2D_GatherGreen([MockResource(Mock2DGather)] Texture2D<float4> tex)
 }
 
 [Test]
-void Tex2D_GatherBlue([MockResource(Mock2DGather)] Texture2D<float4> tex)
+void Tex2D_GatherBlue([MockResource("Mock2DGather")] Texture2D<float4> tex)
 {
     SamplerState s { Filter = MIN_MAG_MIP_POINT; AddressU = Clamp; AddressV = Clamp; };
     float4 g = tex.GatherBlue(s, float2(0.375, 0.375));
@@ -462,7 +462,7 @@ void Tex2D_GatherBlue([MockResource(Mock2DGather)] Texture2D<float4> tex)
 }
 
 [Test]
-void Tex2D_GatherAlpha([MockResource(Mock2DGather)] Texture2D<float4> tex)
+void Tex2D_GatherAlpha([MockResource("Mock2DGather")] Texture2D<float4> tex)
 {
     // All texels have .w == 1
     SamplerState s { Filter = MIN_MAG_MIP_POINT; AddressU = Clamp; AddressV = Clamp; };
@@ -471,7 +471,7 @@ void Tex2D_GatherAlpha([MockResource(Mock2DGather)] Texture2D<float4> tex)
 }
 
 [Test]
-void Tex2D_GatherCmp([MockResource(Mock2DDepth)] Texture2D<float4> tex)
+void Tex2D_GatherCmp([MockResource("Mock2DDepth")] Texture2D<float4> tex)
 {
     // All depths 0.5, cmpVal 0.6 → all pass → float4(1,1,1,1)
     SamplerComparisonState cs { ComparisonFunc = LESS_EQUAL; };
@@ -481,7 +481,7 @@ void Tex2D_GatherCmp([MockResource(Mock2DDepth)] Texture2D<float4> tex)
 }
 
 [Test]
-void Tex2D_GatherCmpRed([MockResource(Mock2DDepth)] Texture2D<float4> tex)
+void Tex2D_GatherCmpRed([MockResource("Mock2DDepth")] Texture2D<float4> tex)
 {
     SamplerComparisonState cs { ComparisonFunc = LESS_EQUAL; };
     float4 g = tex.GatherCmpRed(cs, float2(0.375, 0.375), 0.6);
@@ -489,7 +489,7 @@ void Tex2D_GatherCmpRed([MockResource(Mock2DDepth)] Texture2D<float4> tex)
 }
 
 [Test]
-void Tex2D_GatherCmpGreen([MockResource(Mock2DDepth)] Texture2D<float4> tex)
+void Tex2D_GatherCmpGreen([MockResource("Mock2DDepth")] Texture2D<float4> tex)
 {
     // .y == 0, 0 <= 0.6 → passes → 1.0
     SamplerComparisonState cs { ComparisonFunc = LESS_EQUAL; };
@@ -498,7 +498,7 @@ void Tex2D_GatherCmpGreen([MockResource(Mock2DDepth)] Texture2D<float4> tex)
 }
 
 [Test]
-void Tex2D_GatherCmpBlue([MockResource(Mock2DDepth)] Texture2D<float4> tex)
+void Tex2D_GatherCmpBlue([MockResource("Mock2DDepth")] Texture2D<float4> tex)
 {
     SamplerComparisonState cs { ComparisonFunc = LESS_EQUAL; };
     float4 g = tex.GatherCmpBlue(cs, float2(0.375, 0.375), 0.6);
@@ -506,7 +506,7 @@ void Tex2D_GatherCmpBlue([MockResource(Mock2DDepth)] Texture2D<float4> tex)
 }
 
 [Test]
-void Tex2D_GatherCmpAlpha([MockResource(Mock2DDepth)] Texture2D<float4> tex)
+void Tex2D_GatherCmpAlpha([MockResource("Mock2DDepth")] Texture2D<float4> tex)
 {
     // .w == 1, 1 <= 0.6 → fails → 0.0
     SamplerComparisonState cs { ComparisonFunc = LESS_EQUAL; };
@@ -519,7 +519,7 @@ void Tex2D_GatherCmpAlpha([MockResource(Mock2DDepth)] Texture2D<float4> tex)
 // ============================================================
 
 [Test]
-void Tex2DMS_Load([MockResource(Mock2DMS)] Texture2DMS<float4> tex)
+void Tex2DMS_Load([MockResource("Mock2DMS")] Texture2DMS<float4> tex)
 {
     // Load(int2 Location, int SampleIndex) — sample index ignored in mock
     float4 v = tex.Load(int2(2, 1), 0);
@@ -527,7 +527,7 @@ void Tex2DMS_Load([MockResource(Mock2DMS)] Texture2DMS<float4> tex)
 }
 
 [Test]
-void Tex2DMS_GetDimensions([MockResource(Mock2DMS)] Texture2DMS<float4> tex)
+void Tex2DMS_GetDimensions([MockResource("Mock2DMS")] Texture2DMS<float4> tex)
 {
     uint w, h, samples;
     tex.GetDimensions(w, h, samples);
@@ -537,7 +537,7 @@ void Tex2DMS_GetDimensions([MockResource(Mock2DMS)] Texture2DMS<float4> tex)
 }
 
 [Test]
-void Tex2DMS_GetSamplePosition([MockResource(Mock2DMS)] Texture2DMS<float4> tex)
+void Tex2DMS_GetSamplePosition([MockResource("Mock2DMS")] Texture2DMS<float4> tex)
 {
     float2 pos = tex.GetSamplePosition(0);
     // Implementation always returns (0.5, 0.5)
@@ -550,7 +550,7 @@ void Tex2DMS_GetSamplePosition([MockResource(Mock2DMS)] Texture2DMS<float4> tex)
 // ============================================================
 
 [Test]
-void Tex2DArr_Load([MockResource(Mock2DArray)] Texture2DArray<float4> tex)
+void Tex2DArr_Load([MockResource("Mock2DArray")] Texture2DArray<float4> tex)
 {
     // int4(x, y, arraySlice, mip) for Texture2DArray
     float4 v = tex.Load(int4(1, 2, 0, 0));  // slice 0, (1,2) → data[0*16+2*4+1]=data[9]=9
@@ -558,7 +558,7 @@ void Tex2DArr_Load([MockResource(Mock2DArray)] Texture2DArray<float4> tex)
 }
 
 [Test]
-void Tex2DArr_GetDimensions_NoMip([MockResource(Mock2DArray)] Texture2DArray<float4> tex)
+void Tex2DArr_GetDimensions_NoMip([MockResource("Mock2DArray")] Texture2DArray<float4> tex)
 {
     uint w, h, elements;
     tex.GetDimensions(w, h, elements);
@@ -568,7 +568,7 @@ void Tex2DArr_GetDimensions_NoMip([MockResource(Mock2DArray)] Texture2DArray<flo
 }
 
 [Test]
-void Tex2DArr_GetDimensions_Mip([MockResource(Mock2DArray)] Texture2DArray<float4> tex)
+void Tex2DArr_GetDimensions_Mip([MockResource("Mock2DArray")] Texture2DArray<float4> tex)
 {
     uint w, h, elements, levels;
     tex.GetDimensions(0, w, h, elements, levels);
@@ -579,7 +579,7 @@ void Tex2DArr_GetDimensions_Mip([MockResource(Mock2DArray)] Texture2DArray<float
 }
 
 [Test]
-void Tex2DArr_SampleLevel([MockResource(Mock2DArray)] Texture2DArray<float4> tex)
+void Tex2DArr_SampleLevel([MockResource("Mock2DArray")] Texture2DArray<float4> tex)
 {
     SamplerState s { Filter = MIN_MAG_MIP_POINT; AddressU = Clamp; AddressV = Clamp; };
     // float3(u, v, arraySlice) — slice 0, texel (0,0) center
@@ -588,7 +588,7 @@ void Tex2DArr_SampleLevel([MockResource(Mock2DArray)] Texture2DArray<float4> tex
 }
 
 [Test]
-void Tex2DArr_Gather([MockResource(Mock2DArray)] Texture2DArray<float4> tex)
+void Tex2DArr_Gather([MockResource("Mock2DArray")] Texture2DArray<float4> tex)
 {
     SamplerState s { Filter = MIN_MAG_MIP_POINT; AddressU = Clamp; AddressV = Clamp; };
     // float3(u, v, arraySlice): slice 0, same footprint as Tex2D_Gather
@@ -597,7 +597,7 @@ void Tex2DArr_Gather([MockResource(Mock2DArray)] Texture2DArray<float4> tex)
 }
 
 [Test]
-void Tex2DArr_GatherCmp([MockResource(Mock2DDepth)] Texture2DArray<float4> tex)
+void Tex2DArr_GatherCmp([MockResource("Mock2DDepth")] Texture2DArray<float4> tex)
 {
     SamplerComparisonState cs { ComparisonFunc = LESS_EQUAL; };
     float4 g = tex.GatherCmp(cs, float3(0.375, 0.375, 0), 0.6);
@@ -609,7 +609,7 @@ void Tex2DArr_GatherCmp([MockResource(Mock2DDepth)] Texture2DArray<float4> tex)
 // ============================================================
 
 [Test]
-void Tex2DMSArr_Load([MockResource(Mock2DMSArray)] Texture2DMSArray<float4> tex)
+void Tex2DMSArr_Load([MockResource("Mock2DMSArray")] Texture2DMSArray<float4> tex)
 {
     // Load(int3 Location, int SampleIndex): Location = int3(x, y, arraySlice)
     float4 v = tex.Load(int3(1, 2, 0), 0);  // slice 0, (1,2) → data[9] = 9
@@ -617,7 +617,7 @@ void Tex2DMSArr_Load([MockResource(Mock2DMSArray)] Texture2DMSArray<float4> tex)
 }
 
 [Test]
-void Tex2DMSArr_GetDimensions([MockResource(Mock2DMSArray)] Texture2DMSArray<float4> tex)
+void Tex2DMSArr_GetDimensions([MockResource("Mock2DMSArray")] Texture2DMSArray<float4> tex)
 {
     uint w, h, elements, samples;
     tex.GetDimensions(w, h, elements, samples);
@@ -628,7 +628,7 @@ void Tex2DMSArr_GetDimensions([MockResource(Mock2DMSArray)] Texture2DMSArray<flo
 }
 
 [Test]
-void Tex2DMSArr_GetSamplePosition([MockResource(Mock2DMSArray)] Texture2DMSArray<float4> tex)
+void Tex2DMSArr_GetSamplePosition([MockResource("Mock2DMSArray")] Texture2DMSArray<float4> tex)
 {
     float2 pos = tex.GetSamplePosition(0);
     ASSERT(pos.x == 0.5);
@@ -639,7 +639,7 @@ void Tex2DMSArr_GetSamplePosition([MockResource(Mock2DMSArray)] Texture2DMSArray
 // ============================================================
 
 [Test]
-void Tex3D_Load([MockResource(Mock3D)] Texture3D<float4> tex)
+void Tex3D_Load([MockResource("Mock3D")] Texture3D<float4> tex)
 {
     // int4(x, y, z, mip) for Texture3D
     float4 v = tex.Load(int4(1, 2, 3, 0));  // data[3*16+2*4+1] = data[57] = float4(57,0,0,1)
@@ -647,7 +647,7 @@ void Tex3D_Load([MockResource(Mock3D)] Texture3D<float4> tex)
 }
 
 [Test]
-void Tex3D_GetDimensions_NoMip([MockResource(Mock3D)] Texture3D<float4> tex)
+void Tex3D_GetDimensions_NoMip([MockResource("Mock3D")] Texture3D<float4> tex)
 {
     uint w, h, d;
     tex.GetDimensions(w, h, d);
@@ -657,7 +657,7 @@ void Tex3D_GetDimensions_NoMip([MockResource(Mock3D)] Texture3D<float4> tex)
 }
 
 [Test]
-void Tex3D_GetDimensions_Mip([MockResource(Mock3D)] Texture3D<float4> tex)
+void Tex3D_GetDimensions_Mip([MockResource("Mock3D")] Texture3D<float4> tex)
 {
     uint w, h, d, levels;
     tex.GetDimensions(0, w, h, d, levels);
@@ -668,7 +668,7 @@ void Tex3D_GetDimensions_Mip([MockResource(Mock3D)] Texture3D<float4> tex)
 }
 
 [Test]
-void Tex3D_SampleLevel([MockResource(Mock3DUniform)] Texture3D<float4> tex)
+void Tex3D_SampleLevel([MockResource("Mock3DUniform")] Texture3D<float4> tex)
 {
     SamplerState s { Filter = MIN_MAG_MIP_POINT; AddressU = Clamp; AddressV = Clamp; AddressW = Clamp; };
     float4 v = tex.SampleLevel(s, float3(0.5, 0.5, 0.5), 0);
@@ -676,7 +676,7 @@ void Tex3D_SampleLevel([MockResource(Mock3DUniform)] Texture3D<float4> tex)
 }
 
 [Test]
-void Tex3D_CalculateLevelOfDetail([MockResource(Mock3DUniform)] Texture3D<float4> tex)
+void Tex3D_CalculateLevelOfDetail([MockResource("Mock3DUniform")] Texture3D<float4> tex)
 {
     SamplerState s { Filter = MIN_MAG_MIP_LINEAR; };
     float lod = tex.CalculateLevelOfDetail(s, float3(0.5, 0.5, 0.5));
@@ -688,7 +688,7 @@ void Tex3D_CalculateLevelOfDetail([MockResource(Mock3DUniform)] Texture3D<float4
 // ============================================================
 
 [Test]
-void TexCube_GetDimensions_NoMip([MockResource(MockCube)] TextureCube<float4> tex)
+void TexCube_GetDimensions_NoMip([MockResource("MockCube")] TextureCube<float4> tex)
 {
     uint w, h;
     tex.GetDimensions(w, h);
@@ -697,7 +697,7 @@ void TexCube_GetDimensions_NoMip([MockResource(MockCube)] TextureCube<float4> te
 }
 
 [Test]
-void TexCube_GetDimensions_Mip([MockResource(MockCube)] TextureCube<float4> tex)
+void TexCube_GetDimensions_Mip([MockResource("MockCube")] TextureCube<float4> tex)
 {
     uint w, h, levels;
     tex.GetDimensions(0, w, h, levels);
@@ -706,7 +706,7 @@ void TexCube_GetDimensions_Mip([MockResource(MockCube)] TextureCube<float4> tex)
 }
 
 [Test]
-void TexCube_SampleLevel([MockResource(MockCube)] TextureCube<float4> tex)
+void TexCube_SampleLevel([MockResource("MockCube")] TextureCube<float4> tex)
 {
     SamplerState s { Filter = MIN_MAG_MIP_POINT; };
     // Direction toward +Z face (face 4) — any direction works since all faces are red
@@ -715,7 +715,7 @@ void TexCube_SampleLevel([MockResource(MockCube)] TextureCube<float4> tex)
 }
 
 [Test]
-void TexCube_Sample([MockResource(MockCube)] TextureCube<float4> tex)
+void TexCube_Sample([MockResource("MockCube")] TextureCube<float4> tex)
 {
     SamplerState s { Filter = MIN_MAG_MIP_POINT; };
     float4 v = tex.Sample(s, float3(0, 0, 1));
@@ -723,7 +723,7 @@ void TexCube_Sample([MockResource(MockCube)] TextureCube<float4> tex)
 }
 
 [Test]
-void TexCube_CalculateLevelOfDetail([MockResource(MockCube)] TextureCube<float4> tex)
+void TexCube_CalculateLevelOfDetail([MockResource("MockCube")] TextureCube<float4> tex)
 {
     SamplerState s { Filter = MIN_MAG_MIP_LINEAR; };
     float lod = tex.CalculateLevelOfDetail(s, float3(0, 0, 1));
@@ -735,7 +735,7 @@ void TexCube_CalculateLevelOfDetail([MockResource(MockCube)] TextureCube<float4>
 // ============================================================
 
 [Test]
-void TexCubeArr_GetDimensions_NoMip([MockResource(MockCubeArray)] TextureCubeArray<float4> tex)
+void TexCubeArr_GetDimensions_NoMip([MockResource("MockCubeArray")] TextureCubeArray<float4> tex)
 {
     uint w, h, elements;
     tex.GetDimensions(w, h, elements);
@@ -744,7 +744,7 @@ void TexCubeArr_GetDimensions_NoMip([MockResource(MockCubeArray)] TextureCubeArr
 }
 
 [Test]
-void TexCubeArr_GetDimensions_Mip([MockResource(MockCubeArray)] TextureCubeArray<float4> tex)
+void TexCubeArr_GetDimensions_Mip([MockResource("MockCubeArray")] TextureCubeArray<float4> tex)
 {
     uint w, h, elements, levels;
     tex.GetDimensions(0, w, h, elements, levels);
@@ -754,7 +754,7 @@ void TexCubeArr_GetDimensions_Mip([MockResource(MockCubeArray)] TextureCubeArray
 }
 
 [Test]
-void TexCubeArr_SampleLevel([MockResource(MockCubeArray)] TextureCubeArray<float4> tex)
+void TexCubeArr_SampleLevel([MockResource("MockCubeArray")] TextureCubeArray<float4> tex)
 {
     SamplerState s { Filter = MIN_MAG_MIP_POINT; };
     // float4(dir.xyz, arraySlice): slice 0, direction +Z
@@ -767,7 +767,7 @@ void TexCubeArr_SampleLevel([MockResource(MockCubeArray)] TextureCubeArray<float
 // ============================================================
 
 [Test]
-void RWTex1D_Load([MockResource(Mock1D)] RWTexture1D<float4> tex)
+void RWTex1D_Load([MockResource("Mock1D")] RWTexture1D<float4> tex)
 {
     // RW Load takes a scalar int (no mip component)
     float4 v = tex.Load(3);
@@ -775,7 +775,7 @@ void RWTex1D_Load([MockResource(Mock1D)] RWTexture1D<float4> tex)
 }
 
 [Test]
-void RWTex1D_GetDimensions([MockResource(Mock1D)] RWTexture1D<float4> tex)
+void RWTex1D_GetDimensions([MockResource("Mock1D")] RWTexture1D<float4> tex)
 {
     uint w;
     tex.GetDimensions(w);
@@ -783,7 +783,7 @@ void RWTex1D_GetDimensions([MockResource(Mock1D)] RWTexture1D<float4> tex)
 }
 
 [Test]
-void RWTex1D_SubscriptReadWrite([MockResource(Mock1D)] RWTexture1D<float4> tex)
+void RWTex1D_SubscriptReadWrite([MockResource("Mock1D")] RWTexture1D<float4> tex)
 {
     tex[2] = float4(99, 0, 0, 1);
     float4 v = tex.Load(2);
@@ -795,7 +795,7 @@ void RWTex1D_SubscriptReadWrite([MockResource(Mock1D)] RWTexture1D<float4> tex)
 // ============================================================
 
 [Test]
-void RWTex1DArr_Load([MockResource(Mock1DArray)] RWTexture1DArray<float4> tex)
+void RWTex1DArr_Load([MockResource("Mock1DArray")] RWTexture1DArray<float4> tex)
 {
     // int2(x, arraySlice) for RWTexture1DArray (no mip)
     float4 v = tex.Load(int2(1, 0));  // slice 0, x=1 → data[1] = float4(1,0,0,1)
@@ -803,7 +803,7 @@ void RWTex1DArr_Load([MockResource(Mock1DArray)] RWTexture1DArray<float4> tex)
 }
 
 [Test]
-void RWTex1DArr_GetDimensions([MockResource(Mock1DArray)] RWTexture1DArray<float4> tex)
+void RWTex1DArr_GetDimensions([MockResource("Mock1DArray")] RWTexture1DArray<float4> tex)
 {
     uint w, elements;
     tex.GetDimensions(w, elements);
@@ -812,7 +812,7 @@ void RWTex1DArr_GetDimensions([MockResource(Mock1DArray)] RWTexture1DArray<float
 }
 
 [Test]
-void RWTex1DArr_SubscriptReadWrite([MockResource(Mock1DArray)] RWTexture1DArray<float4> tex)
+void RWTex1DArr_SubscriptReadWrite([MockResource("Mock1DArray")] RWTexture1DArray<float4> tex)
 {
     tex[int2(0, 1)] = float4(77, 0, 0, 1);  // x=0, slice=1
     float4 v = tex.Load(int2(0, 1));
@@ -824,7 +824,7 @@ void RWTex1DArr_SubscriptReadWrite([MockResource(Mock1DArray)] RWTexture1DArray<
 // ============================================================
 
 [Test]
-void RWTex2DArr_Load([MockResource(Mock2DArray)] RWTexture2DArray<float4> tex)
+void RWTex2DArr_Load([MockResource("Mock2DArray")] RWTexture2DArray<float4> tex)
 {
     // int3(x, y, arraySlice) for RWTexture2DArray
     float4 v = tex.Load(int3(1, 2, 0));  // same as Tex2DArr_Load: data[9] = 9
@@ -832,7 +832,7 @@ void RWTex2DArr_Load([MockResource(Mock2DArray)] RWTexture2DArray<float4> tex)
 }
 
 [Test]
-void RWTex2DArr_GetDimensions([MockResource(Mock2DArray)] RWTexture2DArray<float4> tex)
+void RWTex2DArr_GetDimensions([MockResource("Mock2DArray")] RWTexture2DArray<float4> tex)
 {
     uint w, h, elements;
     tex.GetDimensions(w, h, elements);
@@ -842,7 +842,7 @@ void RWTex2DArr_GetDimensions([MockResource(Mock2DArray)] RWTexture2DArray<float
 }
 
 [Test]
-void RWTex2DArr_SubscriptReadWrite([MockResource(Mock2DArray)] RWTexture2DArray<float4> tex)
+void RWTex2DArr_SubscriptReadWrite([MockResource("Mock2DArray")] RWTexture2DArray<float4> tex)
 {
     tex[int3(0, 0, 1)] = float4(55, 0, 0, 1);  // slice 1
     float4 v = tex.Load(int3(0, 0, 1));
@@ -854,7 +854,7 @@ void RWTex2DArr_SubscriptReadWrite([MockResource(Mock2DArray)] RWTexture2DArray<
 // ============================================================
 
 [Test]
-void RWTex3D_Load([MockResource(Mock3D)] RWTexture3D<float4> tex)
+void RWTex3D_Load([MockResource("Mock3D")] RWTexture3D<float4> tex)
 {
     // int3(x, y, z) for RWTexture3D
     float4 v = tex.Load(int3(1, 2, 3));  // data[57] = float4(57,0,0,1)
@@ -862,7 +862,7 @@ void RWTex3D_Load([MockResource(Mock3D)] RWTexture3D<float4> tex)
 }
 
 [Test]
-void RWTex3D_GetDimensions([MockResource(Mock3D)] RWTexture3D<float4> tex)
+void RWTex3D_GetDimensions([MockResource("Mock3D")] RWTexture3D<float4> tex)
 {
     uint w, h, d;
     tex.GetDimensions(w, h, d);
@@ -872,7 +872,7 @@ void RWTex3D_GetDimensions([MockResource(Mock3D)] RWTexture3D<float4> tex)
 }
 
 [Test]
-void RWTex3D_SubscriptReadWrite([MockResource(Mock3D)] RWTexture3D<float4> tex)
+void RWTex3D_SubscriptReadWrite([MockResource("Mock3D")] RWTexture3D<float4> tex)
 {
     tex[int3(0, 0, 0)] = float4(33, 0, 0, 1);
     float4 v = tex.Load(int3(0, 0, 0));
@@ -884,14 +884,14 @@ void RWTex3D_SubscriptReadWrite([MockResource(Mock3D)] RWTexture3D<float4> tex)
 // ============================================================
 
 [Test]
-void Buf_Load([MockResource(MockBuf)] Buffer<float4> buf)
+void Buf_Load([MockResource("MockBuf")] Buffer<float4> buf)
 {
     float4 v = buf.Load(3);
     ASSERT(v.x == 3.0);
 }
 
 [Test]
-void Buf_GetDimensions([MockResource(MockBuf)] Buffer<float4> buf)
+void Buf_GetDimensions([MockResource("MockBuf")] Buffer<float4> buf)
 {
     uint w;
     buf.GetDimensions(w);
@@ -903,14 +903,14 @@ void Buf_GetDimensions([MockResource(MockBuf)] Buffer<float4> buf)
 // ============================================================
 
 [Test]
-void RWBuf_Load([MockResource(MockBuf)] RWBuffer<float4> buf)
+void RWBuf_Load([MockResource("MockBuf")] RWBuffer<float4> buf)
 {
     float4 v = buf.Load(3);
     ASSERT(v.x == 3.0);
 }
 
 [Test]
-void RWBuf_GetDimensions([MockResource(MockBuf)] RWBuffer<float4> buf)
+void RWBuf_GetDimensions([MockResource("MockBuf")] RWBuffer<float4> buf)
 {
     uint w;
     buf.GetDimensions(w);
@@ -918,7 +918,7 @@ void RWBuf_GetDimensions([MockResource(MockBuf)] RWBuffer<float4> buf)
 }
 
 [Test]
-void RWBuf_SubscriptReadWrite([MockResource(MockBuf)] RWBuffer<float4> buf)
+void RWBuf_SubscriptReadWrite([MockResource("MockBuf")] RWBuffer<float4> buf)
 {
     buf[2] = float4(88, 0, 0, 1);
     float4 v = buf.Load(2);
@@ -930,7 +930,7 @@ void RWBuf_SubscriptReadWrite([MockResource(MockBuf)] RWBuffer<float4> buf)
 // ============================================================
 
 [Test]
-void BAB_Load([MockResource(MockBAB)] ByteAddressBuffer buf)
+void BAB_Load([MockResource("MockBAB")] ByteAddressBuffer buf)
 {
     // Byte offset 0 → data[0] = 1
     uint v = buf.Load(0);
@@ -938,7 +938,7 @@ void BAB_Load([MockResource(MockBAB)] ByteAddressBuffer buf)
 }
 
 [Test]
-void BAB_Load2([MockResource(MockBAB)] ByteAddressBuffer buf)
+void BAB_Load2([MockResource("MockBAB")] ByteAddressBuffer buf)
 {
     uint2 v = buf.Load2(0);  // data[0]=1, data[1]=2
     ASSERT(v.x == 1);
@@ -946,7 +946,7 @@ void BAB_Load2([MockResource(MockBAB)] ByteAddressBuffer buf)
 }
 
 [Test]
-void BAB_Load3([MockResource(MockBAB)] ByteAddressBuffer buf)
+void BAB_Load3([MockResource("MockBAB")] ByteAddressBuffer buf)
 {
     uint3 v = buf.Load3(0);
     ASSERT(v.x == 1);
@@ -955,7 +955,7 @@ void BAB_Load3([MockResource(MockBAB)] ByteAddressBuffer buf)
 }
 
 [Test]
-void BAB_Load4([MockResource(MockBAB)] ByteAddressBuffer buf)
+void BAB_Load4([MockResource("MockBAB")] ByteAddressBuffer buf)
 {
     uint4 v = buf.Load4(0);
     ASSERT(v.x == 1);
@@ -965,7 +965,7 @@ void BAB_Load4([MockResource(MockBAB)] ByteAddressBuffer buf)
 }
 
 [Test]
-void BAB_GetDimensions([MockResource(MockBAB)] ByteAddressBuffer buf)
+void BAB_GetDimensions([MockResource("MockBAB")] ByteAddressBuffer buf)
 {
     uint dim;
     buf.GetDimensions(dim);
@@ -977,7 +977,7 @@ void BAB_GetDimensions([MockResource(MockBAB)] ByteAddressBuffer buf)
 // ============================================================
 
 [Test]
-void RWBAB_Store([MockResource(MockBAB)] RWByteAddressBuffer buf)
+void RWBAB_Store([MockResource("MockBAB")] RWByteAddressBuffer buf)
 {
     buf.Store(0, 42u);
     uint v = buf.Load(0);
@@ -985,7 +985,7 @@ void RWBAB_Store([MockResource(MockBAB)] RWByteAddressBuffer buf)
 }
 
 [Test]
-void RWBAB_Store2([MockResource(MockBAB)] RWByteAddressBuffer buf)
+void RWBAB_Store2([MockResource("MockBAB")] RWByteAddressBuffer buf)
 {
     buf.Store2(0, uint2(10, 20));
     uint2 v = buf.Load2(0);
@@ -994,7 +994,7 @@ void RWBAB_Store2([MockResource(MockBAB)] RWByteAddressBuffer buf)
 }
 
 [Test]
-void RWBAB_Store3([MockResource(MockBAB)] RWByteAddressBuffer buf)
+void RWBAB_Store3([MockResource("MockBAB")] RWByteAddressBuffer buf)
 {
     buf.Store3(0, uint3(10, 20, 30));
     uint3 v = buf.Load3(0);
@@ -1003,7 +1003,7 @@ void RWBAB_Store3([MockResource(MockBAB)] RWByteAddressBuffer buf)
 }
 
 [Test]
-void RWBAB_Store4([MockResource(MockBAB)] RWByteAddressBuffer buf)
+void RWBAB_Store4([MockResource("MockBAB")] RWByteAddressBuffer buf)
 {
     buf.Store4(0, uint4(10, 20, 30, 40));
     uint4 v = buf.Load4(0);
@@ -1013,7 +1013,7 @@ void RWBAB_Store4([MockResource(MockBAB)] RWByteAddressBuffer buf)
 
 [Test]
 [WarpSize(1, 1)]
-void RWBAB_InterlockedAdd([MockResource(MockBAB)] RWByteAddressBuffer buf)
+void RWBAB_InterlockedAdd([MockResource("MockBAB")] RWByteAddressBuffer buf)
 {
     // data[0]=1; add 10 → new=11, orig=1
     uint orig;
@@ -1024,7 +1024,7 @@ void RWBAB_InterlockedAdd([MockResource(MockBAB)] RWByteAddressBuffer buf)
 
 [Test]
 [WarpSize(1, 1)]
-void RWBAB_InterlockedMin([MockResource(MockBAB)] RWByteAddressBuffer buf)
+void RWBAB_InterlockedMin([MockResource("MockBAB")] RWByteAddressBuffer buf)
 {
     // data[1]=2; min(2,1)=1
     uint orig;
@@ -1035,7 +1035,7 @@ void RWBAB_InterlockedMin([MockResource(MockBAB)] RWByteAddressBuffer buf)
 
 [Test]
 [WarpSize(1, 1)]
-void RWBAB_InterlockedMax([MockResource(MockBAB)] RWByteAddressBuffer buf)
+void RWBAB_InterlockedMax([MockResource("MockBAB")] RWByteAddressBuffer buf)
 {
     // data[1]=2; max(2,100)=100
     uint orig;
@@ -1046,7 +1046,7 @@ void RWBAB_InterlockedMax([MockResource(MockBAB)] RWByteAddressBuffer buf)
 
 [Test]
 [WarpSize(1, 1)]
-void RWBAB_InterlockedAnd([MockResource(MockBAB)] RWByteAddressBuffer buf)
+void RWBAB_InterlockedAnd([MockResource("MockBAB")] RWByteAddressBuffer buf)
 {
     // data[0]=1 = 0b0001; 1 & 0b1010 = 0
     uint orig;
@@ -1057,7 +1057,7 @@ void RWBAB_InterlockedAnd([MockResource(MockBAB)] RWByteAddressBuffer buf)
 
 [Test]
 [WarpSize(1, 1)]
-void RWBAB_InterlockedOr([MockResource(MockBAB)] RWByteAddressBuffer buf)
+void RWBAB_InterlockedOr([MockResource("MockBAB")] RWByteAddressBuffer buf)
 {
     // data[0]=1; 1 | 6 = 7
     uint orig;
@@ -1068,7 +1068,7 @@ void RWBAB_InterlockedOr([MockResource(MockBAB)] RWByteAddressBuffer buf)
 
 [Test]
 [WarpSize(1, 1)]
-void RWBAB_InterlockedXor([MockResource(MockBAB)] RWByteAddressBuffer buf)
+void RWBAB_InterlockedXor([MockResource("MockBAB")] RWByteAddressBuffer buf)
 {
     // data[0]=1; 1 ^ 3 = 2
     uint orig;
@@ -1079,7 +1079,7 @@ void RWBAB_InterlockedXor([MockResource(MockBAB)] RWByteAddressBuffer buf)
 
 [Test]
 [WarpSize(1, 1)]
-void RWBAB_InterlockedExchange([MockResource(MockBAB)] RWByteAddressBuffer buf)
+void RWBAB_InterlockedExchange([MockResource("MockBAB")] RWByteAddressBuffer buf)
 {
     uint orig;
     buf.InterlockedExchange(0, 99u, orig);
@@ -1089,7 +1089,7 @@ void RWBAB_InterlockedExchange([MockResource(MockBAB)] RWByteAddressBuffer buf)
 
 [Test]
 [WarpSize(1, 1)]
-void RWBAB_InterlockedCompareExchange([MockResource(MockBAB)] RWByteAddressBuffer buf)
+void RWBAB_InterlockedCompareExchange([MockResource("MockBAB")] RWByteAddressBuffer buf)
 {
     // data[0]=1; compare=1 matches → store 42
     uint orig;
@@ -1100,7 +1100,7 @@ void RWBAB_InterlockedCompareExchange([MockResource(MockBAB)] RWByteAddressBuffe
 
 [Test]
 [WarpSize(1, 1)]
-void RWBAB_InterlockedCompareStore([MockResource(MockBAB)] RWByteAddressBuffer buf)
+void RWBAB_InterlockedCompareStore([MockResource("MockBAB")] RWByteAddressBuffer buf)
 {
     // data[0]=1; compare=1 matches → store 77
     buf.InterlockedCompareStore(0, 1u, 77u);
@@ -1109,7 +1109,7 @@ void RWBAB_InterlockedCompareStore([MockResource(MockBAB)] RWByteAddressBuffer b
 
 [Test]
 [WarpSize(1, 1)]
-void RWBAB_InterlockedExchangeFloat([MockResource(MockBAB)] RWByteAddressBuffer buf)
+void RWBAB_InterlockedExchangeFloat([MockResource("MockBAB")] RWByteAddressBuffer buf)
 {
     // Pre-store float bits of 1.0 at offset 0
     buf.Store(0, asuint(1.0));
@@ -1121,7 +1121,7 @@ void RWBAB_InterlockedExchangeFloat([MockResource(MockBAB)] RWByteAddressBuffer 
 
 [Test]
 [WarpSize(1, 1)]
-void RWBAB_InterlockedCompareExchangeFloatBitwise([MockResource(MockBAB)] RWByteAddressBuffer buf)
+void RWBAB_InterlockedCompareExchangeFloatBitwise([MockResource("MockBAB")] RWByteAddressBuffer buf)
 {
     buf.Store(0, asuint(3.0));
     float orig;
@@ -1132,7 +1132,7 @@ void RWBAB_InterlockedCompareExchangeFloatBitwise([MockResource(MockBAB)] RWByte
 
 [Test]
 [WarpSize(1, 1)]
-void RWBAB_InterlockedCompareStoreFloatBitwise([MockResource(MockBAB)] RWByteAddressBuffer buf)
+void RWBAB_InterlockedCompareStoreFloatBitwise([MockResource("MockBAB")] RWByteAddressBuffer buf)
 {
     buf.Store(0, asuint(7.0));
     buf.InterlockedCompareStoreFloatBitwise(0, 7.0, 9.0);
@@ -1140,7 +1140,7 @@ void RWBAB_InterlockedCompareStoreFloatBitwise([MockResource(MockBAB)] RWByteAdd
 }
 
 [Test]
-void RWBAB_GetDimensions([MockResource(MockBAB)] RWByteAddressBuffer buf)
+void RWBAB_GetDimensions([MockResource("MockBAB")] RWByteAddressBuffer buf)
 {
     uint dim;
     buf.GetDimensions(dim);
@@ -1152,14 +1152,14 @@ void RWBAB_GetDimensions([MockResource(MockBAB)] RWByteAddressBuffer buf)
 // ============================================================
 
 [Test]
-void SB_Load([MockResource(MockSB)] StructuredBuffer<float4> buf)
+void SB_Load([MockResource("MockSB")] StructuredBuffer<float4> buf)
 {
     float4 v = buf.Load(1);  // data[1] = float4(11,0,0,1)
     ASSERT(v.x == 11.0);
 }
 
 [Test]
-void SB_GetDimensions([MockResource(MockSB)] StructuredBuffer<float4> buf)
+void SB_GetDimensions([MockResource("MockSB")] StructuredBuffer<float4> buf)
 {
     uint count, stride;
     buf.GetDimensions(count, stride);
@@ -1172,14 +1172,14 @@ void SB_GetDimensions([MockResource(MockSB)] StructuredBuffer<float4> buf)
 // ============================================================
 
 [Test]
-void RWSB_Load([MockResource(MockSB)] RWStructuredBuffer<float4> buf)
+void RWSB_Load([MockResource("MockSB")] RWStructuredBuffer<float4> buf)
 {
     float4 v = buf.Load(2);  // data[2] = float4(21,0,0,1)
     ASSERT(v.x == 21.0);
 }
 
 [Test]
-void RWSB_GetDimensions([MockResource(MockSB)] RWStructuredBuffer<float4> buf)
+void RWSB_GetDimensions([MockResource("MockSB")] RWStructuredBuffer<float4> buf)
 {
     uint count, stride;
     buf.GetDimensions(count, stride);
@@ -1189,7 +1189,7 @@ void RWSB_GetDimensions([MockResource(MockSB)] RWStructuredBuffer<float4> buf)
 
 [Test]
 [WarpSize(1, 1)]
-void RWSB_IncrementDecrementCounter([MockResource(MockSB)] RWStructuredBuffer<float4> buf)
+void RWSB_IncrementDecrementCounter([MockResource("MockSB")] RWStructuredBuffer<float4> buf)
 {
     uint c0 = buf.IncrementCounter();  // 0, counter→1
     uint c1 = buf.IncrementCounter();  // 1, counter→2
@@ -1204,7 +1204,7 @@ void RWSB_IncrementDecrementCounter([MockResource(MockSB)] RWStructuredBuffer<fl
 // ============================================================
 
 [Test]
-void AppendSB_Append([MockResource(MockSB)] AppendStructuredBuffer<float4> buf)
+void AppendSB_Append([MockResource("MockSB")] AppendStructuredBuffer<float4> buf)
 {
     buf.Append(float4(42, 0, 0, 1));  // writes to index 0 (counter starts at 0)
     // Verify dimensions are still intact
@@ -1215,7 +1215,7 @@ void AppendSB_Append([MockResource(MockSB)] AppendStructuredBuffer<float4> buf)
 }
 
 [Test]
-void AppendSB_GetDimensions([MockResource(MockSB)] AppendStructuredBuffer<float4> buf)
+void AppendSB_GetDimensions([MockResource("MockSB")] AppendStructuredBuffer<float4> buf)
 {
     uint count, stride;
     buf.GetDimensions(count, stride);
@@ -1229,7 +1229,7 @@ void AppendSB_GetDimensions([MockResource(MockSB)] AppendStructuredBuffer<float4
 
 [Test]
 [WarpSize(1, 1)]
-void ConsumeSB_Consume([MockResource(MockSB)] ConsumeStructuredBuffer<float4> buf)
+void ConsumeSB_Consume([MockResource("MockSB")] ConsumeStructuredBuffer<float4> buf)
 {
     // Counter starts at 0; Consume() reads index 0 (post-decrement).
     float4 v = buf.Consume();
@@ -1237,7 +1237,7 @@ void ConsumeSB_Consume([MockResource(MockSB)] ConsumeStructuredBuffer<float4> bu
 }
 
 [Test]
-void ConsumeSB_GetDimensions([MockResource(MockSB)] ConsumeStructuredBuffer<float4> buf)
+void ConsumeSB_GetDimensions([MockResource("MockSB")] ConsumeStructuredBuffer<float4> buf)
 {
     uint count, stride;
     buf.GetDimensions(count, stride);

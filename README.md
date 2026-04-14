@@ -391,7 +391,7 @@ struct MockTex2D
 };
 
 [Test]
-void Texture_Load([MockResource(MockTex2D)] RWTexture2D<float4> tex)
+void Texture_Load([MockResource("MockTex2D")] RWTexture2D<float4> tex)
 {
     // pixel (2,1): index = 1*4+2 = 6
     float4 val = tex.Load(int2(2, 1));
@@ -405,7 +405,7 @@ void Texture_Load([MockResource(MockTex2D)] RWTexture2D<float4> tex)
 [Test]
 [TestCase(0, 0)]
 [TestCase(2, 1)]
-void Texture_LoadAtCoord([MockResource(MockTex2D)] RWTexture2D<float4> tex, int x, int y)
+void Texture_LoadAtCoord([MockResource("MockTex2D")] RWTexture2D<float4> tex, int x, int y)
 {
     float4 val = tex.Load(int2(x, y));
     ASSERT(val.x == float(y * 4 + x));
@@ -438,7 +438,7 @@ void Texture_Write_Global()
 | `[TestCaseSource("Generator")]` | Function | Runs the test for each case emitted by `Generator` via `TEST_CASE()`. |
 | `[Values(vals...)]` | Parameter | Provides a set of values for this parameter, combined combinatorially with other parameters. |
 | `[ValueSource("Generator")]` | Parameter | Like `[Values]`, but values are emitted by `Generator` via `TEST_VALUE()`. |
-| `[MockResource(MockType)]` | Parameter | Injects a mock resource of the given struct type before each test call. |
+| `[MockResource("MockType")]` | Parameter | Injects a mock resource of the given struct type before each test call. |
 | `[WarpSize(x, y)]` | Function | Sets the warp size for the test. Required for tests using wave intrinsics or `ddx()/ddy()`. |
 | `[Ignore]`<br>`[Ignore("reason")]` | Function | Unconditionally skips the test, with an optional reason shown in the output. |
 | `[Description("text")]` | Function | Attaches a human-readable description to the test. |

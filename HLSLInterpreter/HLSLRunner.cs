@@ -322,7 +322,8 @@ namespace UnityShaderParser.Test
                     if (attr.Name.Identifier.ToLower() != "mockresource" || attr.Arguments.Count == 0)
                         continue;
 
-                    string mockStructName = (attr.Arguments[0] as IdentifierExpressionNode)?.GetName();
+                    string mockStructName = (attr.Arguments[0] as IdentifierExpressionNode)?.GetName()
+                        ?? (interpreter.EvaluateExpression(attr.Arguments[0]) as ScalarValue)?.Value.Get(0) as string;
                     if (mockStructName == null)
                         continue;
 
