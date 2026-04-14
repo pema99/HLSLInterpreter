@@ -4,7 +4,7 @@ using System.Linq;
 using System.Reflection;
 using UnityShaderParser.HLSL;
 using UnityShaderParser.HLSL.PreProcessor;
-using UnityShaderParser.Test;
+using HLSLInterpreter;
 using UnityShaderParser.Common;
 
 namespace HLSLInterpreter.Tests

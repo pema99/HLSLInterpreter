@@ -5,7 +5,7 @@ using System.Linq;
 using UnityShaderParser.Common;
 using UnityShaderParser.HLSL;
 
-namespace UnityShaderParser.Test
+namespace HLSLInterpreter
 {
     public class HLSLExpressionEvaluator : HLSLSyntaxVisitor<HLSLValue>
     {
