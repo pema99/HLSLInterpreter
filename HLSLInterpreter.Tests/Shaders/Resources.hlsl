@@ -27,7 +27,7 @@ struct MockTex2D
 
 // Load from a mock texture: after Initialize, pixel (x,y) has .x == y*4+x.
 [Test]
-void MockResource_Load([MockResource(MockTex2D)] RWTexture2D<float4> tex)
+void MockResource_Load([MockResource("MockTex2D")] RWTexture2D<float4> tex)
 {
     // Pixel (2, 1): index = 1*4+2 = 6 -> float4(6, 0, 0, 1)
     float4 val = tex.Load(int2(2, 1));
@@ -37,7 +37,7 @@ void MockResource_Load([MockResource(MockTex2D)] RWTexture2D<float4> tex)
 
 // Write to a mock texture via subscript, then read back.
 [Test]
-void MockResource_Store([MockResource(MockTex2D)] RWTexture2D<float4> tex)
+void MockResource_Store([MockResource("MockTex2D")] RWTexture2D<float4> tex)
 {
     tex[int2(1,0)] = 99.0;
     float4 val = tex.Load(int2(1, 0));
@@ -67,7 +67,7 @@ struct MockTex2D_Sized
 
 // GetDimensions on an RWTexture2D reports width and height from SizeX/SizeY.
 [Test]
-void MockResource_Dimensions([MockResource(MockTex2D_Sized)] RWTexture2D<float4> tex)
+void MockResource_Dimensions([MockResource("MockTex2D_Sized")] RWTexture2D<float4> tex)
 {
     uint w, h;
     tex.GetDimensions(w, h);
@@ -77,7 +77,7 @@ void MockResource_Dimensions([MockResource(MockTex2D_Sized)] RWTexture2D<float4>
 
 // GetDimensions on a read-only Texture2D also reports mip count from MipCount.
 [Test]
-void MockResource_MipCount([MockResource(MockTex2D_Sized)] Texture2D<float4> tex)
+void MockResource_MipCount([MockResource("MockTex2D_Sized")] Texture2D<float4> tex)
 {
     uint w, h, levels;
     tex.GetDimensions(0, w, h, levels);
@@ -92,7 +92,7 @@ void MockResource_MipCount([MockResource(MockTex2D_Sized)] Texture2D<float4> tex
 [TestCase(0, 0)]
 [TestCase(2, 1)]
 [TestCase(3, 3)]
-void MockResource_LoadAtCoord([MockResource(MockTex2D)] RWTexture2D<float4> tex, int x, int y)
+void MockResource_LoadAtCoord([MockResource("MockTex2D")] RWTexture2D<float4> tex, int x, int y)
 {
     float4 val = tex.Load(int2(x, y));
     ASSERT(val.x == float(y * 4 + x));
@@ -105,7 +105,7 @@ void MockResource_LoadAtCoord([MockResource(MockTex2D)] RWTexture2D<float4> tex,
 // back to tex[0,0], clobbering thread 0's result.
 [Test]
 [WarpSize(2, 1)]
-void MockResource_VaryingStore_OnlyActiveThreadsWrite([MockResource(MockTex2D)] RWTexture2D<float4> tex)
+void MockResource_VaryingStore_OnlyActiveThreadsWrite([MockResource("MockTex2D")] RWTexture2D<float4> tex)
 {
     uint tid = WaveGetLaneIndex();
     if (tid == 0)
@@ -122,7 +122,7 @@ void MockResource_VaryingStore_OnlyActiveThreadsWrite([MockResource(MockTex2D)] 
 // Mip k has dimensions 8>>k * 8>>k.
 [Test]
 [WarpSize(2, 1)]
-void MockResource_GetDimensions_VaryingMip([MockResource(MockTex2D_Sized)] Texture2D<float4> tex)
+void MockResource_GetDimensions_VaryingMip([MockResource("MockTex2D_Sized")] Texture2D<float4> tex)
 {
     uint tid = WaveGetLaneIndex();  // 0 or 1
     uint w, h, levels;
@@ -346,7 +346,7 @@ struct MockIntTex2D
 
 [Test]
 [WarpSize(1,1)]
-void Interlocked_Add_ResourceElement([MockResource(MockIntTex2D)] RWTexture2D<int> tex)
+void Interlocked_Add_ResourceElement([MockResource("MockIntTex2D")] RWTexture2D<int> tex)
 {
     InterlockedAdd(tex[uint2(1,2)], 7);
     ASSERT(tex[uint2(1,2)] == 7);
@@ -355,7 +355,7 @@ void Interlocked_Add_ResourceElement([MockResource(MockIntTex2D)] RWTexture2D<in
 
 [Test]
 [WarpSize(1,1)]
-void Interlocked_Exchange_ResourceElement([MockResource(MockIntTex2D)] RWTexture2D<int> tex)
+void Interlocked_Exchange_ResourceElement([MockResource("MockIntTex2D")] RWTexture2D<int> tex)
 {
     int orig;
     InterlockedExchange(tex[uint2(3,3)], 42, orig);
@@ -365,7 +365,7 @@ void Interlocked_Exchange_ResourceElement([MockResource(MockIntTex2D)] RWTexture
 
 [Test]
 [WarpSize(1,1)]
-void Interlocked_CompareExchange_ResourceElement([MockResource(MockIntTex2D)] RWTexture2D<int> tex)
+void Interlocked_CompareExchange_ResourceElement([MockResource("MockIntTex2D")] RWTexture2D<int> tex)
 {
     int orig;
     InterlockedCompareExchange(tex[uint2(2,1)], 0, 99, orig);

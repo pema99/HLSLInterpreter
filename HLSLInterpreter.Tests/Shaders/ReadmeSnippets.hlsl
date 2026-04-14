@@ -218,7 +218,7 @@ struct MockTex2D
 };
 
 [Test]
-void Readme_Texture_Load([MockResource(MockTex2D)] RWTexture2D<float4> tex)
+void Readme_Texture_Load([MockResource("MockTex2D")] RWTexture2D<float4> tex)
 {
     // pixel (2,1): index = 1*4+2 = 6
     float4 val = tex.Load(int2(2, 1));
@@ -228,7 +228,7 @@ void Readme_Texture_Load([MockResource(MockTex2D)] RWTexture2D<float4> tex)
 [Test]
 [TestCase(0, 0)]
 [TestCase(2, 1)]
-void Readme_Texture_LoadAtCoord([MockResource(MockTex2D)] RWTexture2D<float4> tex, int x, int y)
+void Readme_Texture_LoadAtCoord([MockResource("MockTex2D")] RWTexture2D<float4> tex, int x, int y)
 {
     float4 val = tex.Load(int2(x, y));
     ASSERT(val.x == float(y * 4 + x));
