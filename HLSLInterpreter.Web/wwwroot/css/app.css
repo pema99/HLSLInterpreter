@@ -174,7 +174,7 @@
     min-height: 0;
     flex-shrink: 0;
     background: #252526;
-    overflow: hidden;
+    overflow-y: auto;
 }
 
 .panel-header {
@@ -622,6 +622,111 @@
     height: var(--section-h, 200px);
     min-height: 0;
     flex-shrink: 0;
+}
+
+/* Immediate window */
+.debug-section-immediate {
+    height: var(--section-h, 180px);
+    min-height: 0;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.debug-section-immediate.section-collapsed {
+    height: auto;
+}
+
+.imm-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0;
+    min-height: 0;
+}
+
+.imm-history {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.imm-entry {
+    padding: 4px 10px;
+    border-bottom: 1px solid #2d2d2d;
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-size: 12px;
+}
+
+.imm-expr {
+    color: #9cdcfe;
+}
+
+.imm-prompt {
+    color: #569cd6;
+    user-select: none;
+}
+
+.imm-result {
+    color: #ce9178;
+    padding-left: 14px;
+}
+
+.imm-error {
+    color: #f44747;
+}
+
+.imm-input-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 6px;
+    border-top: 1px solid #3c3c3c;
+    background: #1e1e1e;
+    flex-shrink: 0;
+}
+
+.imm-prompt-inline {
+    color: #569cd6;
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-size: 12px;
+    user-select: none;
+}
+
+.imm-input {
+    flex: 1;
+    background: #2d2d2d;
+    border: 1px solid #3c3c3c;
+    border-radius: 3px;
+    color: #d4d4d4;
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-size: 12px;
+    padding: 3px 6px;
+    outline: none;
+}
+
+.imm-input:focus {
+    border-color: #569cd6;
+}
+
+.imm-eval-btn {
+    background: #0e639c;
+    border: none;
+    border-radius: 3px;
+    color: #fff;
+    font-size: 11px;
+    padding: 3px 8px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.imm-eval-btn:hover {
+    background: #1177bb;
+}
+
+.imm-eval-btn:disabled {
+    background: #3c3c3c;
+    color: #666;
+    cursor: default;
 }
 
 .debug-section-exec.section-collapsed {
