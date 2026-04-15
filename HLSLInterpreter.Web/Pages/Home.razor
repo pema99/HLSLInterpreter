@@ -192,28 +192,42 @@
                     }
                 </div>
 
-                <!-- Console Output -->
-                <div class="debug-section debug-section-console @(consoleCollapsed ? "section-collapsed" : "")">
-                    <div class="panel-header collapsible-header" @onclick="() => consoleCollapsed = !consoleCollapsed">
+                <!-- Call Stack -->
+                <div class="debug-section debug-section-callstack @(callStackCollapsed ? "section-collapsed" : "")">
+                    <div class="panel-header collapsible-header" @onclick="() => callStackCollapsed = !callStackCollapsed">
                         <div class="panel-header-left">
-                            <span class="collapse-icon @(consoleCollapsed ? "" : "expanded")">&#x203A;</span>
-                            <span>Console</span>
+                            <span class="collapse-icon @(callStackCollapsed ? "" : "expanded")">&#x203A;</span>
+                            <span>Call Stack</span>
                         </div>
                     </div>
-                    @if (!consoleCollapsed)
+                    @if (!callStackCollapsed)
                     {
-                        <div class="output-body debug-console-body">
-                            @if (!string.IsNullOrEmpty(CurrentDebugOutput))
+                        <div class="output-body debug-vars-body">
+                            @if (debugStepIndex >= 0 && debugStepIndex < debugTrace.Count)
                             {
-                                <pre class="output-text">@CurrentDebugOutput</pre>
+                                var stack = debugTrace[debugStepIndex].CallStack;
+                                {
+                                    <table class="var-table">
+                                        <tbody>
+                                            @for (int i = 0; i < stack.Length; i++)
+                                            {
+                                                var fi = i;
+                                                <tr class="@(fi == selectedFrame ? "callstack-selected" : "")"
+                                                    @onclick="() => selectedFrame = fi"
+                                                    style="cursor: pointer;">
+                                                    <td class="var-name">@stack[i]</td>
+                                                </tr>
+                                            }
+                                            <tr style="cursor: default;">
+                                                <td class="var-name" style="color: #555; font-style: italic;">[Globals]</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                }
                             }
                             else
                             {
-                                <div class="hint">No output yet.</div>
-                            }
-                            @if (hasError)
-                            {
-                                <pre class="error-text">@errorMessage</pre>
+                                <div class="hint">Use Step or Continue to inspect call stack.</div>
                             }
                         </div>
                         <div class="resize-v-handle" title="Drag to resize"></div>
@@ -263,42 +277,67 @@
                     </div>
                 }
 
-                <!-- Call Stack -->
-                <div class="debug-section debug-section-callstack @(callStackCollapsed ? "section-collapsed" : "")">
-                    <div class="panel-header collapsible-header" @onclick="() => callStackCollapsed = !callStackCollapsed">
+                <!-- Immediate -->
+                <div class="debug-section debug-section-immediate @(immediateCollapsed ? "section-collapsed" : "")">
+                    <div class="panel-header collapsible-header" @onclick="() => immediateCollapsed = !immediateCollapsed">
                         <div class="panel-header-left">
-                            <span class="collapse-icon @(callStackCollapsed ? "" : "expanded")">&#x203A;</span>
-                            <span>Call Stack</span>
+                            <span class="collapse-icon @(immediateCollapsed ? "" : "expanded")">&#x203A;</span>
+                            <span>Immediate</span>
                         </div>
                     </div>
-                    @if (!callStackCollapsed)
+                    @if (!immediateCollapsed)
                     {
-                        <div class="output-body debug-vars-body">
-                            @if (debugStepIndex >= 0 && debugStepIndex < debugTrace.Count)
+                        <div class="output-body imm-body">
+                            @if (immediateHistory.Count == 0)
                             {
-                                var stack = debugTrace[debugStepIndex].CallStack;
-                                {
-                                    <table class="var-table">
-                                        <tbody>
-                                            @for (int i = 0; i < stack.Length; i++)
-                                            {
-                                                var fi = i;
-                                                <tr class="@(fi == selectedFrame ? "callstack-selected" : "")"
-                                                    @onclick="() => selectedFrame = fi"
-                                                    style="cursor: pointer;">
-                                                    <td class="var-name">@stack[i]</td>
-                                                </tr>
-                                            }
-                                            <tr style="cursor: default;">
-                                                <td class="var-name" style="color: #555; font-style: italic;">[Globals]</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                }
+                                <div class="hint">Evaluate expressions in the current scope.</div>
                             }
                             else
                             {
-                                <div class="hint">Use Step or Continue to inspect call stack.</div>
+                                <div class="imm-history">
+                                    @foreach (var entry in immediateHistory)
+                                    {
+                                        <div class="imm-entry">
+                                            <div class="imm-expr"><span class="imm-prompt">&gt;</span> @entry.Expression</div>
+                                            <div class="imm-result @(entry.IsError ? "imm-error" : "")">@entry.Result</div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                        <div class="imm-input-row">
+                            <span class="imm-prompt-inline">&gt;</span>
+                            <input class="imm-input" type="text" placeholder="Expression..."
+                                   @bind="immediateInput" @bind:event="oninput"
+                                   @onkeydown="OnImmediateKeyDown" />
+                            <button class="imm-eval-btn" @onclick="EvaluateImmediate" disabled="@(debugStepIndex < 0)">Eval</button>
+                        </div>
+                        <div class="resize-v-handle" title="Drag to resize"></div>
+                    }
+                </div>
+
+                <!-- Console Output -->
+                <div class="debug-section debug-section-console @(consoleCollapsed ? "section-collapsed" : "")">
+                    <div class="panel-header collapsible-header" @onclick="() => consoleCollapsed = !consoleCollapsed">
+                        <div class="panel-header-left">
+                            <span class="collapse-icon @(consoleCollapsed ? "" : "expanded")">&#x203A;</span>
+                            <span>Console</span>
+                        </div>
+                    </div>
+                    @if (!consoleCollapsed)
+                    {
+                        <div class="output-body debug-console-body">
+                            @if (!string.IsNullOrEmpty(CurrentDebugOutput))
+                            {
+                                <pre class="output-text">@CurrentDebugOutput</pre>
+                            }
+                            else
+                            {
+                                <div class="hint">No output yet.</div>
+                            }
+                            @if (hasError)
+                            {
+                                <pre class="error-text">@errorMessage</pre>
                             }
                         </div>
                         <div class="resize-v-handle" title="Drag to resize"></div>
@@ -446,6 +485,7 @@
     private DotNetObjectReference<Home>? dotNetRef;
     private bool needsThreadGridInit = false;
     private bool needsSectionHeightRestore = false;
+    private string debugCode = "";
 
     // --- Collapse state ---
     private int selectedFrame = 0;
@@ -457,6 +497,18 @@
     private bool callStackCollapsed = false;
     private bool imageCollapsed = false;
     private bool consoleCollapsed = false;
+    private bool immediateCollapsed = false;
+
+    // --- Immediate window ---
+    private string immediateInput = "";
+    private List<ImmediateEntry> immediateHistory = new();
+
+    private sealed class ImmediateEntry
+    {
+        public string Expression { get; init; } = "";
+        public string Result { get; init; } = "";
+        public bool IsError { get; init; }
+    }
 
     private int inspectedThread
     {
@@ -583,6 +635,9 @@
         imagePixels = null;
         debugTrace = new();
         debugStepIndex = -1;
+        immediateCollapsed = true;
+        consoleCollapsed = true;
+        imageCollapsed = true;
         await JS.InvokeVoidAsync("saveSectionHeights");
         StateHasChanged();
         await Task.Yield();
@@ -594,6 +649,8 @@
         try
         {
             string code = await JS.InvokeAsync<string>("getMonacoValue");
+            debugCode = code;
+            immediateHistory = new();
             int wx = Math.Max(1, warpX);
             int wy = Math.Max(1, warpY);
             int threadCount = wx * wy;
@@ -744,6 +801,8 @@
         isDebugging = false;
         debugTrace = new();
         debugStepIndex = -1;
+        consoleCollapsed = false;
+        imageCollapsed = false;
         await JS.InvokeVoidAsync("highlightDebugLine", 0);
         await JS.InvokeVoidAsync("disposeThreadGridResize");
         needsSectionHeightRestore = true;
@@ -888,6 +947,86 @@
         {
             return runner.CallFunction("main");
         }
+    }
+
+    private static HLSLValue CallMainWith(HLSLRunner r, VectorValue threadArg)
+    {
+        try
+        {
+            return r.CallFunction("main", threadArg);
+        }
+        catch (Exception ex) when (ex.Message.Contains("Unknown function 'main' called."))
+        {
+            return r.CallFunction("main");
+        }
+    }
+
+    private async Task OnImmediateKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await EvaluateImmediate();
+    }
+
+    private async Task EvaluateImmediate()
+    {
+        string expr = immediateInput.Trim();
+        if (string.IsNullOrEmpty(expr) || debugStepIndex < 0 || string.IsNullOrEmpty(debugCode)) return;
+        immediateInput = "";
+
+        int wx = Math.Max(1, warpX);
+        int wy = Math.Max(1, warpY);
+        int threadCount = wx * wy;
+
+        string resultStr;
+        bool isError = false;
+
+        try
+        {
+            var evalRunner = new HLSLRunner(wx, wy);
+            evalRunner.SetVariable("WARP_SIZE_X", new ScalarValue(ScalarType.Uint, new HLSLRegister<object>((uint)wx)));
+            evalRunner.SetVariable("WARP_SIZE_Y", new ScalarValue(ScalarType.Uint, new HLSLRegister<object>((uint)wy)));
+
+            HLSLValue evalResult = null;
+            Exception evalError = null;
+            int stepCount = 0;
+            int targetStep = debugStepIndex;
+
+            evalRunner.DebugHook = _ =>
+            {
+                if (stepCount == targetStep)
+                {
+                    try { evalResult = evalRunner.EvaluateExpression(expr); }
+                    catch (Exception ex) { evalError = ex; }
+                    throw new OperationCanceledException();
+                }
+                stepCount++;
+            };
+
+            var sw = new System.IO.StringWriter();
+            var oldOut = Console.Out;
+            Console.SetOut(sw);
+            try
+            {
+                evalRunner.ProcessCode(debugCode);
+                var threadArg = BuildThreadArg(wx, wy, threadCount);
+                try { CallMainWith(evalRunner, threadArg); }
+                catch (OperationCanceledException) { }
+            }
+            finally { Console.SetOut(oldOut); }
+
+            if (evalError != null) { resultStr = evalError.Message; isError = true; }
+            else if (evalResult != null) resultStr = FormatValue(evalResult, inspectedThread);
+            else { resultStr = "(step not reached — expression may be after this point)"; isError = true; }
+        }
+        catch (Exception ex)
+        {
+            resultStr = ex.Message;
+            isError = true;
+        }
+
+        immediateHistory.Add(new ImmediateEntry { Expression = expr, Result = resultStr, IsError = isError });
+        StateHasChanged();
+        await Task.Yield();
+        await JS.InvokeVoidAsync("scrollImmediateToBottom");
     }
 
     private void TryExtractImage(HLSLValue result, int wx, int wy)

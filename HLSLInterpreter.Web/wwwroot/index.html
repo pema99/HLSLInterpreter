@@ -681,6 +681,13 @@
             }
         };
 
+        window.scrollImmediateToBottom = function () {
+            requestAnimationFrame(function () {
+                var el = document.querySelector('.imm-body');
+                if (el) el.scrollTop = el.scrollHeight;
+            });
+        };
+
         window.saveSectionHeights = function () {
             window._savedSectionHeights = {};
             document.querySelectorAll('[class*="debug-section-"]').forEach(function (el) {
@@ -781,7 +788,7 @@
                     startSize = document.querySelector('.output-panel').getBoundingClientRect().width;
                     e.preventDefault();
                 } else if (e.target.classList.contains('resize-v-handle')) {
-                    const section = e.target.closest('.image-section, .debug-section-image, .exec-state-section, .debug-section-exec, .debug-section-console, .debug-section-vars, .debug-section-callstack');
+                    const section = e.target.closest('.image-section, .debug-section-image, .exec-state-section, .debug-section-exec, .debug-section-console, .debug-section-vars, .debug-section-callstack, .debug-section-immediate');
                     if (section) {
                         activeHandle = { type: 'vertical', section };
                         startPos = e.clientY;

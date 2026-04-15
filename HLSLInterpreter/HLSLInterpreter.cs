@@ -52,6 +52,12 @@ namespace HLSL
 
         public HLSLValue EvaluateExpression(ExpressionNode node) => expressionEvaluator.Visit(node);
 
+        public HLSLValue EvaluateExpression(string source)
+        {
+            var expr = ShaderParser.ParseExpression(source);
+            return expressionEvaluator.Visit(expr);
+        }
+
         // Debug API
         public Action<HLSLSyntaxNode> DebugHook { get; set; }
         public Dictionary<string, HLSLValue> GetVisibleVariables() => context.GetVisibleVariables();

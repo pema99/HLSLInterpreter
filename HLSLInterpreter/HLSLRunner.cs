@@ -428,6 +428,7 @@ namespace HLSL
         public HLSLExecutionState.ThreadState[] GetThreadStates() => interpreter.GetThreadStates();
         public HLSLExecutionState.ThreadState[][] GetThreadStatesPerFrame() => interpreter.GetThreadStatesPerFrame();
         public string[] GetCallStack() => interpreter.GetCallStack();
+        public HLSLValue EvaluateExpression(string source) => interpreter.EvaluateExpression(source);
 
         public TestRun[] DiscoverTests(string testFilter = null)
         {
