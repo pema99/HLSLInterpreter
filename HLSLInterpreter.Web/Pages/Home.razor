@@ -192,21 +192,28 @@
                     }
                 </div>
 
-                <!-- Call Stack -->
+                <!-- Call Stack + Execution State -->
                 <div class="debug-section debug-section-callstack @(callStackCollapsed ? "section-collapsed" : "")">
-                    <div class="panel-header collapsible-header" @onclick="() => callStackCollapsed = !callStackCollapsed">
+                    <div class="panel-header collapsible-header" @onclick="() => { callStackCollapsed = !callStackCollapsed; if (!callStackCollapsed) needsThreadGridInit = true; }">
                         <div class="panel-header-left">
                             <span class="collapse-icon @(callStackCollapsed ? "" : "expanded")">&#x203A;</span>
                             <span>Call Stack</span>
                         </div>
+                        @if (!callStackCollapsed && threadStates.Length > 0)
+                        {
+                            <span class="thread-legend">
+                                <span class="tl-dot tc-active"></span>Active thread
+                                <span class="tl-dot tc-diverged"></span>Inactive thread
+                            </span>
+                        }
                     </div>
                     @if (!callStackCollapsed)
                     {
-                        <div class="output-body debug-vars-body">
-                            @if (debugStepIndex >= 0 && debugStepIndex < debugTrace.Count)
-                            {
-                                var stack = debugTrace[debugStepIndex].CallStack;
+                        <div class="callstack-exec-body">
+                            <div class="callstack-pane">
+                                @if (debugStepIndex >= 0 && debugStepIndex < debugTrace.Count)
                                 {
+                                    var stack = debugTrace[debugStepIndex].CallStack;
                                     <table class="var-table">
                                         <tbody>
                                             @for (int i = 0; i < stack.Length; i++)
@@ -224,58 +231,38 @@
                                         </tbody>
                                     </table>
                                 }
-                            }
-                            else
+                                else
+                                {
+                                    <div class="hint">Use Step or Continue to inspect call stack.</div>
+                                }
+                            </div>
+                            @if (threadStates.Length > 0)
                             {
-                                <div class="hint">Use Step or Continue to inspect call stack.</div>
+                                <div class="resize-inner-h-handle" id="callstack-exec-divider"></div>
+                                <div class="exec-state-body" id="thread-grid-container">
+                                    <div class="thread-grid">
+                                        @for (int ti = 0; ti < threadStates.Length; ti++)
+                                        {
+                                            var tidx = ti;
+                                            var state = threadStates[ti];
+                                            var stateClass = state switch {
+                                                HLSLExecutionState.ThreadState.Active    => "tc-active",
+                                                HLSLExecutionState.ThreadState.Inactive  => "tc-diverged",
+                                                HLSLExecutionState.ThreadState.Suspended => "tc-suspended",
+                                                _ => ""
+                                            };
+                                            var label = $"Thread ({ti % warpX}, {ti / warpX}) – {state}";
+                                            <div class="thread-cell @stateClass @(tidx == inspectedThread ? "tc-selected" : "")"
+                                                 title="@label"
+                                                 @onclick="() => inspectedThread = tidx"></div>
+                                        }
+                                    </div>
+                                </div>
                             }
                         </div>
                         <div class="resize-v-handle" title="Drag to resize"></div>
                     }
                 </div>
-
-                <!-- Execution State -->
-                @if (threadStates.Length > 0)
-                {
-                    <div class="debug-section debug-section-exec @(execStateCollapsed ? "section-collapsed" : "")">
-                        <div class="panel-header collapsible-header" @onclick="ToggleExecStateSection">
-                            <div class="panel-header-left">
-                                <span class="collapse-icon @(execStateCollapsed ? "" : "expanded")">&#x203A;</span>
-                                <span>Execution State</span>
-                            </div>
-                            @if (!execStateCollapsed)
-                            {
-                                <span class="thread-legend">
-                                    <span class="tl-dot tc-active"></span>Active
-                                    <span class="tl-dot tc-diverged"></span>Inactive
-                                </span>
-                            }
-                        </div>
-                        @if (!execStateCollapsed)
-                        {
-                            <div class="exec-state-body" id="thread-grid-container">
-                                <div class="thread-grid">
-                                    @for (int ti = 0; ti < threadStates.Length; ti++)
-                                    {
-                                        var tidx = ti;
-                                        var state = threadStates[ti];
-                                        var stateClass = state switch {
-                                            HLSLExecutionState.ThreadState.Active    => "tc-active",
-                                            HLSLExecutionState.ThreadState.Inactive  => "tc-diverged",
-                                            HLSLExecutionState.ThreadState.Suspended => "tc-suspended",
-                                            _ => ""
-                                        };
-                                        var label = $"Thread ({ti % warpX}, {ti / warpX}) – {state}";
-                                        <div class="thread-cell @stateClass @(tidx == inspectedThread ? "tc-selected" : "")"
-                                             title="@label"
-                                             @onclick="() => inspectedThread = tidx"></div>
-                                    }
-                                </div>
-                            </div>
-                            <div class="resize-v-handle" title="Drag to resize"></div>
-                        }
-                    </div>
-                }
 
                 <!-- Immediate -->
                 <div class="debug-section debug-section-immediate @(immediateCollapsed ? "section-collapsed" : "")">
@@ -493,7 +480,6 @@
     private bool varsCollapsed = false;
     private bool localVarsCollapsed = false;
     private bool globalVarsCollapsed = false;
-    private bool execStateCollapsed = false;
     private bool callStackCollapsed = false;
     private bool imageCollapsed = false;
     private bool consoleCollapsed = false;
@@ -635,7 +621,7 @@
         imagePixels = null;
         debugTrace = new();
         debugStepIndex = -1;
-        immediateCollapsed = true;
+        immediateCollapsed = false;
         consoleCollapsed = true;
         imageCollapsed = true;
         await JS.InvokeVoidAsync("saveSectionHeights");
@@ -781,12 +767,6 @@
         StateHasChanged();
     }
 
-    private void ToggleExecStateSection()
-    {
-        execStateCollapsed = !execStateCollapsed;
-        if (!execStateCollapsed)
-            needsThreadGridInit = true;
-    }
 
     private void ToggleImageSection()
     {

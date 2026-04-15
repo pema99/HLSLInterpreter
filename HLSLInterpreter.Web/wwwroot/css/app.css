@@ -624,6 +624,34 @@
     flex-shrink: 0;
 }
 
+.callstack-exec-body {
+    display: flex;
+    flex-direction: row;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.callstack-pane {
+    flex: 0 0 var(--callstack-w, 70%);
+    min-width: 40px;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.resize-inner-h-handle {
+    width: 4px;
+    flex-shrink: 0;
+    background: #3c3c3c;
+    cursor: col-resize;
+    transition: background 0.1s;
+}
+
+.resize-inner-h-handle:hover,
+.resize-inner-h-handle.dragging {
+    background: #007acc;
+}
+
 /* Immediate window */
 .debug-section-immediate {
     height: var(--section-h, 180px);
@@ -737,6 +765,8 @@
     height: var(--section-h, 200px);
     min-height: 0;
     flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
 }
 
 .debug-section-callstack.section-collapsed {

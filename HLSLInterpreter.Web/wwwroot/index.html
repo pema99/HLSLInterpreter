@@ -757,6 +757,40 @@
             }
         };
 
+        // Inner horizontal resize: call stack / execution state divider
+        (function () {
+            var dragging = false;
+            var startX, startW, pane;
+
+            document.addEventListener('mousedown', function (e) {
+                if (!e.target.classList.contains('resize-inner-h-handle')) return;
+                dragging = true;
+                startX = e.clientX;
+                var body = e.target.closest('.callstack-exec-body');
+                pane = body ? body.querySelector('.callstack-pane') : null;
+                if (!pane) { dragging = false; return; }
+                startW = pane.getBoundingClientRect().width;
+                e.target.classList.add('dragging');
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', function (e) {
+                if (!dragging || !pane) return;
+                var body = pane.closest('.callstack-exec-body');
+                var totalW = body ? body.getBoundingClientRect().width : 0;
+                var newW = Math.max(40, Math.min(totalW - 44, startW + (e.clientX - startX)));
+                pane.style.flex = '0 0 ' + newW + 'px';
+            });
+
+            document.addEventListener('mouseup', function (e) {
+                if (!dragging) return;
+                dragging = false;
+                var handle = document.getElementById('callstack-exec-divider');
+                if (handle) handle.classList.remove('dragging');
+                pane = null;
+            });
+        })();
+
         window.getMonacoValue = function () {
             if (window._monacoEditor) {
                 return window._monacoEditor.getValue();
@@ -788,7 +822,7 @@
                     startSize = document.querySelector('.output-panel').getBoundingClientRect().width;
                     e.preventDefault();
                 } else if (e.target.classList.contains('resize-v-handle')) {
-                    const section = e.target.closest('.image-section, .debug-section-image, .exec-state-section, .debug-section-exec, .debug-section-console, .debug-section-vars, .debug-section-callstack, .debug-section-immediate');
+                    const section = e.target.closest('.image-section, .debug-section-image, .debug-section-console, .debug-section-vars, .debug-section-callstack, .debug-section-immediate');
                     if (section) {
                         activeHandle = { type: 'vertical', section };
                         startPos = e.clientY;
