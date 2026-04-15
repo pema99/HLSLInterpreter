@@ -423,7 +423,10 @@ namespace HLSL
             set => interpreter.DebugHook = value;
         }
         public Dictionary<string, HLSLValue> GetVisibleVariables() => interpreter.GetVisibleVariables();
+        public Dictionary<string, HLSLValue>[] GetVariablesPerFrame() => interpreter.GetVariablesPerFrame();
+        public Dictionary<string, HLSLValue> GetGlobalVariables() => interpreter.GetGlobalVariables();
         public HLSLExecutionState.ThreadState[] GetThreadStates() => interpreter.GetThreadStates();
+        public HLSLExecutionState.ThreadState[][] GetThreadStatesPerFrame() => interpreter.GetThreadStatesPerFrame();
         public string[] GetCallStack() => interpreter.GetCallStack();
 
         public TestRun[] DiscoverTests(string testFilter = null)
