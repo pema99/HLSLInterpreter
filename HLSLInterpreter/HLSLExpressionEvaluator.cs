@@ -52,7 +52,7 @@ namespace HLSL
                 }
 
                 // Call function
-                context.PushScope(isFunction: true);
+                context.PushScope(isFunction: true, functionName: name);
                 context.PushReturn();
                 executionState.PushExecutionMask(ExecutionScope.Function);
 
@@ -560,7 +560,7 @@ namespace HLSL
             if (args.Length != method.Parameters.Count)
                 throw Error($"Argument count mismatch in call to '{method.Name.GetName()}'.");
 
-            context.PushScope(isFunction: true);
+            context.PushScope(isFunction: true, functionName: method.Name.GetName());
             context.PushReturn();
             executionState.PushExecutionMask(ExecutionScope.Function);
 

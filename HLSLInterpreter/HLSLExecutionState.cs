@@ -15,7 +15,7 @@ namespace HLSL
 
     public class HLSLExecutionState
     {
-        private enum ThreadState : byte
+        public enum ThreadState : byte
         {
             Active,    // Alive
             Inactive,  // Helper lane or disabled by return, break
@@ -119,6 +119,7 @@ namespace HLSL
             }
         }
 
+        public ThreadState[] GetThreadStates() => executionMask.Peek().mask.ToArray();
         public bool IsAnyThreadActive() => executionMask.Peek().mask.Any(x => x == ThreadState.Active);
         public bool IsUniformExecution() => executionMask.Peek().mask.All(x => x == ThreadState.Active);
         public bool IsVaryingExecution() => !IsUniformExecution();

@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>HLSL Interpreter</title>
-    <base href="/hlsl/" />
+    <base href="/" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <link rel="stylesheet" href="css/app.css" />
     <link href="HLSLInterpreter.Web.styles.css" rel="stylesheet" />
@@ -78,6 +78,43 @@
             right: 0.75rem;
             top: 0.5rem;
         }
+
+        /* Debug: breakpoint glyph — red circle, right-aligned in glyph margin */
+        .dbg-breakpoint-glyph {
+            cursor: pointer;
+        }
+        .dbg-breakpoint-glyph::before {
+            content: '';
+            display: block;
+            background: #e51400;
+            border-radius: 50%;
+            width: 10px;
+            height: 10px;
+            position: absolute;
+            right: 3px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        /* Debug: current statement line highlight */
+        .dbg-current-line {
+            background: rgba(255, 204, 0, 0.12) !important;
+        }
+
+        /* Debug: current line arrow glyph — right-aligned in glyph margin */
+        .dbg-current-glyph::before {
+            content: '';
+            display: block;
+            width: 0;
+            height: 0;
+            border-top: 5px solid transparent;
+            border-bottom: 5px solid transparent;
+            border-left: 9px solid #ffcc00;
+            position: absolute;
+            right: 2px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
     </style>
 </head>
 
@@ -101,7 +138,8 @@
         window.monacoEditorInitialized = false;
         window._monacoEditor = null;
 
-        window.initMonaco = function (containerId, initialCode) {
+        window.initMonaco = function (containerId, initialCode, dotNetRef) {
+            if (dotNetRef) window._dotNetDebugRef = dotNetRef;
             require.config({
                 paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs' }
             });
@@ -475,6 +513,8 @@
                     theme: 'hlsl-dark',
                     fontSize: 16,
                     lineNumbers: 'on',
+                    lineNumbersMinChars: 3,
+                    glyphMargin: true,
                     minimap: { enabled: false },
                     scrollBeyondLastLine: false,
                     automaticLayout: true,
@@ -488,8 +528,121 @@
                     function () { document.querySelector('.btn-run').click(); }
                 );
 
+                // Gutter click → toggle breakpoint
+                window._monacoEditor.onMouseDown(function (e) {
+                    var t = e.target.type;
+                    if ((t === monaco.editor.MouseTargetType.GUTTER_LINE_NUMBERS ||
+                         t === monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) &&
+                        e.target.position && window._dotNetDebugRef) {
+                        window._dotNetDebugRef.invokeMethodAsync('ToggleBreakpoint', e.target.position.lineNumber);
+                    }
+                });
+
+                // Debug hotkeys when editor has focus
+                function clickBtn(title) {
+                    var btn = document.querySelector('[title="' + title + '"]');
+                    if (btn && !btn.disabled) btn.click();
+                }
+                function toggleBreakpointAtCursor() {
+                    if (window._dotNetDebugRef) {
+                        var pos = window._monacoEditor.getPosition();
+                        if (pos) window._dotNetDebugRef.invokeMethodAsync('ToggleBreakpoint', pos.lineNumber);
+                    }
+                }
+                window._monacoEditor.addCommand(monaco.KeyCode.F5, function () {
+                    var cont = document.querySelector('.btn-dbg-continue');
+                    var start = document.querySelector('.btn-debug-start');
+                    if (cont && !cont.disabled) cont.click();
+                    else if (start && !start.disabled) start.click();
+                });
+                window._monacoEditor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F5, function () {
+                    clickBtn('Stop debugging');
+                });
+                window._monacoEditor.addCommand(monaco.KeyCode.F9, function () { toggleBreakpointAtCursor(); });
+                window._monacoEditor.addCommand(monaco.KeyCode.F10, function () { clickBtn('Step over'); });
+                window._monacoEditor.addCommand(monaco.KeyCode.F11, function () { clickBtn('Step in'); });
+                window._monacoEditor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F11, function () { clickBtn('Step out'); });
+                window._monacoEditor.addCommand(monaco.KeyCode.F12, function () { clickBtn('Step back'); });
+
                 window.monacoEditorInitialized = true;
             });
+        };
+
+        // Global debug hotkeys (when Monaco does not have focus)
+        document.addEventListener('keydown', function (e) {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+            var mc = document.getElementById('monaco-container');
+            if (mc && mc.contains(document.activeElement)) return;
+
+            if (e.key === 'F5' && !e.shiftKey) {
+                e.preventDefault();
+                var cont = document.querySelector('.btn-dbg-continue');
+                var start = document.querySelector('.btn-debug-start');
+                if (cont && !cont.disabled) cont.click();
+                else if (start && !start.disabled) start.click();
+            } else if (e.key === 'F5' && e.shiftKey) {
+                e.preventDefault();
+                var stop = document.querySelector('.btn-stop');
+                if (stop) stop.click();
+            } else if (e.key === 'F9') {
+                e.preventDefault();
+                if (window._monacoEditor && window._dotNetDebugRef) {
+                    var pos = window._monacoEditor.getPosition();
+                    if (pos) window._dotNetDebugRef.invokeMethodAsync('ToggleBreakpoint', pos.lineNumber);
+                }
+            } else if (e.key === 'F10') {
+                e.preventDefault();
+                var btn = document.querySelector('[title="Step over"]');
+                if (btn && !btn.disabled) btn.click();
+            } else if (e.key === 'F11' && !e.shiftKey) {
+                e.preventDefault();
+                var btn = document.querySelector('[title="Step in"]');
+                if (btn && !btn.disabled) btn.click();
+            } else if (e.key === 'F11' && e.shiftKey) {
+                e.preventDefault();
+                var btn = document.querySelector('[title="Step out"]');
+                if (btn && !btn.disabled) btn.click();
+            } else if (e.key === 'F12') {
+                e.preventDefault();
+                var btn = document.querySelector('[title="Step back"]');
+                if (btn && !btn.disabled) btn.click();
+            }
+        });
+
+        // Update breakpoint decorations in Monaco gutter
+        window.setBreakpoints = function (lines) {
+            if (!window._monacoEditor) return;
+            var decorations = (lines || []).map(function (line) {
+                return {
+                    range: new monaco.Range(line, 1, line, 1),
+                    options: {
+                        glyphMarginClassName: 'dbg-breakpoint-glyph',
+                        glyphMarginHoverMessage: { value: 'Breakpoint' },
+                        overviewRuler: { color: '#e51400', position: monaco.editor.OverviewRulerLane.Left },
+                    }
+                };
+            });
+            window._breakpointDecorationIds = window._monacoEditor.deltaDecorations(
+                window._breakpointDecorationIds || [], decorations
+            );
+        };
+
+        // Highlight the current debug line (0 to clear)
+        window.highlightDebugLine = function (lineNumber) {
+            if (!window._monacoEditor) return;
+            var decorations = lineNumber > 0 ? [{
+                range: new monaco.Range(lineNumber, 1, lineNumber, 1),
+                options: {
+                    isWholeLine: true,
+                    className: 'dbg-current-line',
+                    glyphMarginClassName: 'dbg-current-glyph',
+                    overviewRuler: { color: '#ffcc00', position: monaco.editor.OverviewRulerLane.Center },
+                }
+            }] : [];
+            window._debugLineDecorationIds = window._monacoEditor.deltaDecorations(
+                window._debugLineDecorationIds || [], decorations
+            );
+            if (lineNumber > 0) window._monacoEditor.revealLineInCenter(lineNumber);
         };
 
         window.renderPixels = function (canvasId, rgbaData, width, height) {
@@ -523,8 +676,77 @@
 
         window.restoreImageSectionHeight = function () {
             if (window._imageSectionHeight) {
-                const el = document.querySelector('.image-section');
-                if (el) el.style.height = window._imageSectionHeight;
+                const el = document.querySelector('.image-section, .debug-section-image');
+                if (el) el.style.setProperty('--section-h', window._imageSectionHeight);
+            }
+        };
+
+        window.saveSectionHeights = function () {
+            window._savedSectionHeights = {};
+            document.querySelectorAll('[class*="debug-section-"]').forEach(function (el) {
+                var key = Array.from(el.classList).find(function (c) { return c.startsWith('debug-section-'); });
+                if (!key) return;
+                var h = el.style.getPropertyValue('--section-h');
+                if (h) window._savedSectionHeights[key] = h;
+            });
+        };
+
+        window.restoreSectionHeights = function () {
+            if (!window._savedSectionHeights) return;
+            Object.entries(window._savedSectionHeights).forEach(function ([cls, h]) {
+                var el = document.querySelector('.' + cls);
+                if (el) el.style.setProperty('--section-h', h);
+            });
+        };
+
+        window._threadGridCols = 1;
+        window._threadGridRows = 1;
+        window._threadGridResizeObserver = null;
+
+        window.fitThreadGrid = function (containerId, cols, rows) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            const grid = container.querySelector('.thread-grid');
+            if (!grid) return;
+            const cw = container.clientWidth - 12;  // account for padding
+            const ch = container.clientHeight - 12;
+            if (cw <= 0 || ch <= 0 || cols <= 0 || rows <= 0) return;
+            // Account for gaps in the cell size calculation to prevent overflow/clipping.
+            // Try gap=2 first; fall back to gap=1 for small cells.
+            let gap = 2;
+            let cellSize = Math.max(2, Math.floor(Math.min(
+                (cw - (cols - 1) * gap) / cols,
+                (ch - (rows - 1) * gap) / rows
+            )));
+            if (cellSize <= 4) {
+                gap = 1;
+                cellSize = Math.max(2, Math.floor(Math.min(
+                    (cw - (cols - 1) * gap) / cols,
+                    (ch - (rows - 1) * gap) / rows
+                )));
+            }
+            grid.style.gridTemplateColumns = `repeat(${cols}, ${cellSize}px)`;
+            grid.style.gridTemplateRows = `repeat(${rows}, ${cellSize}px)`;
+            grid.style.gap = gap + 'px';
+        };
+
+        window.initThreadGridResize = function (containerId, cols, rows) {
+            window.disposeThreadGridResize();
+            window._threadGridCols = cols;
+            window._threadGridRows = rows;
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            window.fitThreadGrid(containerId, cols, rows);
+            window._threadGridResizeObserver = new ResizeObserver(function () {
+                window.fitThreadGrid(containerId, cols, rows);
+            });
+            window._threadGridResizeObserver.observe(container);
+        };
+
+        window.disposeThreadGridResize = function () {
+            if (window._threadGridResizeObserver) {
+                window._threadGridResizeObserver.disconnect();
+                window._threadGridResizeObserver = null;
             }
         };
 
@@ -549,7 +771,7 @@
     </script>
     <script>
         (function () {
-            let activeHandle = null;
+            let activeHandle = null;  // null | 'horizontal' | { type: 'vertical', section: Element }
             let startPos, startSize;
 
             document.addEventListener('mousedown', function (e) {
@@ -559,10 +781,13 @@
                     startSize = document.querySelector('.output-panel').getBoundingClientRect().width;
                     e.preventDefault();
                 } else if (e.target.classList.contains('resize-v-handle')) {
-                    activeHandle = 'vertical';
-                    startPos = e.clientY;
-                    startSize = document.querySelector('.image-section').getBoundingClientRect().height;
-                    e.preventDefault();
+                    const section = e.target.closest('.image-section, .debug-section-image, .exec-state-section, .debug-section-exec, .debug-section-console, .debug-section-vars, .debug-section-callstack');
+                    if (section) {
+                        activeHandle = { type: 'vertical', section };
+                        startPos = e.clientY;
+                        startSize = section.getBoundingClientRect().height;
+                        e.preventDefault();
+                    }
                 }
             });
 
@@ -574,20 +799,29 @@
                     const canvas = document.getElementById('color-canvas');
                     if (canvas && canvas.width && canvas.height)
                         window.fitCanvas(canvas, canvas.width, canvas.height);
-                } else if (activeHandle === 'vertical') {
-                    const newHeight = Math.max(60, Math.min(800, startSize - (e.clientY - startPos)));
-                    document.querySelector('.image-section').style.height = newHeight + 'px';
-                    const canvas = document.getElementById('color-canvas');
-                    if (canvas && canvas.width && canvas.height)
-                        window.fitCanvas(canvas, canvas.width, canvas.height);
+                    // Thread grid reacts via ResizeObserver automatically
+                } else if (activeHandle && activeHandle.type === 'vertical') {
+                    // Handle is at the bottom of the section: drag down = grow
+                    const newHeight = Math.max(60, Math.min(800, startSize + (e.clientY - startPos)));
+                    // Use CSS custom property so .section-collapsed { height: auto } can still override
+                    activeHandle.section.style.setProperty('--section-h', newHeight + 'px');
+                    if (activeHandle.section.classList.contains('image-section') ||
+                        activeHandle.section.classList.contains('debug-section-image')) {
+                        const canvas = document.getElementById('color-canvas');
+                        if (canvas && canvas.width && canvas.height)
+                            window.fitCanvas(canvas, canvas.width, canvas.height);
+                    }
+                    // exec-state / thread-grid: ResizeObserver on exec-state-body handles it
                 }
                 e.preventDefault();
             });
 
             document.addEventListener('mouseup', function () {
-                if (activeHandle === 'vertical') {
-                    const el = document.querySelector('.image-section');
-                    if (el) window._imageSectionHeight = el.style.height;
+                if (activeHandle && activeHandle.type === 'vertical') {
+                    if (activeHandle.section.classList.contains('image-section') ||
+                        activeHandle.section.classList.contains('debug-section-image')) {
+                        window._imageSectionHeight = activeHandle.section.style.getPropertyValue('--section-h');
+                    }
                 }
                 activeHandle = null;
             });
