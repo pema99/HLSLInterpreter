@@ -324,8 +324,8 @@
 
 .btn-dbg {
     height: 30px;
-    min-width: 30px;
-    padding: 0 8px;
+    width: 30px;
+    padding: 0;
     background: #3c3c3c;
     color: #d4d4d4;
     border: 1px solid #555;
@@ -350,7 +350,6 @@
     background: #0e639c;
     border-color: #0e639c;
     color: white;
-    padding: 0 12px;
 }
 
 .btn-dbg-continue:hover:not(:disabled) {
@@ -508,7 +507,7 @@
 }
 
 .debug-section-console {
-    height: var(--section-h, 120px);
+    height: var(--section-h, 200px);
     min-height: 0;
     flex-shrink: 0;
 }

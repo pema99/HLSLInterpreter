@@ -13,9 +13,11 @@
             @if (isDebugging)
             {
                 <div class="debug-controls">
-                    <button class="btn-dbg" @onclick="StepBack" disabled="@(debugStepIndex <= 0)" title="Step back">&#x23EE;</button>
                     <button class="btn-dbg btn-dbg-continue" @onclick="ContinueToBreakpoint" title="Continue to next breakpoint">&#x25B6;</button>
-                    <button class="btn-dbg" @onclick="StepForward" disabled="@(debugStepIndex >= debugTrace.Count - 1)" title="Step forward">&#x23ED;</button>
+                    <button class="btn-dbg" @onclick="StepOver" disabled="@(debugStepIndex >= debugTrace.Count - 1)" title="Step over">&#x21B7;</button>
+                    <button class="btn-dbg" @onclick="StepForward" disabled="@(debugStepIndex >= debugTrace.Count - 1)" title="Step in">&#x21A7;</button>
+                    <button class="btn-dbg" @onclick="StepOut" disabled="@(debugStepIndex >= debugTrace.Count - 1)" title="Step out">&#x21A5;</button>
+                    <button class="btn-dbg" @onclick="StepBack" disabled="@(debugStepIndex <= 0)" title="Step back">&#x23EE;</button>
                 </div>
             }
         </div>
@@ -226,7 +228,7 @@
             {
                 <!-- Console -->
                 <div class="debug-section debug-section-console @(consoleCollapsed ? "section-collapsed" : "")"
-                     style="--section-h: 300px;">
+                     style="--section-h: 200px;">
                     <div class="panel-header collapsible-header" @onclick="() => consoleCollapsed = !consoleCollapsed">
                         <div class="panel-header-left">
                             <span class="collapse-icon @(consoleCollapsed ? "" : "expanded")">&#x203A;</span>
@@ -340,6 +342,7 @@
     private int _inspectedThread = 0;
     private DotNetObjectReference<Home>? dotNetRef;
     private bool needsThreadGridInit = false;
+    private bool needsSectionHeightRestore = false;
 
     // --- Collapse state ---
     private bool varsCollapsed = false;
@@ -360,6 +363,7 @@
     private sealed class DebugStep
     {
         public int Line { get; init; }
+        public int CallDepth { get; init; }
         public Dictionary<string, HLSLValue> Variables { get; init; } = new();
         public int OutputOffset { get; init; }
         public DebugThreadState[] ThreadStates { get; init; } = Array.Empty<DebugThreadState>();
@@ -385,6 +389,12 @@
         {
             dotNetRef = DotNetObjectReference.Create(this);
             await JS.InvokeVoidAsync("initMonaco", "monaco-container", DefaultCode, dotNetRef);
+        }
+
+        if (needsSectionHeightRestore)
+        {
+            needsSectionHeightRestore = false;
+            await JS.InvokeVoidAsync("restoreSectionHeights");
         }
 
         if (needsImageRender && imagePixels != null)
@@ -462,10 +472,7 @@
         imagePixels = null;
         debugTrace = new();
         debugStepIndex = -1;
-        varsCollapsed = false;
-        execStateCollapsed = false;
-        imageCollapsed = false;
-        consoleCollapsed = false;
+        await JS.InvokeVoidAsync("saveSectionHeights");
         StateHasChanged();
         await Task.Yield();
 
@@ -497,6 +504,7 @@
                 debugTrace.Add(new DebugStep
                 {
                     Line = node.Span.Start.Line,
+                    CallDepth = runner.GetCallDepth(),
                     Variables = snapshot,
                     OutputOffset = sw.GetStringBuilder().Length,
                     ThreadStates = runner.GetThreadStates()
@@ -531,6 +539,7 @@
             await JS.InvokeVoidAsync("highlightDebugLine", currentDebugLine);
         }
 
+        needsSectionHeightRestore = true;
         needsThreadGridInit = true;
         StateHasChanged();
     }
@@ -554,6 +563,30 @@
             await JS.InvokeVoidAsync("highlightDebugLine", currentDebugLine);
             StateHasChanged();
         }
+    }
+
+    private async Task StepOver()
+    {
+        if (debugStepIndex >= debugTrace.Count - 1) return;
+        int depth = debugTrace[debugStepIndex].CallDepth;
+        int next = debugStepIndex + 1;
+        while (next < debugTrace.Count - 1 && debugTrace[next].CallDepth > depth)
+            next++;
+        debugStepIndex = next;
+        await JS.InvokeVoidAsync("highlightDebugLine", currentDebugLine);
+        StateHasChanged();
+    }
+
+    private async Task StepOut()
+    {
+        if (debugStepIndex >= debugTrace.Count - 1) return;
+        int depth = debugTrace[debugStepIndex].CallDepth;
+        int next = debugStepIndex + 1;
+        while (next < debugTrace.Count - 1 && debugTrace[next].CallDepth >= depth)
+            next++;
+        debugStepIndex = next;
+        await JS.InvokeVoidAsync("highlightDebugLine", currentDebugLine);
+        StateHasChanged();
     }
 
     private async Task ContinueToBreakpoint()
@@ -583,11 +616,13 @@
 
     private async Task ExitDebug()
     {
+        await JS.InvokeVoidAsync("saveSectionHeights");
         isDebugging = false;
         debugTrace = new();
         debugStepIndex = -1;
         await JS.InvokeVoidAsync("highlightDebugLine", 0);
         await JS.InvokeVoidAsync("disposeThreadGridResize");
+        needsSectionHeightRestore = true;
         StateHasChanged();
     }
 

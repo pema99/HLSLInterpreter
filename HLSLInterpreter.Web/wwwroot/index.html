@@ -538,9 +538,76 @@
                     }
                 });
 
+                // Debug hotkeys when editor has focus
+                function clickBtn(title) {
+                    var btn = document.querySelector('[title="' + title + '"]');
+                    if (btn && !btn.disabled) btn.click();
+                }
+                function toggleBreakpointAtCursor() {
+                    if (window._dotNetDebugRef) {
+                        var pos = window._monacoEditor.getPosition();
+                        if (pos) window._dotNetDebugRef.invokeMethodAsync('ToggleBreakpoint', pos.lineNumber);
+                    }
+                }
+                window._monacoEditor.addCommand(monaco.KeyCode.F5, function () {
+                    var cont = document.querySelector('.btn-dbg-continue');
+                    var start = document.querySelector('.btn-debug-start');
+                    if (cont && !cont.disabled) cont.click();
+                    else if (start && !start.disabled) start.click();
+                });
+                window._monacoEditor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F5, function () {
+                    clickBtn('Stop debugging');
+                });
+                window._monacoEditor.addCommand(monaco.KeyCode.F9, function () { toggleBreakpointAtCursor(); });
+                window._monacoEditor.addCommand(monaco.KeyCode.F10, function () { clickBtn('Step over'); });
+                window._monacoEditor.addCommand(monaco.KeyCode.F11, function () { clickBtn('Step in'); });
+                window._monacoEditor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F11, function () { clickBtn('Step out'); });
+                window._monacoEditor.addCommand(monaco.KeyCode.F12, function () { clickBtn('Step back'); });
+
                 window.monacoEditorInitialized = true;
             });
         };
+
+        // Global debug hotkeys (when Monaco does not have focus)
+        document.addEventListener('keydown', function (e) {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+            var mc = document.getElementById('monaco-container');
+            if (mc && mc.contains(document.activeElement)) return;
+
+            if (e.key === 'F5' && !e.shiftKey) {
+                e.preventDefault();
+                var cont = document.querySelector('.btn-dbg-continue');
+                var start = document.querySelector('.btn-debug-start');
+                if (cont && !cont.disabled) cont.click();
+                else if (start && !start.disabled) start.click();
+            } else if (e.key === 'F5' && e.shiftKey) {
+                e.preventDefault();
+                var stop = document.querySelector('.btn-stop');
+                if (stop) stop.click();
+            } else if (e.key === 'F9') {
+                e.preventDefault();
+                if (window._monacoEditor && window._dotNetDebugRef) {
+                    var pos = window._monacoEditor.getPosition();
+                    if (pos) window._dotNetDebugRef.invokeMethodAsync('ToggleBreakpoint', pos.lineNumber);
+                }
+            } else if (e.key === 'F10') {
+                e.preventDefault();
+                var btn = document.querySelector('[title="Step over"]');
+                if (btn && !btn.disabled) btn.click();
+            } else if (e.key === 'F11' && !e.shiftKey) {
+                e.preventDefault();
+                var btn = document.querySelector('[title="Step in"]');
+                if (btn && !btn.disabled) btn.click();
+            } else if (e.key === 'F11' && e.shiftKey) {
+                e.preventDefault();
+                var btn = document.querySelector('[title="Step out"]');
+                if (btn && !btn.disabled) btn.click();
+            } else if (e.key === 'F12') {
+                e.preventDefault();
+                var btn = document.querySelector('[title="Step back"]');
+                if (btn && !btn.disabled) btn.click();
+            }
+        });
 
         // Update breakpoint decorations in Monaco gutter
         window.setBreakpoints = function (lines) {
@@ -612,6 +679,24 @@
                 const el = document.querySelector('.image-section, .debug-section-image');
                 if (el) el.style.setProperty('--section-h', window._imageSectionHeight);
             }
+        };
+
+        window.saveSectionHeights = function () {
+            window._savedSectionHeights = {};
+            document.querySelectorAll('[class*="debug-section-"]').forEach(function (el) {
+                var key = Array.from(el.classList).find(function (c) { return c.startsWith('debug-section-'); });
+                if (!key) return;
+                var h = el.style.getPropertyValue('--section-h');
+                if (h) window._savedSectionHeights[key] = h;
+            });
+        };
+
+        window.restoreSectionHeights = function () {
+            if (!window._savedSectionHeights) return;
+            Object.entries(window._savedSectionHeights).forEach(function ([cls, h]) {
+                var el = document.querySelector('.' + cls);
+                if (el) el.style.setProperty('--section-h', h);
+            });
         };
 
         window._threadGridCols = 1;
