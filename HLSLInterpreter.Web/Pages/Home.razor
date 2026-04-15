@@ -79,7 +79,7 @@
         @{
             var threadStates = (isDebugging && debugStepIndex >= 0 && debugStepIndex < debugTrace.Count)
                 ? debugTrace[debugStepIndex].ThreadStates
-                : Array.Empty<DebugThreadState>();
+                : Array.Empty<HLSLExecutionState.ThreadState>();
         }
         <div class="output-panel">
             @if (isDebugging)
@@ -171,7 +171,6 @@
                                 <span class="thread-legend">
                                     <span class="tl-dot tc-active"></span>Active
                                     <span class="tl-dot tc-diverged"></span>Inactive
-                                    <span class="tl-dot tc-exited"></span>Exited
                                 </span>
                             }
                         </div>
@@ -184,10 +183,9 @@
                                         var tidx = ti;
                                         var state = threadStates[ti];
                                         var stateClass = state switch {
-                                            DebugThreadState.Active    => "tc-active",
-                                            DebugThreadState.Diverged  => "tc-diverged",
-                                            DebugThreadState.Suspended => "tc-suspended",
-                                            DebugThreadState.Exited    => "tc-exited",
+                                            HLSLExecutionState.ThreadState.Active    => "tc-active",
+                                            HLSLExecutionState.ThreadState.Inactive  => "tc-diverged",
+                                            HLSLExecutionState.ThreadState.Suspended => "tc-suspended",
                                             _ => ""
                                         };
                                         var label = $"Thread ({ti % warpX}, {ti / warpX}) – {state}";
@@ -201,6 +199,45 @@
                         }
                     </div>
                 }
+
+                <!-- Call Stack -->
+                <div class="debug-section debug-section-callstack @(callStackCollapsed ? "section-collapsed" : "")">
+                    <div class="panel-header collapsible-header" @onclick="() => callStackCollapsed = !callStackCollapsed">
+                        <div class="panel-header-left">
+                            <span class="collapse-icon @(callStackCollapsed ? "" : "expanded")">&#x203A;</span>
+                            <span>Call Stack</span>
+                        </div>
+                    </div>
+                    @if (!callStackCollapsed)
+                    {
+                        <div class="output-body debug-vars-body">
+                            @if (debugStepIndex >= 0 && debugStepIndex < debugTrace.Count)
+                            {
+                                var stack = debugTrace[debugStepIndex].CallStack;
+                                if (stack.Length == 0)
+                                {
+                                    <div class="hint">No call stack.</div>
+                                }
+                                else
+                                {
+                                    <table class="var-table">
+                                        <tbody>
+                                            @for (int i = 0; i < stack.Length; i++)
+                                            {
+                                                <tr><td class="var-name">@stack[i]</td></tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                }
+                            }
+                            else
+                            {
+                                <div class="hint">Use Step or Continue to inspect call stack.</div>
+                            }
+                        </div>
+                        <div class="resize-v-handle" title="Drag to resize"></div>
+                    }
+                </div>
 
                 <!-- Color Output -->
                 @if (hasImage)
@@ -347,6 +384,7 @@
     // --- Collapse state ---
     private bool varsCollapsed = false;
     private bool execStateCollapsed = false;
+    private bool callStackCollapsed = false;
     private bool imageCollapsed = false;
     private bool consoleCollapsed = false;
 
@@ -363,10 +401,11 @@
     private sealed class DebugStep
     {
         public int Line { get; init; }
-        public int CallDepth { get; init; }
+        public string[] CallStack { get; init; } = Array.Empty<string>();
+        public int CallDepth => CallStack.Length;
         public Dictionary<string, HLSLValue> Variables { get; init; } = new();
         public int OutputOffset { get; init; }
-        public DebugThreadState[] ThreadStates { get; init; } = Array.Empty<DebugThreadState>();
+        public HLSLExecutionState.ThreadState[] ThreadStates { get; init; } = Array.Empty<HLSLExecutionState.ThreadState>();
     }
 
     // Console output visible at the current debug step (output produced by statements executed so far).
@@ -434,7 +473,7 @@
             int wy = Math.Max(1, warpY);
             int threadCount = wx * wy;
 
-            runner.BeforeStatement = null;
+            runner.DebugHook = null;
             runner.Reset();
             runner.SetWarpSize(wx, wy);
             runner.SetVariable("WARP_SIZE_X", new ScalarValue(ScalarType.Uint, new HLSLRegister<object>((uint)wx)));
@@ -492,7 +531,7 @@
             runner.SetVariable("WARP_SIZE_X", new ScalarValue(ScalarType.Uint, new HLSLRegister<object>((uint)wx)));
             runner.SetVariable("WARP_SIZE_Y", new ScalarValue(ScalarType.Uint, new HLSLRegister<object>((uint)wy)));
 
-            runner.BeforeStatement = node =>
+            runner.DebugHook = node =>
             {
                 var vars = runner.GetVisibleVariables();
                 var snapshot = new Dictionary<string, HLSLValue>();
@@ -504,7 +543,7 @@
                 debugTrace.Add(new DebugStep
                 {
                     Line = node.Span.Start.Line,
-                    CallDepth = runner.GetCallDepth(),
+                    CallStack = runner.GetCallStack(),
                     Variables = snapshot,
                     OutputOffset = sw.GetStringBuilder().Length,
                     ThreadStates = runner.GetThreadStates()
@@ -523,7 +562,7 @@
         }
         finally
         {
-            runner.BeforeStatement = null;
+            runner.DebugHook = null;
             Console.SetOut(oldOut);
         }
 

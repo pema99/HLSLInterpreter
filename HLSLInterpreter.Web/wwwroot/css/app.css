@@ -533,6 +533,16 @@
     height: auto;
 }
 
+.debug-section-callstack {
+    height: var(--section-h, 200px);
+    min-height: 0;
+    flex-shrink: 0;
+}
+
+.debug-section-callstack.section-collapsed {
+    height: auto;
+}
+
 .debug-section-image {
     height: var(--section-h, 200px);
     min-height: 0;

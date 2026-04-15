@@ -10,12 +10,17 @@ namespace HLSL
         private sealed class Scope
         {
             public readonly bool IsFunction;
+            public readonly string FunctionName;
             public readonly Dictionary<string, HLSLValue> Variables = new Dictionary<string, HLSLValue>();
             public readonly Dictionary<string, List<FunctionDefinitionNode>> Functions = new Dictionary<string, List<FunctionDefinitionNode>>();
             public readonly Dictionary<string, StructTypeNode> Structs = new Dictionary<string, StructTypeNode>();
             public readonly Dictionary<string, TypeNode> TypeAliases = new Dictionary<string, TypeNode>();
 
-            public Scope(bool isFunction) => IsFunction = isFunction;
+            public Scope(bool isFunction, string functionName = null)
+            {
+                IsFunction = isFunction;
+                FunctionName = functionName;
+            }
         }
 
         private Stack<Scope> environment = new Stack<Scope>(new[] { new Scope(false) });
@@ -36,14 +41,43 @@ namespace HLSL
 
         public bool IsGlobalScope() => environment.Count <= 1;
 
-        public void PushScope(bool isFunction = false)
+        public void PushScope(bool isFunction = false, string functionName = null)
         {
-            environment.Push(new Scope(isFunction));
+            environment.Push(new Scope(isFunction, functionName));
         }
 
         public void PopScope()
         {
             environment.Pop();
+        }
+
+        public string[] GetCallStack()
+        {
+            return environment
+                .Where(s => s.IsFunction && s.FunctionName != null)
+                .Select(s => s.FunctionName)
+                .ToArray();
+        }
+
+        // Returns a snapshot of all variables visible from the current scope.
+        public Dictionary<string, HLSLValue> GetVisibleVariables()
+        {
+            var result = new Dictionary<string, HLSLValue>();
+            // Add global scope first (lowest priority)
+            foreach (var kvp in environment.Last().Variables)
+            {
+                result[kvp.Key] = kvp.Value;
+            }
+            // Add local scopes outermost-to-innermost
+            var localScopes = environment.Take(environment.Count - 1).Reverse();
+            foreach (var scope in localScopes)
+            {
+                foreach (var kvp in scope.Variables)
+                {
+                    result[kvp.Key] = kvp.Value;
+                }
+            }
+            return result;
         }
 
         private bool TryFindVariable(string name, out Dictionary<string, HLSLValue> resolvedScope, out string resolvedName, out HLSLValue resolvedValue, out bool isGlobal)

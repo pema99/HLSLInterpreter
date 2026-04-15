@@ -781,7 +781,7 @@
                     startSize = document.querySelector('.output-panel').getBoundingClientRect().width;
                     e.preventDefault();
                 } else if (e.target.classList.contains('resize-v-handle')) {
-                    const section = e.target.closest('.image-section, .debug-section-image, .exec-state-section, .debug-section-exec, .debug-section-console, .debug-section-vars');
+                    const section = e.target.closest('.image-section, .debug-section-image, .exec-state-section, .debug-section-exec, .debug-section-console, .debug-section-vars, .debug-section-callstack');
                     if (section) {
                         activeHandle = { type: 'vertical', section };
                         startPos = e.clientY;
