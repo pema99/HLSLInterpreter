@@ -4,7 +4,7 @@ using System.Linq;
 using UnityShaderParser.Common;
 using UnityShaderParser.HLSL;
 
-namespace HLSLInterpreter
+namespace HLSL
 {
     public static class HLSLOverloadResolution
     {

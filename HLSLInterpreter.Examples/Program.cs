@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 using UnityShaderParser.Common;
 using UnityShaderParser.HLSL;
 using UnityShaderParser.HLSL.PreProcessor;
-using HLSLInterpreter;
+using HLSL;
 
 public class Program
 {

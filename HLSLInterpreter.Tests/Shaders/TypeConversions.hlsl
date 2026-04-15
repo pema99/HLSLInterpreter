@@ -365,6 +365,26 @@ void Assignment_MatrixScalarBroadcast()
 }
 
 // ============================================================================
+// STRUCT CASTS
+// ============================================================================
+
+struct FiveValues { int One; uint Two; float Three; int FourFive[2]; };
+
+int FiveValuesSum(int X)
+{
+    FiveValues V = (FiveValues)X;
+    return V.One + V.Two + V.Three + V.FourFive[0] + V.FourFive[1];
+}
+
+[Test]
+void Cast_ScalarToStruct_BroadcastsToAllFields()
+{
+    // Casting scalar 2 to FiveValues fills every component with 2.
+    // Sum = 2 + 2 + 2.0 + 2 + 2 = 10.
+    ASSERT(FiveValuesSum(2) == 10);
+}
+
+// ============================================================================
 // ARRAY CASTS
 // ============================================================================
 

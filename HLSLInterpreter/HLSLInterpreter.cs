@@ -4,7 +4,7 @@ using System.Linq;
 using UnityShaderParser.Common;
 using UnityShaderParser.HLSL;
 
-namespace HLSLInterpreter
+namespace HLSL
 {
     public class HLSLInterpreter : HLSLSyntaxVisitor
     {
@@ -354,36 +354,6 @@ namespace HLSLInterpreter
             foreach (var (kind, decl) in HLSLTypeUtils.GetStructFields(structType, context))
             {
                 members[decl.Name] = GetVariableDeclarationInitialValue(kind, decl);
-            }
-            return new StructValue(context.GetQualifiedName(structType.Name.GetName()), members);
-        }
-
-        internal StructValue CreateStructValueFilledWith(StructTypeNode structType, NumericValue fillValue)
-        {
-            Dictionary<string, HLSLValue> members = new Dictionary<string, HLSLValue>();
-            foreach (var (kind, decl) in HLSLTypeUtils.GetStructFields(structType, context))
-            {
-                HLSLValue fieldValue;
-                switch (kind)
-                {
-                    case ScalarTypeNode scalarType:
-                        fieldValue = fillValue.Cast(scalarType.Kind);
-                        break;
-                    case VectorTypeNode vectorType:
-                        fieldValue = fillValue.Cast(vectorType.Kind).BroadcastToVector(vectorType.Dimension);
-                        break;
-                    case MatrixTypeNode matrixType:
-                        fieldValue = fillValue.Cast(matrixType.Kind).BroadcastToMatrix(matrixType.FirstDimension, matrixType.SecondDimension);
-                        break;
-                    case UserDefinedNamedTypeNode namedType:
-                        var nestedStruct = context.GetStruct(namedType.GetName());
-                        fieldValue = CreateStructValueFilledWith(nestedStruct, fillValue);
-                        break;
-                    default:
-                        fieldValue = GetVariableDeclarationInitialValue(kind, decl);
-                        break;
-                }
-                members[decl.Name] = fieldValue;
             }
             return new StructValue(context.GetQualifiedName(structType.Name.GetName()), members);
         }
