@@ -59,6 +59,36 @@ namespace HLSL
                 .ToArray();
         }
 
+        // Returns per-frame local variable snapshots, innermost frame first.
+        public Dictionary<string, HLSLValue>[] GetVariablesPerFrame()
+        {
+            var frames = new List<Dictionary<string, HLSLValue>>();
+            var currentFrame = new Dictionary<string, HLSLValue>();
+
+            foreach (var scope in environment.Take(environment.Count - 1))
+            {
+                // Innermost scope wins for same-name vars within a frame
+                foreach (var kvp in scope.Variables)
+                {
+                    if (!currentFrame.ContainsKey(kvp.Key))
+                        currentFrame[kvp.Key] = kvp.Value;
+                }
+
+                if (scope.IsFunction)
+                {
+                    frames.Add(currentFrame);
+                    currentFrame = new Dictionary<string, HLSLValue>();
+                }
+            }
+
+            return frames.ToArray();
+        }
+
+        public Dictionary<string, HLSLValue> GetGlobalVariables()
+        {
+            return environment.Last().Variables;
+        }
+
         // Returns a snapshot of all variables visible from the current scope.
         public Dictionary<string, HLSLValue> GetVisibleVariables()
         {

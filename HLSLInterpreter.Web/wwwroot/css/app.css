@@ -443,12 +443,103 @@
     flex: 1;
 }
 
+/* Hierarchical variable list */
+.var-list {
+    width: 100%;
+    font-size: 12px;
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+}
+
+.var-subsection-header {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    background: #252526;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    border-bottom: 1px solid #3c3c3c;
+    padding: 4px 10px 4px 6px;
+    font-size: 10px;
+    font-weight: 600;
+    color: #999;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    cursor: pointer;
+    user-select: none;
+}
+
+.var-subsection-header:hover {
+    background: #2d2d2d;
+}
+
+.var-row {
+    display: flex;
+    align-items: baseline;
+    border-bottom: 1px solid #2d2d2d;
+    padding: 3px 10px 3px 0;
+    min-height: 22px;
+}
+
+.var-row:hover {
+    background: #2a2a2a;
+}
+
+.var-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    cursor: pointer;
+    color: #888;
+    font-size: 9px;
+    transition: transform 0.12s ease;
+    user-select: none;
+    margin-right: 4px;
+}
+
+.var-toggle.expanded {
+    transform: rotate(90deg);
+}
+
+.var-toggle-spacer {
+    display: inline-block;
+    width: 14px;
+    flex-shrink: 0;
+    margin-right: 4px;
+}
+
+.var-row-name {
+    color: #9cdcfe;
+    flex: 0 0 35%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-right: 8px;
+    /* subtract toggle width from the 35% so name+toggle = 35% of container */
+    max-width: calc(35% - 18px);
+}
+
+.var-row-value {
+    color: #ce9178;
+    flex: 1;
+    word-break: break-all;
+}
+
+
+/* Call stack table (reuses var-table) */
 .var-table {
     width: 100%;
     border-collapse: collapse;
     font-size: 12px;
     font-family: 'Cascadia Code', 'Consolas', monospace;
+    table-layout: fixed;
 }
+
+.var-table col.col-name { width: 35%; }
+.var-table col.col-value { width: 65%; }
 
 .var-table thead tr {
     background: #2a2a2a;
@@ -469,6 +560,10 @@
 
 .var-table tr:hover {
     background: #2a2a2a;
+}
+
+.callstack-selected {
+    background: #094771 !important;
 }
 
 .var-table td {

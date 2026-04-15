@@ -77,8 +77,12 @@
         <div class="resize-h-handle" title="Drag to resize"></div>
 
         @{
-            var threadStates = (isDebugging && debugStepIndex >= 0 && debugStepIndex < debugTrace.Count)
-                ? debugTrace[debugStepIndex].ThreadStates
+            var _dbgStep = (isDebugging && debugStepIndex >= 0 && debugStepIndex < debugTrace.Count)
+                ? debugTrace[debugStepIndex] : null;
+            var _frameIdx = _dbgStep != null
+                ? Math.Clamp(selectedFrame, 0, Math.Max(0, _dbgStep.FrameThreadStates.Length - 1)) : 0;
+            var threadStates = (_dbgStep != null && _frameIdx < _dbgStep.FrameThreadStates.Length)
+                ? _dbgStep.FrameThreadStates[_frameIdx]
                 : Array.Empty<HLSLExecutionState.ThreadState>();
         }
         <div class="output-panel">
@@ -98,26 +102,85 @@
                             @if (debugStepIndex >= 0 && debugStepIndex < debugTrace.Count)
                             {
                                 var step = debugTrace[debugStepIndex];
-                                if (step.Variables.Count == 0)
+                                var localFrameIdx = Math.Clamp(selectedFrame, 0, Math.Max(0, step.FrameVariables.Length - 1));
+                                var locals = localFrameIdx < step.FrameVariables.Length ? step.FrameVariables[localFrameIdx] : null;
+                                var globals = step.GlobalVariables;
+
+                                bool hasLocals = locals != null && locals.Count > 0;
+                                bool hasGlobals = globals != null && globals.Count > 0;
+
+                                if (!hasLocals && !hasGlobals)
                                 {
                                     <div class="hint">No variables in scope.</div>
                                 }
                                 else
                                 {
-                                    <table class="var-table">
-                                        <thead>
-                                            <tr><th>Name</th><th>Value</th></tr>
-                                        </thead>
-                                        <tbody>
-                                            @foreach (var kvp in step.Variables)
+                                    <div class="var-list">
+                                        @{
+                                            var rows = new List<VarRow>();
+                                            if (hasLocals)
+                                                foreach (var kvp in locals!)
+                                                    BuildVarRows(rows, kvp.Key, kvp.Value, 0, kvp.Key);
+                                            var globalRows = new List<VarRow>();
+                                            if (hasGlobals)
+                                                foreach (var kvp in globals!)
+                                                    BuildVarRows(globalRows, kvp.Key, kvp.Value, 0, "g:" + kvp.Key);
+                                        }
+                                        @if (hasLocals)
+                                        {
+                                            <div class="var-subsection-header" @onclick="() => localVarsCollapsed = !localVarsCollapsed">
+                                                <span class="collapse-icon @(localVarsCollapsed ? "" : "expanded")">&#x203A;</span>
+                                                <span>Locals</span>
+                                            </div>
+                                            if (!localVarsCollapsed)
                                             {
-                                                <tr>
-                                                    <td class="var-name">@kvp.Key</td>
-                                                    <td class="var-value">@FormatValue(kvp.Value, inspectedThread)</td>
-                                                </tr>
+                                                foreach (var row in rows)
+                                                {
+                                                    var rowPath = row.Path;
+                                                    <div class="var-row" style="padding-left: @(6 + row.Depth * 18)px">
+                                                        @if (row.IsExpandable)
+                                                        {
+                                                            <span class="var-toggle @(expandedVarPaths.Contains(rowPath) ? "expanded" : "")"
+                                                                  @onclick="() => ToggleVarPath(rowPath)">&#x25BA;</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="var-toggle-spacer"></span>
+                                                        }
+                                                        <span class="var-row-name" title="@row.Name">@row.Name</span>
+                                                        <span class="var-row-value">@FormatValue(row.Value, inspectedThread)</span>
+                                                    </div>
+                                                }
                                             }
-                                        </tbody>
-                                    </table>
+                                        }
+                                        @if (hasGlobals)
+                                        {
+                                            <div class="var-subsection-header" @onclick="() => globalVarsCollapsed = !globalVarsCollapsed">
+                                                <span class="collapse-icon @(globalVarsCollapsed ? "" : "expanded")">&#x203A;</span>
+                                                <span>Globals</span>
+                                            </div>
+                                            if (!globalVarsCollapsed)
+                                            {
+                                                foreach (var row in globalRows)
+                                                {
+                                                    var rowPath = row.Path;
+                                                    <div class="var-row" style="padding-left: @(6 + row.Depth * 18)px">
+                                                        @if (row.IsExpandable)
+                                                        {
+                                                            <span class="var-toggle @(expandedVarPaths.Contains(rowPath) ? "expanded" : "")"
+                                                                  @onclick="() => ToggleVarPath(rowPath)">&#x25BA;</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="var-toggle-spacer"></span>
+                                                        }
+                                                        <span class="var-row-name" title="@row.Name">@row.Name</span>
+                                                        <span class="var-row-value">@FormatValue(row.Value, inspectedThread)</span>
+                                                    </div>
+                                                }
+                                            }
+                                        }
+                                    </div>
                                 }
                             }
                             else
@@ -214,18 +277,21 @@
                             @if (debugStepIndex >= 0 && debugStepIndex < debugTrace.Count)
                             {
                                 var stack = debugTrace[debugStepIndex].CallStack;
-                                if (stack.Length == 0)
-                                {
-                                    <div class="hint">No call stack.</div>
-                                }
-                                else
                                 {
                                     <table class="var-table">
                                         <tbody>
                                             @for (int i = 0; i < stack.Length; i++)
                                             {
-                                                <tr><td class="var-name">@stack[i]</td></tr>
+                                                var fi = i;
+                                                <tr class="@(fi == selectedFrame ? "callstack-selected" : "")"
+                                                    @onclick="() => selectedFrame = fi"
+                                                    style="cursor: pointer;">
+                                                    <td class="var-name">@stack[i]</td>
+                                                </tr>
                                             }
+                                            <tr style="cursor: default;">
+                                                <td class="var-name" style="color: #555; font-style: italic;">[Globals]</td>
+                                            </tr>
                                         </tbody>
                                     </table>
                                 }
@@ -382,7 +448,11 @@
     private bool needsSectionHeightRestore = false;
 
     // --- Collapse state ---
+    private int selectedFrame = 0;
+    private HashSet<string> expandedVarPaths = new();
     private bool varsCollapsed = false;
+    private bool localVarsCollapsed = false;
+    private bool globalVarsCollapsed = false;
     private bool execStateCollapsed = false;
     private bool callStackCollapsed = false;
     private bool imageCollapsed = false;
@@ -403,9 +473,11 @@
         public int Line { get; init; }
         public string[] CallStack { get; init; } = Array.Empty<string>();
         public int CallDepth => CallStack.Length;
-        public Dictionary<string, HLSLValue> Variables { get; init; } = new();
+        // Per-frame local variables, index 0 = innermost (current) frame
+        public Dictionary<string, HLSLValue>[] FrameVariables { get; init; } = Array.Empty<Dictionary<string, HLSLValue>>();
+        public Dictionary<string, HLSLValue> GlobalVariables { get; init; } = new();
         public int OutputOffset { get; init; }
-        public HLSLExecutionState.ThreadState[] ThreadStates { get; init; } = Array.Empty<HLSLExecutionState.ThreadState>();
+        public HLSLExecutionState.ThreadState[][] FrameThreadStates { get; init; } = Array.Empty<HLSLExecutionState.ThreadState[]>();
     }
 
     // Console output visible at the current debug step (output produced by statements executed so far).
@@ -533,20 +605,29 @@
 
             runner.DebugHook = node =>
             {
-                var vars = runner.GetVisibleVariables();
-                var snapshot = new Dictionary<string, HLSLValue>();
-                foreach (var kvp in vars)
+                Dictionary<string, HLSLValue> CopyFrame(Dictionary<string, HLSLValue> frame)
                 {
-                    try { snapshot[kvp.Key] = kvp.Value?.Copy() ?? kvp.Value!; }
-                    catch { snapshot[kvp.Key] = kvp.Value!; }
+                    var copy = new Dictionary<string, HLSLValue>();
+                    foreach (var kvp in frame)
+                    {
+                        HLSLValue val = kvp.Value is ReferenceValue rv ? rv.Get() : kvp.Value;
+                        try { copy[kvp.Key] = val?.Copy() ?? val!; }
+                        catch { copy[kvp.Key] = val!; }
+                    }
+                    return copy;
                 }
+
+                var frameCopies = runner.GetVariablesPerFrame().Select(CopyFrame).ToArray();
+                var globalCopy = CopyFrame(runner.GetGlobalVariables());
+
                 debugTrace.Add(new DebugStep
                 {
                     Line = node.Span.Start.Line,
                     CallStack = runner.GetCallStack(),
-                    Variables = snapshot,
+                    FrameVariables = frameCopies,
+                    GlobalVariables = globalCopy,
                     OutputOffset = sw.GetStringBuilder().Length,
-                    ThreadStates = runner.GetThreadStates()
+                    FrameThreadStates = runner.GetThreadStatesPerFrame()
                 });
             };
 
@@ -589,6 +670,7 @@
         if (debugStepIndex < debugTrace.Count - 1)
         {
             debugStepIndex++;
+            selectedFrame = 0;
             await JS.InvokeVoidAsync("highlightDebugLine", currentDebugLine);
             StateHasChanged();
         }
@@ -599,6 +681,7 @@
         if (debugStepIndex > 0)
         {
             debugStepIndex--;
+            selectedFrame = 0;
             await JS.InvokeVoidAsync("highlightDebugLine", currentDebugLine);
             StateHasChanged();
         }
@@ -612,6 +695,7 @@
         while (next < debugTrace.Count - 1 && debugTrace[next].CallDepth > depth)
             next++;
         debugStepIndex = next;
+        selectedFrame = 0;
         await JS.InvokeVoidAsync("highlightDebugLine", currentDebugLine);
         StateHasChanged();
     }
@@ -624,6 +708,7 @@
         while (next < debugTrace.Count - 1 && debugTrace[next].CallDepth >= depth)
             next++;
         debugStepIndex = next;
+        selectedFrame = 0;
         await JS.InvokeVoidAsync("highlightDebugLine", currentDebugLine);
         StateHasChanged();
     }
@@ -631,10 +716,10 @@
     private async Task ContinueToBreakpoint()
     {
         int next = debugStepIndex + 1;
-        // Advance until we hit a breakpoint or reach the end
         while (next < debugTrace.Count && !breakpoints.Contains(debugTrace[next].Line))
             next++;
         debugStepIndex = Math.Min(next, debugTrace.Count - 1);
+        selectedFrame = 0;
         await JS.InvokeVoidAsync("highlightDebugLine", currentDebugLine);
         StateHasChanged();
     }
@@ -678,6 +763,42 @@
     }
 
     // --- Value formatting ---
+    // --- Hierarchical variable list ---
+    private sealed class VarRow
+    {
+        public string Path = "";
+        public string Name = "";
+        public HLSLValue Value = null!;
+        public int Depth;
+        public bool IsExpandable;
+    }
+
+    private void ToggleVarPath(string path)
+    {
+        if (!expandedVarPaths.Remove(path))
+            expandedVarPaths.Add(path);
+    }
+
+    private void BuildVarRows(List<VarRow> rows, string name, HLSLValue value, int depth, string path)
+    {
+        if (value is ReferenceValue rv) value = rv.Get();
+        bool isExpandable = value is StructValue or ArrayValue;
+        rows.Add(new VarRow { Path = path, Name = name, Value = value, Depth = depth, IsExpandable = isExpandable });
+
+        if (!isExpandable || !expandedVarPaths.Contains(path)) return;
+
+        if (value is StructValue sv)
+        {
+            foreach (var kvp in sv.Members)
+                BuildVarRows(rows, kvp.Key, kvp.Value, depth + 1, $"{path}.{kvp.Key}");
+        }
+        else if (value is ArrayValue av)
+        {
+            for (int i = 0; i < av.Values.Length; i++)
+                BuildVarRows(rows, $"[{i}]", av.Values[i], depth + 1, $"{path}[{i}]");
+        }
+    }
+
     private string FormatValue(HLSLValue value, int threadIndex)
     {
         if (value is ReferenceValue rv) value = rv.Get();
