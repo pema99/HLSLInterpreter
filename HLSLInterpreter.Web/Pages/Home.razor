@@ -224,43 +224,67 @@
             }
             else
             {
-                <div class="panel-header"><span>Output</span></div>
-                <div class="output-body">
-                    @if (output == null && !isRunning)
+                <!-- Console -->
+                <div class="debug-section debug-section-console @(consoleCollapsed ? "section-collapsed" : "")"
+                     style="--section-h: 300px;">
+                    <div class="panel-header collapsible-header" @onclick="() => consoleCollapsed = !consoleCollapsed">
+                        <div class="panel-header-left">
+                            <span class="collapse-icon @(consoleCollapsed ? "" : "expanded")">&#x203A;</span>
+                            <span>Console</span>
+                        </div>
+                    </div>
+                    @if (!consoleCollapsed)
                     {
-                        <div class="hint">Press <strong>Run</strong> or <strong>Ctrl+Enter</strong> to execute.</div>
-                    }
-                    else if (isRunning)
-                    {
-                        <div class="hint running-hint"><span class="spinner spinner-output"></span> Running...</div>
-                    }
-                    else if (output!.Length == 0 && !hasError)
-                    {
-                        <div class="hint">No output.</div>
-                    }
-                    else
-                    {
-                        @if (!string.IsNullOrEmpty(output))
-                        {
-                            <pre class="output-text">@output</pre>
-                        }
-                        @if (hasError)
-                        {
-                            <pre class="error-text">@errorMessage</pre>
-                        }
+                        <div class="output-body">
+                            @if (output == null && !isRunning)
+                            {
+                                <div class="hint">Press <strong>Run</strong> or <strong>Ctrl+Enter</strong> to execute.</div>
+                            }
+                            else if (isRunning)
+                            {
+                                <div class="hint running-hint"><span class="spinner spinner-output"></span> Running...</div>
+                            }
+                            else if (output!.Length == 0 && !hasError)
+                            {
+                                <div class="hint">No output.</div>
+                            }
+                            else
+                            {
+                                @if (!string.IsNullOrEmpty(output))
+                                {
+                                    <pre class="output-text">@output</pre>
+                                }
+                                @if (hasError)
+                                {
+                                    <pre class="error-text">@errorMessage</pre>
+                                }
+                            }
+                        </div>
+                        <div class="resize-v-handle" title="Drag to resize"></div>
                     }
                 </div>
 
+                <!-- Color Output -->
                 @if (hasImage)
                 {
-                    <div class="image-section">
-                        <div class="resize-v-handle" title="Drag to resize"></div>
-                        <div class="panel-header"><span>Color Output</span></div>
-                        <div class="image-container">
-                            <canvas id="color-canvas"></canvas>
+                    <div class="debug-section debug-section-image @(imageCollapsed ? "section-collapsed" : "")">
+                        <div class="panel-header collapsible-header" @onclick="ToggleImageSection">
+                            <div class="panel-header-left">
+                                <span class="collapse-icon @(imageCollapsed ? "" : "expanded")">&#x203A;</span>
+                                <span>Color Output</span>
+                            </div>
                         </div>
+                        @if (!imageCollapsed)
+                        {
+                            <div class="image-container">
+                                <canvas id="color-canvas"></canvas>
+                            </div>
+                            <div class="resize-v-handle" title="Drag to resize"></div>
+                        }
                     </div>
                 }
+
+                <div class="debug-panel-spacer"></div>
             }
         </div>
     </div>
