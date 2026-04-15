@@ -325,6 +325,8 @@ ScaleIsPositive(2, 1)
 ScaleIsPositive(2, 2)
 ```
 
+> **Note:** `[Values]` and `[ValueSource]` are attributes on function parameters and require DXC to compile. If your shader must compile with FXC, use `[TestCase]` or `[TestCaseSource]` instead, which are function-level attributes.
+
 ### Test metadata
 
 `[Description]` and `[Category]` attach metadata to a test function. The description and category are surfaced in the test runner output and can be used for filtering or reporting:
@@ -413,6 +415,8 @@ void Texture_LoadAtCoord([MockResource("MockTex2D")] RWTexture2D<float4> tex, in
 }
 ```
 
+> **Note:** Attributes on function parameters only work with DXC. If your shader must compile with FXC, use `MOCK_RESOURCE` inside the function body instead, and declare the resource as a global variable.
+
 **`MOCK_RESOURCE(resource, MockStructType)`** - binds a mock to a globally declared resource variable at the point of the call. Use this when the resource is a shader global rather than a function parameter:
 
 ```hlsl
@@ -437,9 +441,9 @@ void Texture_Write_Global()
 | `[Test]` | Function | Marks a function as a test to be discovered and run. |
 | `[TestCase(args...)]` | Function | Runs the test once per attribute, passing the given arguments. |
 | `[TestCaseSource("Generator")]` | Function | Runs the test for each case emitted by `Generator` via `TEST_CASE()`. |
-| `[Values(vals...)]` | Parameter | Provides a set of values for this parameter, combined combinatorially with other parameters. |
-| `[ValueSource("Generator")]` | Parameter | Like `[Values]`, but values are emitted by `Generator` via `TEST_VALUE()`. |
-| `[MockResource("MockType")]` | Parameter | Injects a mock resource of the given struct type before each test call. |
+| `[Values(vals...)]` | Parameter | Provides a set of values for this parameter, combined combinatorially with other parameters. **DXC only.** |
+| `[ValueSource("Generator")]` | Parameter | Like `[Values]`, but values are emitted by `Generator` via `TEST_VALUE()`. **DXC only.** |
+| `[MockResource("MockType")]` | Parameter | Injects a mock resource of the given struct type before each test call. **DXC only.** |
 | `[WarpSize(x, y)]` | Function | Sets the warp size for the test. Required for tests using wave intrinsics or `ddx()/ddy()`. |
 | `[Ignore]`<br>`[Ignore("reason")]` | Function | Unconditionally skips the test, with an optional reason shown in the output. |
 | `[Description("text")]` | Function | Attaches a human-readable description to the test. |
