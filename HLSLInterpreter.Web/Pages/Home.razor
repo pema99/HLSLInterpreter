@@ -2,19 +2,41 @@
 @inject IJSRuntime JS
 @using HLSL
 @using UnityShaderParser.HLSL
+@using System.Globalization
 @implements IAsyncDisposable
 
 <div class="app-shell">
     <header class="topbar">
         <a class="logo" href="https://github.com/pema99/HLSLInterpreter" target="_blank" rel="noopener noreferrer">HLSL Interpreter</a>
-        <div class="topbar-actions">
+
+        <div class="topbar-center">
+            @if (isDebugging)
+            {
+                <div class="debug-controls">
+                    <button class="btn-dbg" @onclick="StepBack" disabled="@(debugStepIndex <= 0)" title="Step back">&#x23EE;</button>
+                    <button class="btn-dbg btn-dbg-continue" @onclick="ContinueToBreakpoint" title="Continue to next breakpoint">&#x25B6;</button>
+                    <button class="btn-dbg" @onclick="StepForward" disabled="@(debugStepIndex >= debugTrace.Count - 1)" title="Step forward">&#x23ED;</button>
+                </div>
+            }
+        </div>
+
+        <div class="topbar-right">
+            @if (isDebugging)
+            {
+                <div class="thread-selector">
+                    <label class="warp-label">Thread</label>
+                    <input class="warp-input" type="number" min="0" max="@(warpX * warpY - 1)"
+                           @bind="inspectedThread" @bind:event="oninput" />
+                    <span class="warp-sep">(@(inspectedThread % warpX), @(inspectedThread / warpX))</span>
+                </div>
+            }
             <div class="warp-control">
                 <label class="warp-label">Warp size</label>
-                <input class="warp-input" type="number" min="1" max="32" @bind="warpX" @bind:event="oninput" disabled="@isRunning" title="Warp X" />
+                <input class="warp-input" type="number" min="1" max="32" @bind="warpX" @bind:event="oninput" disabled="@(isRunning || isDebugging)" title="Warp X" />
                 <span class="warp-sep">×</span>
-                <input class="warp-input" type="number" min="1" max="32" @bind="warpY" @bind:event="oninput" disabled="@isRunning" title="Warp Y" />
+                <input class="warp-input" type="number" min="1" max="32" @bind="warpY" @bind:event="oninput" disabled="@(isRunning || isDebugging)" title="Warp Y" />
             </div>
-            <button class="btn-run" @onclick="Run" disabled="@isRunning">
+            <button class="btn-run" @onclick="Run" disabled="@(isRunning || isDebugging)">
                 @if (isRunning)
                 {
                     <span class="spinner"></span>
@@ -25,6 +47,14 @@
                     <span>&#9654; Run</span>
                 }
             </button>
+            @if (isDebugging)
+            {
+                <button class="btn-stop" @onclick="ExitDebug" title="Stop debugging">&#x25A0; Stop</button>
+            }
+            else
+            {
+                <button class="btn-debug-start" @onclick="StartDebug" disabled="@isRunning" title="Debug (record execution trace)">&#x1F41E; Debug</button>
+            }
         </div>
     </header>
 
@@ -32,57 +62,205 @@
         <div class="editor-panel">
             <div class="panel-header">
                 <span>Input</span>
-                <div class="panel-header-actions">
-                    <select class="footer-select" title="Font size" @onchange="OnFontSizeChanged">
-                        @foreach (var size in fontSizes)
-                        {
-                            <option value="@size" selected="@(size == fontSize)">@size</option>
-                        }
-                    </select>
-                </div>
+                <select class="footer-select" title="Font size" @onchange="OnFontSizeChanged">
+                    @foreach (var size in fontSizes)
+                    {
+                        <option value="@size" selected="@(size == fontSize)">@size</option>
+                    }
+                </select>
             </div>
             <div id="monaco-container" class="editor-container"></div>
         </div>
 
         <div class="resize-h-handle" title="Drag to resize"></div>
 
+        @{
+            var threadStates = (isDebugging && debugStepIndex >= 0 && debugStepIndex < debugTrace.Count)
+                ? debugTrace[debugStepIndex].ThreadStates
+                : Array.Empty<DebugThreadState>();
+        }
         <div class="output-panel">
-            <div class="panel-header"><span>Output</span></div>
-            <div class="output-body">
-                @if (output == null && !isRunning)
-                {
-                    <div class="hint">Press <strong>Run</strong> or <strong>Ctrl+Enter</strong> to execute.</div>
-                }
-                else if (isRunning)
-                {
-                    <div class="hint running-hint"><span class="spinner spinner-output"></span> Running...</div>
-                }
-                else if (output.Length == 0 && !hasError)
-                {
-                    <div class="hint">No output.</div>
-                }
-                else
-                {
-                    @if (!string.IsNullOrEmpty(output))
-                    {
-                        <pre class="output-text">@output</pre>
-                    }
-                    @if (hasError)
-                    {
-                        <pre class="error-text">@errorMessage</pre>
-                    }
-                }
-            </div>
-
-            @if (hasImage)
+            @if (isDebugging)
             {
-                <div class="image-section">
-                    <div class="resize-v-handle" title="Drag to resize"></div>
-                    <div class="panel-header"><span>Color Output</span></div>
-                    <div class="image-container">
-                        <canvas id="color-canvas"></canvas>
+                <!-- Variables -->
+                <div class="debug-section debug-section-vars @(varsCollapsed ? "section-collapsed" : "")">
+                    <div class="panel-header collapsible-header" @onclick="() => varsCollapsed = !varsCollapsed">
+                        <div class="panel-header-left">
+                            <span class="collapse-icon @(varsCollapsed ? "" : "expanded")">&#x203A;</span>
+                            <span>Variables</span>
+                        </div>
                     </div>
+                    @if (!varsCollapsed)
+                    {
+                        <div class="output-body debug-vars-body">
+                            @if (debugStepIndex >= 0 && debugStepIndex < debugTrace.Count)
+                            {
+                                var step = debugTrace[debugStepIndex];
+                                if (step.Variables.Count == 0)
+                                {
+                                    <div class="hint">No variables in scope.</div>
+                                }
+                                else
+                                {
+                                    <table class="var-table">
+                                        <thead>
+                                            <tr><th>Name</th><th>Value</th></tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var kvp in step.Variables)
+                                            {
+                                                <tr>
+                                                    <td class="var-name">@kvp.Key</td>
+                                                    <td class="var-value">@FormatValue(kvp.Value, inspectedThread)</td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                }
+                            }
+                            else
+                            {
+                                <div class="hint">Use Step or Continue to inspect variables.</div>
+                            }
+                        </div>
+                        <div class="resize-v-handle" title="Drag to resize"></div>
+                    }
                 </div>
+
+                <!-- Console Output -->
+                <div class="debug-section debug-section-console @(consoleCollapsed ? "section-collapsed" : "")">
+                    <div class="panel-header collapsible-header" @onclick="() => consoleCollapsed = !consoleCollapsed">
+                        <div class="panel-header-left">
+                            <span class="collapse-icon @(consoleCollapsed ? "" : "expanded")">&#x203A;</span>
+                            <span>Console</span>
+                        </div>
+                    </div>
+                    @if (!consoleCollapsed)
+                    {
+                        <div class="output-body debug-console-body">
+                            @if (!string.IsNullOrEmpty(CurrentDebugOutput))
+                            {
+                                <pre class="output-text">@CurrentDebugOutput</pre>
+                            }
+                            else
+                            {
+                                <div class="hint">No output yet.</div>
+                            }
+                            @if (hasError)
+                            {
+                                <pre class="error-text">@errorMessage</pre>
+                            }
+                        </div>
+                        <div class="resize-v-handle" title="Drag to resize"></div>
+                    }
+                </div>
+
+                <!-- Execution State -->
+                @if (threadStates.Length > 0)
+                {
+                    <div class="debug-section debug-section-exec @(execStateCollapsed ? "section-collapsed" : "")">
+                        <div class="panel-header collapsible-header" @onclick="ToggleExecStateSection">
+                            <div class="panel-header-left">
+                                <span class="collapse-icon @(execStateCollapsed ? "" : "expanded")">&#x203A;</span>
+                                <span>Execution State</span>
+                            </div>
+                            @if (!execStateCollapsed)
+                            {
+                                <span class="thread-legend">
+                                    <span class="tl-dot tc-active"></span>Active
+                                    <span class="tl-dot tc-diverged"></span>Inactive
+                                    <span class="tl-dot tc-exited"></span>Exited
+                                </span>
+                            }
+                        </div>
+                        @if (!execStateCollapsed)
+                        {
+                            <div class="exec-state-body" id="thread-grid-container">
+                                <div class="thread-grid">
+                                    @for (int ti = 0; ti < threadStates.Length; ti++)
+                                    {
+                                        var tidx = ti;
+                                        var state = threadStates[ti];
+                                        var stateClass = state switch {
+                                            DebugThreadState.Active    => "tc-active",
+                                            DebugThreadState.Diverged  => "tc-diverged",
+                                            DebugThreadState.Suspended => "tc-suspended",
+                                            DebugThreadState.Exited    => "tc-exited",
+                                            _ => ""
+                                        };
+                                        var label = $"Thread ({ti % warpX}, {ti / warpX}) – {state}";
+                                        <div class="thread-cell @stateClass @(tidx == inspectedThread ? "tc-selected" : "")"
+                                             title="@label"
+                                             @onclick="() => inspectedThread = tidx"></div>
+                                    }
+                                </div>
+                            </div>
+                            <div class="resize-v-handle" title="Drag to resize"></div>
+                        }
+                    </div>
+                }
+
+                <!-- Color Output -->
+                @if (hasImage)
+                {
+                    <div class="debug-section debug-section-image @(imageCollapsed ? "section-collapsed" : "")">
+                        <div class="panel-header collapsible-header" @onclick="ToggleImageSection">
+                            <div class="panel-header-left">
+                                <span class="collapse-icon @(imageCollapsed ? "" : "expanded")">&#x203A;</span>
+                                <span>Color Output</span>
+                            </div>
+                        </div>
+                        @if (!imageCollapsed)
+                        {
+                            <div class="image-container">
+                                <canvas id="color-canvas"></canvas>
+                            </div>
+                            <div class="resize-v-handle" title="Drag to resize"></div>
+                        }
+                    </div>
+                }
+
+                <div class="debug-panel-spacer"></div>
+            }
+            else
+            {
+                <div class="panel-header"><span>Output</span></div>
+                <div class="output-body">
+                    @if (output == null && !isRunning)
+                    {
+                        <div class="hint">Press <strong>Run</strong> or <strong>Ctrl+Enter</strong> to execute.</div>
+                    }
+                    else if (isRunning)
+                    {
+                        <div class="hint running-hint"><span class="spinner spinner-output"></span> Running...</div>
+                    }
+                    else if (output!.Length == 0 && !hasError)
+                    {
+                        <div class="hint">No output.</div>
+                    }
+                    else
+                    {
+                        @if (!string.IsNullOrEmpty(output))
+                        {
+                            <pre class="output-text">@output</pre>
+                        }
+                        @if (hasError)
+                        {
+                            <pre class="error-text">@errorMessage</pre>
+                        }
+                    }
+                </div>
+
+                @if (hasImage)
+                {
+                    <div class="image-section">
+                        <div class="resize-v-handle" title="Drag to resize"></div>
+                        <div class="panel-header"><span>Color Output</span></div>
+                        <div class="image-container">
+                            <canvas id="color-canvas"></canvas>
+                        </div>
+                    </div>
+                }
             }
         </div>
     </div>
@@ -117,22 +295,73 @@
         }
     }
 
+    // --- Core state ---
     private HLSLRunner runner = new HLSLRunner();
     private string? output;
     private bool isRunning;
     private bool hasError;
     private string errorMessage = "";
-    private int warpX = 32;
-    private int warpY = 32;
+    private int warpX = 8;
+    private int warpY = 8;
     private bool hasImage = false;
     private bool needsImageRender = false;
     private int imageWidth, imageHeight;
     private byte[]? imagePixels;
 
+    // --- Debug state ---
+    private bool isDebugging = false;
+    private List<DebugStep> debugTrace = new();
+    private int debugStepIndex = -1;
+    private HashSet<int> breakpoints = new();
+    private int _inspectedThread = 0;
+    private DotNetObjectReference<Home>? dotNetRef;
+    private bool needsThreadGridInit = false;
+
+    // --- Collapse state ---
+    private bool varsCollapsed = false;
+    private bool execStateCollapsed = false;
+    private bool imageCollapsed = false;
+    private bool consoleCollapsed = false;
+
+    private int inspectedThread
+    {
+        get => _inspectedThread;
+        set => _inspectedThread = Math.Clamp(value, 0, Math.Max(0, warpX * warpY - 1));
+    }
+
+    private int currentDebugLine =>
+        (debugStepIndex >= 0 && debugStepIndex < debugTrace.Count)
+            ? debugTrace[debugStepIndex].Line : 0;
+
+    private sealed class DebugStep
+    {
+        public int Line { get; init; }
+        public Dictionary<string, HLSLValue> Variables { get; init; } = new();
+        public int OutputOffset { get; init; }
+        public DebugThreadState[] ThreadStates { get; init; } = Array.Empty<DebugThreadState>();
+    }
+
+    // Console output visible at the current debug step (output produced by statements executed so far).
+    private string CurrentDebugOutput
+    {
+        get
+        {
+            if (output == null || debugStepIndex < 0) return "";
+            // Output produced *through* step N ends at the start of step N+1's offset (or total length if last).
+            int endOffset = debugStepIndex < debugTrace.Count - 1
+                ? debugTrace[debugStepIndex + 1].OutputOffset
+                : output.Length;
+            return output[..Math.Min(endOffset, output.Length)];
+        }
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
-            await JS.InvokeVoidAsync("initMonaco", "monaco-container", DefaultCode);
+        {
+            dotNetRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("initMonaco", "monaco-container", DefaultCode, dotNetRef);
+        }
 
         if (needsImageRender && imagePixels != null)
         {
@@ -140,8 +369,15 @@
             await JS.InvokeVoidAsync("restoreImageSectionHeight");
             await JS.InvokeVoidAsync("renderPixels", "color-canvas", imagePixels, imageWidth, imageHeight);
         }
+
+        if (needsThreadGridInit)
+        {
+            needsThreadGridInit = false;
+            await JS.InvokeVoidAsync("initThreadGridResize", "thread-grid-container", warpX, warpY);
+        }
     }
 
+    // --- Run (normal mode) ---
     private async Task Run()
     {
         isRunning = true;
@@ -160,32 +396,19 @@
         try
         {
             string code = await JS.InvokeAsync<string>("getMonacoValue");
-
             int wx = Math.Max(1, warpX);
             int wy = Math.Max(1, warpY);
             int threadCount = wx * wy;
 
+            runner.BeforeStatement = null;
             runner.Reset();
             runner.SetWarpSize(wx, wy);
             runner.SetVariable("WARP_SIZE_X", new ScalarValue(ScalarType.Uint, new HLSLRegister<object>((uint)wx)));
             runner.SetVariable("WARP_SIZE_Y", new ScalarValue(ScalarType.Uint, new HLSLRegister<object>((uint)wy)));
             runner.ProcessCode(code);
 
-            var threadIds = new object[threadCount][];
-            for (int i = 0; i < threadCount; i++)
-                threadIds[i] = new object[] { (uint)(i % wx), (uint)(i / wx) };
-            var threadArg = new VectorValue(ScalarType.Uint, new HLSLRegister<object[]>(threadIds).Converge());
-
-            HLSLValue result;
-            try
-            {
-                result = runner.CallFunction("main", threadArg);
-            }
-            catch (Exception ex) when (ex.Message.Contains("Unknown function 'main' called."))
-            {
-                result = runner.CallFunction("main");
-            }
-
+            var threadArg = BuildThreadArg(wx, wy, threadCount);
+            HLSLValue result = CallMain(threadArg);
             TryExtractImage(result, wx, wy);
         }
         catch (Exception ex)
@@ -202,6 +425,250 @@
         needsImageRender = hasImage;
         isRunning = false;
         StateHasChanged();
+    }
+
+    // --- Debug: record trace ---
+    private async Task StartDebug()
+    {
+        isRunning = true;
+        hasError = false;
+        errorMessage = "";
+        output = null;
+        hasImage = false;
+        imagePixels = null;
+        debugTrace = new();
+        debugStepIndex = -1;
+        varsCollapsed = false;
+        execStateCollapsed = false;
+        imageCollapsed = false;
+        consoleCollapsed = false;
+        StateHasChanged();
+        await Task.Yield();
+
+        var sw = new System.IO.StringWriter();
+        var oldOut = Console.Out;
+        Console.SetOut(sw);
+
+        try
+        {
+            string code = await JS.InvokeAsync<string>("getMonacoValue");
+            int wx = Math.Max(1, warpX);
+            int wy = Math.Max(1, warpY);
+            int threadCount = wx * wy;
+
+            runner.Reset();
+            runner.SetWarpSize(wx, wy);
+            runner.SetVariable("WARP_SIZE_X", new ScalarValue(ScalarType.Uint, new HLSLRegister<object>((uint)wx)));
+            runner.SetVariable("WARP_SIZE_Y", new ScalarValue(ScalarType.Uint, new HLSLRegister<object>((uint)wy)));
+
+            runner.BeforeStatement = node =>
+            {
+                var vars = runner.GetVisibleVariables();
+                var snapshot = new Dictionary<string, HLSLValue>();
+                foreach (var kvp in vars)
+                {
+                    try { snapshot[kvp.Key] = kvp.Value?.Copy() ?? kvp.Value!; }
+                    catch { snapshot[kvp.Key] = kvp.Value!; }
+                }
+                debugTrace.Add(new DebugStep
+                {
+                    Line = node.Span.Start.Line,
+                    Variables = snapshot,
+                    OutputOffset = sw.GetStringBuilder().Length,
+                    ThreadStates = runner.GetThreadStates()
+                });
+            };
+
+            runner.ProcessCode(code);
+            var threadArg = BuildThreadArg(wx, wy, threadCount);
+            HLSLValue result = CallMain(threadArg);
+            TryExtractImage(result, wx, wy);
+        }
+        catch (Exception ex)
+        {
+            hasError = true;
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            runner.BeforeStatement = null;
+            Console.SetOut(oldOut);
+        }
+
+        output = sw.ToString();
+        needsImageRender = hasImage;
+        isRunning = false;
+        isDebugging = true;
+
+        // Position at first step
+        if (debugTrace.Count > 0)
+        {
+            debugStepIndex = 0;
+            await JS.InvokeVoidAsync("highlightDebugLine", currentDebugLine);
+        }
+
+        needsThreadGridInit = true;
+        StateHasChanged();
+    }
+
+    // --- Debug navigation ---
+    private async Task StepForward()
+    {
+        if (debugStepIndex < debugTrace.Count - 1)
+        {
+            debugStepIndex++;
+            await JS.InvokeVoidAsync("highlightDebugLine", currentDebugLine);
+            StateHasChanged();
+        }
+    }
+
+    private async Task StepBack()
+    {
+        if (debugStepIndex > 0)
+        {
+            debugStepIndex--;
+            await JS.InvokeVoidAsync("highlightDebugLine", currentDebugLine);
+            StateHasChanged();
+        }
+    }
+
+    private async Task ContinueToBreakpoint()
+    {
+        int next = debugStepIndex + 1;
+        // Advance until we hit a breakpoint or reach the end
+        while (next < debugTrace.Count && !breakpoints.Contains(debugTrace[next].Line))
+            next++;
+        debugStepIndex = Math.Min(next, debugTrace.Count - 1);
+        await JS.InvokeVoidAsync("highlightDebugLine", currentDebugLine);
+        StateHasChanged();
+    }
+
+    private void ToggleExecStateSection()
+    {
+        execStateCollapsed = !execStateCollapsed;
+        if (!execStateCollapsed)
+            needsThreadGridInit = true;
+    }
+
+    private void ToggleImageSection()
+    {
+        imageCollapsed = !imageCollapsed;
+        if (!imageCollapsed && hasImage && imagePixels != null)
+            needsImageRender = true;
+    }
+
+    private async Task ExitDebug()
+    {
+        isDebugging = false;
+        debugTrace = new();
+        debugStepIndex = -1;
+        await JS.InvokeVoidAsync("highlightDebugLine", 0);
+        await JS.InvokeVoidAsync("disposeThreadGridResize");
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public async Task ToggleBreakpoint(int line)
+    {
+        if (breakpoints.Contains(line))
+            breakpoints.Remove(line);
+        else
+            breakpoints.Add(line);
+
+        await JS.InvokeVoidAsync("setBreakpoints", breakpoints.ToArray());
+        StateHasChanged();
+    }
+
+    // --- Value formatting ---
+    private string FormatValue(HLSLValue value, int threadIndex)
+    {
+        if (value is ReferenceValue rv) value = rv.Get();
+        if (value == null) return "null";
+
+        return value switch
+        {
+            ScalarValue sv => FormatScalar(sv, threadIndex),
+            VectorValue vv => FormatVector(vv, threadIndex),
+            MatrixValue mv => FormatMatrix(mv, threadIndex),
+            StructValue sv2 => FormatStruct(sv2, threadIndex),
+            ArrayValue av => $"[{av.Values.Length}]",
+            _ => value.GetType().Name
+        };
+    }
+
+    private string FormatScalar(ScalarValue sv, int threadIndex)
+    {
+        try
+        {
+            int idx = Math.Min(threadIndex, sv.ThreadCount - 1);
+            object v = sv.Value.Get(idx);
+            return FormatObject(v);
+        }
+        catch { return "?"; }
+    }
+
+    private string FormatVector(VectorValue vv, int threadIndex)
+    {
+        try
+        {
+            int idx = Math.Min(threadIndex, vv.ThreadCount - 1);
+            object[] comps = vv.Values.Get(idx);
+            if (comps == null) return "(null)";
+            return $"({string.Join(", ", comps.Select(c => FormatObject(c)))})";
+        }
+        catch { return "?"; }
+    }
+
+    private string FormatMatrix(MatrixValue mv, int threadIndex)
+    {
+        try
+        {
+            int idx = Math.Min(threadIndex, mv.ThreadCount - 1);
+            object[] elems = mv.Values.Get(idx);
+            if (elems == null) return "[null]";
+            return $"[{mv.Rows}x{mv.Columns}: {string.Join(", ", elems.Take(4).Select(c => FormatObject(c)))}...]";
+        }
+        catch { return "[matrix]"; }
+    }
+
+    private string FormatStruct(StructValue sv, int threadIndex)
+    {
+        try
+        {
+            var parts = sv.Members.Take(4).Select(kv => $"{kv.Key}: {FormatValue(kv.Value, threadIndex)}");
+            string body = string.Join(", ", parts);
+            if (sv.Members.Count > 4) body += ", ...";
+            return "{" + body + "}";
+        }
+        catch { return "{struct}"; }
+    }
+
+    private static string FormatObject(object? v)
+    {
+        if (v is float f) return f.ToString("G6", CultureInfo.InvariantCulture);
+        if (v is double d) return d.ToString("G6", CultureInfo.InvariantCulture);
+        return Convert.ToString(v, CultureInfo.InvariantCulture) ?? "null";
+    }
+
+    // --- Helpers shared by Run and StartDebug ---
+    private static VectorValue BuildThreadArg(int wx, int wy, int threadCount)
+    {
+        var threadIds = new object[threadCount][];
+        for (int i = 0; i < threadCount; i++)
+            threadIds[i] = new object[] { (uint)(i % wx), (uint)(i / wx) };
+        return new VectorValue(ScalarType.Uint, new HLSLRegister<object[]>(threadIds).Converge());
+    }
+
+    private HLSLValue CallMain(VectorValue threadArg)
+    {
+        try
+        {
+            return runner.CallFunction("main", threadArg);
+        }
+        catch (Exception ex) when (ex.Message.Contains("Unknown function 'main' called."))
+        {
+            return runner.CallFunction("main");
+        }
     }
 
     private void TryExtractImage(HLSLValue result, int wx, int wy)
@@ -243,5 +710,10 @@
 
     private static byte FloatToByte(float v) => (byte)(Math.Clamp(v, 0f, 1f) * 255f + 0.5f);
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public async ValueTask DisposeAsync()
+    {
+        dotNetRef?.Dispose();
+        await JS.InvokeVoidAsync("highlightDebugLine", 0);
+        await JS.InvokeVoidAsync("setBreakpoints", Array.Empty<int>());
+    }
 }
