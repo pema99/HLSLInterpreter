@@ -5,7 +5,7 @@ using System.Linq;
 using UnityShaderParser.Common;
 using UnityShaderParser.HLSL;
 
-namespace HLSLInterpreter
+namespace HLSL
 {
     public class HLSLExpressionEvaluator : HLSLSyntaxVisitor<HLSLValue>
     {
@@ -1139,9 +1139,10 @@ namespace HLSLInterpreter
                     int rows = Convert.ToInt32(EvaluateScalar(genMatrixType.FirstDimension).Cast(ScalarType.Int).GetThreadValue(0));
                     int cols = Convert.ToInt32(EvaluateScalar(genMatrixType.SecondDimension).Cast(ScalarType.Int).GetThreadValue(0));
                     return numeric.BroadcastToMatrix(rows, cols).Cast(genMatrixType.Kind);
-                case UserDefinedNamedTypeNode named when node.Expression is LiteralExpressionNode:
+                case UserDefinedNamedTypeNode named when numeric is ScalarValue scalar:
                     var structType = context.GetStruct(named.GetName());
-                    return interpreter.CreateStructValueFilledWith(structType, numeric);
+                    int size = HLSLTypeUtils.GetTypeSizeDwords(context, structType, node.ArrayRanks);
+                    return HLSLValueUtils.PackScalars(context, Enumerable.Repeat(scalar, size).ToArray(), structType, node.ArrayRanks);
                 default:
                     throw Error(node, "Invalid cast.");
             }

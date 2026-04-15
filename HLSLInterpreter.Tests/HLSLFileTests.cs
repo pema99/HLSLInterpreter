@@ -4,10 +4,10 @@ using System.Linq;
 using System.Reflection;
 using UnityShaderParser.HLSL;
 using UnityShaderParser.HLSL.PreProcessor;
-using HLSLInterpreter;
+using HLSL;
 using UnityShaderParser.Common;
 
-namespace HLSLInterpreter.Tests
+namespace HLSL.Tests
 {
     [TestFixture]
     public class HLSLFileTests

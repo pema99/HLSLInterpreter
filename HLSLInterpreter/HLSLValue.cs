@@ -7,7 +7,7 @@ using System.Text;
 using UnityShaderParser.Common;
 using UnityShaderParser.HLSL;
 
-namespace HLSLInterpreter
+namespace HLSL
 {
     public readonly struct HLSLRegister<T>
     {

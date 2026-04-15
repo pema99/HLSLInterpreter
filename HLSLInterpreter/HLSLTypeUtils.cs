@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using UnityShaderParser.HLSL;
 
-namespace HLSLInterpreter
+namespace HLSL
 {
     public static class HLSLTypeUtils
     {
