@@ -52,6 +52,21 @@ namespace HLSL
 
         public HLSLValue EvaluateExpression(ExpressionNode node) => expressionEvaluator.Visit(node);
 
+        public HLSLValue EvaluateExpression(string source)
+        {
+            var expr = ShaderParser.ParseExpression(source);
+            return expressionEvaluator.Visit(expr);
+        }
+
+        // Debug API
+        public Action<HLSLSyntaxNode> DebugHook { get; set; }
+        public Dictionary<string, HLSLValue> GetVisibleVariables() => context.GetVisibleVariables();
+        public Dictionary<string, HLSLValue>[] GetVariablesPerFrame() => context.GetVariablesPerFrame();
+        public Dictionary<string, HLSLValue> GetGlobalVariables() => context.GetGlobalVariables();
+        public HLSLExecutionState.ThreadState[] GetThreadStates() => executionState.GetThreadStates();
+        public HLSLExecutionState.ThreadState[][] GetThreadStatesPerFrame() => executionState.GetThreadStatesPerFrame();
+        public string[] GetCallStack() => context.GetCallStack();
+
         public ResourceValue CreateMockResource(string structName, PredefinedObjectType resourceType, TypeNode[] templateArgs)
         {
             var structDef = context.GetStruct(structName) ?? throw Error($"Unknown type '{structName}'.");
@@ -359,6 +374,20 @@ namespace HLSL
         }
 
         // Visitor implementation
+        public override void Visit(HLSLSyntaxNode node)
+        {
+            if (DebugHook != null
+                && node is StatementNode
+                && node is not BlockNode
+                && node is not StructDefinitionNode
+                && node is not InterfaceDefinitionNode
+                && node is not TypedefNode)
+            {
+                DebugHook(node);
+            }
+            base.Visit(node);
+        }
+
         protected override void DefaultVisit(HLSLSyntaxNode node)
         {
             if (node is ExpressionNode expr)

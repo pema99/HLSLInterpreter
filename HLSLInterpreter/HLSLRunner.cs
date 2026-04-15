@@ -416,6 +416,20 @@ namespace HLSL
         public HLSLValue GetVariable(string name) => interpreter.GetVariable(name);
         public HLSLValue CallFunction(string name, params HLSLValue[] args) => interpreter.CallFunction(name, args);
 
+        // Debug API
+        public Action<HLSLSyntaxNode> DebugHook
+        {
+            get => interpreter.DebugHook;
+            set => interpreter.DebugHook = value;
+        }
+        public Dictionary<string, HLSLValue> GetVisibleVariables() => interpreter.GetVisibleVariables();
+        public Dictionary<string, HLSLValue>[] GetVariablesPerFrame() => interpreter.GetVariablesPerFrame();
+        public Dictionary<string, HLSLValue> GetGlobalVariables() => interpreter.GetGlobalVariables();
+        public HLSLExecutionState.ThreadState[] GetThreadStates() => interpreter.GetThreadStates();
+        public HLSLExecutionState.ThreadState[][] GetThreadStatesPerFrame() => interpreter.GetThreadStatesPerFrame();
+        public string[] GetCallStack() => interpreter.GetCallStack();
+        public HLSLValue EvaluateExpression(string source) => interpreter.EvaluateExpression(source);
+
         public TestRun[] DiscoverTests(string testFilter = null)
         {
             var functions = interpreter.GetFunctions();
