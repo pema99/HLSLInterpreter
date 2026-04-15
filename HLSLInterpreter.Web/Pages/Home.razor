@@ -1,13 +1,22 @@
 @page "/"
 @inject IJSRuntime JS
+@inject NavigationManager Nav
 @using HLSL
 @using UnityShaderParser.HLSL
 @using System.Globalization
+@using System.IO.Compression
+@using System.Text
 @implements IAsyncDisposable
 
 <div class="app-shell">
     <header class="topbar">
-        <a class="logo" href="https://github.com/pema99/HLSLInterpreter" target="_blank" rel="noopener noreferrer">HLSL Interpreter</a>
+        <div class="topbar-left">
+            <a class="btn-permalink" href="https://github.com/pema99/HLSLInterpreter" target="_blank" rel="noopener noreferrer">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+                HLSLInterpreter
+            </a>
+            <button class="btn-permalink" @onclick="CopyPermalink" title="Copy permalink to clipboard">&#x1F517; Copy permalink</button>
+        </div>
 
         <div class="topbar-center">
             @if (isDebugging)
@@ -537,7 +546,17 @@
         if (firstRender)
         {
             dotNetRef = DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("initMonaco", "monaco-container", DefaultCode, dotNetRef);
+
+            // Load code from permalink if present
+            string initialCode = DefaultCode;
+            var param = GetQueryParam(Nav.Uri, "c");
+            if (!string.IsNullOrEmpty(param))
+            {
+                try { initialCode = DecompressCode(param); }
+                catch { }
+            }
+
+            await JS.InvokeVoidAsync("initMonaco", "monaco-container", initialCode, dotNetRef);
         }
 
         if (needsSectionHeightRestore)
@@ -1047,6 +1066,54 @@
     }
 
     private static byte FloatToByte(float v) => (byte)(Math.Clamp(v, 0f, 1f) * 255f + 0.5f);
+
+    // --- Permalink ---
+    private static string GetQueryParam(string url, string key)
+    {
+        var query = new Uri(url).Query.TrimStart('?');
+        foreach (var part in query.Split('&'))
+        {
+            var kv = part.Split('=', 2);
+            if (kv.Length == 2 && Uri.UnescapeDataString(kv[0]) == key)
+                return Uri.UnescapeDataString(kv[1]);
+        }
+        return null;
+    }
+
+    private static string CompressCode(string code)
+    {
+        var bytes = Encoding.UTF8.GetBytes(code);
+        using var output = new MemoryStream();
+        using (var gz = new GZipStream(output, CompressionLevel.Optimal))
+            gz.Write(bytes, 0, bytes.Length);
+        return Convert.ToBase64String(output.ToArray())
+            .Replace('+', '-').Replace('/', '_').TrimEnd('=');
+    }
+
+    private static string DecompressCode(string encoded)
+    {
+        encoded = encoded.Replace('-', '+').Replace('_', '/');
+        switch (encoded.Length % 4)
+        {
+            case 2: encoded += "=="; break;
+            case 3: encoded += "="; break;
+        }
+        var bytes = Convert.FromBase64String(encoded);
+        using var input = new MemoryStream(bytes);
+        using var gz = new GZipStream(input, CompressionMode.Decompress);
+        using var output = new MemoryStream();
+        gz.CopyTo(output);
+        return Encoding.UTF8.GetString(output.ToArray());
+    }
+
+    private async Task CopyPermalink()
+    {
+        string code = await JS.InvokeAsync<string>("getMonacoValue");
+        string encoded = CompressCode(code);
+        var uri = new Uri(Nav.Uri);
+        string permalink = $"{uri.GetLeftPart(UriPartial.Path)}?c={encoded}";
+        await JS.InvokeVoidAsync("copyToClipboard", permalink);
+    }
 
     public async ValueTask DisposeAsync()
     {

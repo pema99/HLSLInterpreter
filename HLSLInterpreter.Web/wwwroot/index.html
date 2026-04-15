@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>HLSL Interpreter</title>
-    <base href="/" />
+    <base href="/hlsl/" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <link rel="stylesheet" href="css/app.css" />
     <link href="HLSLInterpreter.Web.styles.css" rel="stylesheet" />
@@ -679,6 +679,10 @@
                 const el = document.querySelector('.image-section, .debug-section-image');
                 if (el) el.style.setProperty('--section-h', window._imageSectionHeight);
             }
+        };
+
+        window.copyToClipboard = function (text) {
+            return navigator.clipboard.writeText(text);
         };
 
         window.scrollImmediateToBottom = function () {

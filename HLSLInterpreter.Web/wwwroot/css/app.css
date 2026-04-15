@@ -21,6 +21,12 @@
     gap: 8px;
 }
 
+.topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
 .topbar-center {
     display: flex;
     align-items: center;
@@ -387,6 +393,30 @@
 .thread-selector .warp-sep {
     min-width: 62px;
     font-variant-numeric: tabular-nums;
+}
+
+.btn-permalink {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    height: 30px;
+    padding: 0 12px;
+    background: #3c3c3c;
+    color: #d4d4d4;
+    border: 1px solid #555;
+    border-radius: 3px;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s;
+    text-decoration: none;
+    box-sizing: border-box;
+}
+
+.btn-permalink:hover {
+    background: #4e4e4e;
+    border-color: #777;
 }
 
 .btn-debug-start {
