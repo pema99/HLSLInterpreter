@@ -79,6 +79,26 @@
             top: 0.5rem;
         }
 
+        /* Debug toolbar button overrides */
+        .btn-dbg-continue {
+            background: #1a7a3a;
+            border-color: #1a7a3a;
+            color: white;
+        }
+        .btn-dbg-continue:hover:not(:disabled) { background: #22964a; }
+
+        .btn-dbg-continue-back {
+            background: #0e639c;
+            border-color: #0e639c;
+            color: white;
+        }
+        .btn-dbg-continue-back:hover:not(:disabled) { background: #1177bb; }
+
+        .btn-icon-mirror {
+            display: inline-block;
+            transform: scaleX(-1);
+        }
+
         /* Debug: breakpoint glyph — red circle, right-aligned in glyph margin */
         .dbg-breakpoint-glyph {
             cursor: pointer;
