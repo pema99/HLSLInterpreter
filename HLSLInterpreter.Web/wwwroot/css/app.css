@@ -622,7 +622,7 @@
 }
 
 .debug-section-vars {
-    height: var(--section-h, 200px);
+    height: var(--section-h, 240px);
     min-height: 0;
     flex-shrink: 0;
 }
@@ -632,7 +632,7 @@
 }
 
 .debug-section-console {
-    height: var(--section-h, 200px);
+    height: var(--section-h, 240px);
     min-height: 0;
     flex-shrink: 0;
 }
@@ -649,7 +649,7 @@
 }
 
 .debug-section-exec {
-    height: var(--section-h, 200px);
+    height: var(--section-h, 240px);
     min-height: 0;
     flex-shrink: 0;
 }
@@ -684,7 +684,7 @@
 
 /* Immediate window */
 .debug-section-immediate {
-    height: var(--section-h, 180px);
+    height: var(--section-h, 240px);
     min-height: 0;
     flex-shrink: 0;
     display: flex;
@@ -792,7 +792,7 @@
 }
 
 .debug-section-callstack {
-    height: var(--section-h, 200px);
+    height: var(--section-h, 240px);
     min-height: 0;
     flex-shrink: 0;
     display: flex;
@@ -804,7 +804,7 @@
 }
 
 .debug-section-image {
-    height: var(--section-h, 200px);
+    height: var(--section-h, 240px);
     min-height: 0;
     flex-shrink: 0;
 }
