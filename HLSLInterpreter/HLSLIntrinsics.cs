@@ -1514,6 +1514,12 @@ namespace HLSL
                     if (scalarizeLoop && !executionState.IsThreadActive(threadIndex))
                         continue;
 
+                    if (scalarizeLoop && args.Length == 1)
+                    {
+                        Console.WriteLine(Convert.ToString(HLSLValueUtils.Scalarize(args[0], threadIndex), CultureInfo.InvariantCulture));
+                        continue;
+                    }
+
                     string formatString = args[0].ToString();
                     StringBuilder sb = new StringBuilder();
                     if (scalarizeLoop)
@@ -1525,14 +1531,7 @@ namespace HLSL
                         {
                             j++;
                             var arg = args[argCounter++];
-                            if (arg is NumericValue num)
-                            {
-                                sb.Append(Convert.ToString(num.Scalarize(threadIndex), CultureInfo.InvariantCulture));
-                            }
-                            else
-                            {
-                                sb.Append(Convert.ToString(arg, CultureInfo.InvariantCulture));
-                            }
+                            sb.Append(Convert.ToString(HLSLValueUtils.Scalarize(arg, threadIndex), CultureInfo.InvariantCulture));
                         }
                         else
                         {

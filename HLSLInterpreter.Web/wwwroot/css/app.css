@@ -13,7 +13,7 @@
     display: grid;
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
-    padding: 0 16px;
+    padding: 0 9px;
     height: 48px;
     background: #252526;
     border-bottom: 1px solid #3c3c3c;
@@ -24,7 +24,7 @@
 .topbar-left {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 9px;
 }
 
 .topbar-center {
@@ -37,7 +37,7 @@
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 20px;
+    gap: 9px;
 }
 
 .logo {
@@ -440,6 +440,75 @@
 .btn-permalink:hover {
     background: #4e4e4e;
     border-color: #777;
+}
+
+.btn-settings {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    height: 30px;
+    width: 96px;
+    padding: 0 12px;
+    background: #3c3c3c;
+    color: #d4d4d4;
+    border: 1px solid #555;
+    border-radius: 3px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+    box-sizing: border-box;
+}
+
+.btn-settings:hover {
+    background: #4e4e4e;
+}
+
+.settings-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.settings-label {
+    font-size: 13px;
+    color: #cccccc;
+    width: 90px;
+    flex-shrink: 0;
+}
+
+.settings-text-input {
+    height: 30px;
+    padding: 0 8px;
+    background: #3c3c3c;
+    color: #d4d4d4;
+    border: 1px solid #555;
+    border-radius: 3px;
+    font-size: 13px;
+    font-family: 'Consolas', monospace;
+    box-sizing: border-box;
+    flex: 1;
+    min-width: 0;
+}
+
+.settings-row > .warp-control {
+    flex: 1;
+}
+
+.settings-row > .warp-control .warp-input {
+    flex: 1;
+    min-width: 0;
+    width: 0;
+}
+
+.settings-text-input:focus {
+    outline: none;
+    border-color: #007acc;
+}
+
+.settings-text-input:disabled {
+    opacity: 0.5;
 }
 
 .btn-debug-start {
