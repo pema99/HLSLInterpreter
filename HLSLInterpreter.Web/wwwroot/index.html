@@ -482,6 +482,21 @@
                             return { suggestions: [...keywordSuggestions, ...intrinsicSuggestions, ...wordSuggestions] };
                         },
                     });
+
+                    // Debug hover: show variable value under cursor
+                    monaco.languages.registerHoverProvider('hlsl', {
+                        provideHover: async function (model, position) {
+                            if (!window._dotNetDebugRef) return null;
+                            var word = model.getWordAtPosition(position);
+                            if (!word) return null;
+                            var result = await window._dotNetDebugRef.invokeMethodAsync('GetHoverValue', word.word);
+                            if (result == null) return null;
+                            return {
+                                range: new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn),
+                                contents: [{ value: '```\n' + word.word + ' = ' + result + '\n```' }]
+                            };
+                        }
+                    });
                 })();
 
                 monaco.editor.defineTheme('hlsl-dark', {
