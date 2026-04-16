@@ -888,7 +888,7 @@ float4 main(uint2 thread : SV_DispatchThreadID)
     private void BuildVarRows(List<VarRow> rows, string name, HLSLValue value, int depth, string path)
     {
         if (value is ReferenceValue rv) value = rv.Get();
-        bool isExpandable = value is StructValue or ArrayValue;
+        bool isExpandable = value is StructValue or ArrayValue or MatrixValue;
         rows.Add(new VarRow { Path = path, Name = name, Value = value, Depth = depth, IsExpandable = isExpandable });
 
         if (!isExpandable || !expandedVarPaths.Contains(path)) return;
@@ -902,6 +902,27 @@ float4 main(uint2 thread : SV_DispatchThreadID)
         {
             for (int i = 0; i < av.Values.Length; i++)
                 BuildVarRows(rows, $"[{i}]", av.Values[i], depth + 1, $"{path}[{i}]");
+        }
+        else if (value is MatrixValue mv)
+        {
+            for (int r = 0; r < mv.Rows; r++)
+            {
+                VectorValue rowVec;
+                int cols = mv.Columns;
+                if (mv.Values.IsVarying)
+                {
+                    var perThread = mv.Values.VaryingValues
+                        .Select(elems => elems.Skip(r * cols).Take(cols).ToArray() as object[])
+                        .ToArray();
+                    rowVec = new VectorValue(mv.Type, new HLSLRegister<object[]>(perThread));
+                }
+                else
+                {
+                    var rowElems = mv.Values.UniformValue.Skip(r * cols).Take(cols).ToArray();
+                    rowVec = new VectorValue(mv.Type, new HLSLRegister<object[]>(rowElems));
+                }
+                BuildVarRows(rows, $"[{r}]", rowVec, depth + 1, $"{path}[{r}]");
+            }
         }
     }
 
@@ -917,6 +938,7 @@ float4 main(uint2 thread : SV_DispatchThreadID)
             MatrixValue mv => FormatMatrix(mv, threadIndex),
             StructValue sv2 => FormatStruct(sv2, threadIndex),
             ArrayValue av => $"[{av.Values.Length}]",
+            PredefinedObjectValue pov => pov.ToString(),
             _ => value.GetType().Name
         };
     }
@@ -946,14 +968,7 @@ float4 main(uint2 thread : SV_DispatchThreadID)
 
     private string FormatMatrix(MatrixValue mv, int threadIndex)
     {
-        try
-        {
-            int idx = Math.Min(threadIndex, mv.ThreadCount - 1);
-            object[] elems = mv.Values.Get(idx);
-            if (elems == null) return "[null]";
-            return $"[{mv.Rows}x{mv.Columns}: {string.Join(", ", elems.Take(4).Select(c => FormatObject(c)))}...]";
-        }
-        catch { return "[matrix]"; }
+        return $"[{mv.Rows}×{mv.Columns}]";
     }
 
     private string FormatStruct(StructValue sv, int threadIndex)

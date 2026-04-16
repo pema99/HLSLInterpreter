@@ -854,6 +854,8 @@ namespace HLSL
         public override string ToString()
         {
             string type = PrintingUtil.GetEnumName(Type);
+            if (TemplateArguments == null || TemplateArguments.Length == 0)
+                return type;
             return $"{type}<{string.Join(", ", TemplateArguments.Select(x => x.GetPrettyPrintedCode()))}>";
         }
     }
