@@ -23,11 +23,15 @@
             @if (isDebugging)
             {
                 <div class="debug-controls">
-                    <button class="btn-dbg btn-dbg-continue" @onclick="ContinueToBreakpoint" title="Continue to next breakpoint">&#x25B6;</button>
-                    <button class="btn-dbg" @onclick="StepOver" disabled="@(debugStepIndex >= debugTrace.Count - 1)" title="Step over">&#x21B7;</button>
-                    <button class="btn-dbg" @onclick="StepForward" disabled="@(debugStepIndex >= debugTrace.Count - 1)" title="Step in">&#x21A7;</button>
-                    <button class="btn-dbg" @onclick="StepOut" disabled="@(debugStepIndex >= debugTrace.Count - 1)" title="Step out">&#x21A5;</button>
-                    <button class="btn-dbg" @onclick="StepBack" disabled="@(debugStepIndex <= 0)" title="Step back">&#x23EE;</button>
+                    <button class="btn-dbg btn-dbg-continue" data-dbg="continue" @onclick="ContinueToBreakpoint" disabled="@(debugStepIndex >= debugTrace.Count - 1)" title="Continue (F5)">&#x25B6;</button>
+                    <button class="btn-dbg" data-dbg="step-over" @onclick="StepOver" disabled="@(debugStepIndex >= debugTrace.Count - 1)" title="Step over (F10)">&#x21B7;</button>
+                    <button class="btn-dbg" data-dbg="step-in" @onclick="StepForward" disabled="@(debugStepIndex >= debugTrace.Count - 1)" title="Step in (F11)">&#x2935;</button>
+                    <button class="btn-dbg" data-dbg="step-out" @onclick="StepOut" disabled="@(debugStepIndex >= debugTrace.Count - 1)" title="Step out (F12)">&#x2934;</button>
+                    <div class="dbg-controls-sep"></div>
+                    <button class="btn-dbg btn-dbg-continue-back" data-dbg="continue-back" @onclick="ContinueToBreakpointBack" disabled="@(debugStepIndex <= 0)" title="Continue back (Shift+F5)"><span class="btn-icon-mirror">&#x25B6;</span></button>
+                    <button class="btn-dbg" data-dbg="step-over-back" @onclick="StepOverBack" disabled="@(debugStepIndex <= 0)" title="Step over back (Shift+F10)"><span class="btn-icon-mirror">&#x21B7;</span></button>
+                    <button class="btn-dbg" data-dbg="step-in-back" @onclick="StepBack" disabled="@(debugStepIndex <= 0)" title="Step in back (Shift+F11)"><span class="btn-icon-mirror">&#x2935;</span></button>
+                    <button class="btn-dbg" data-dbg="step-out-back" @onclick="StepOutBack" disabled="@(debugStepIndex <= 0)" title="Step out back (Shift+F12)"><span class="btn-icon-mirror">&#x2934;</span></button>
                 </div>
             }
         </div>
@@ -829,6 +833,43 @@ float4 main(uint2 thread : SV_DispatchThreadID)
         while (next < debugTrace.Count && !breakpoints.Contains(debugTrace[next].Line))
             next++;
         debugStepIndex = Math.Min(next, debugTrace.Count - 1);
+        selectedFrame = 0;
+        await JS.InvokeVoidAsync("highlightDebugLine", currentDebugLine);
+        StateHasChanged();
+    }
+
+    private async Task ContinueToBreakpointBack()
+    {
+        int prev = debugStepIndex - 1;
+        while (prev > 0 && !breakpoints.Contains(debugTrace[prev].Line))
+            prev--;
+        debugStepIndex = Math.Max(prev, 0);
+        selectedFrame = 0;
+        await JS.InvokeVoidAsync("highlightDebugLine", currentDebugLine);
+        StateHasChanged();
+    }
+
+    private async Task StepOverBack()
+    {
+        if (debugStepIndex <= 0) return;
+        int depth = debugTrace[debugStepIndex].CallDepth;
+        int prev = debugStepIndex - 1;
+        while (prev > 0 && debugTrace[prev].CallDepth > depth)
+            prev--;
+        debugStepIndex = prev;
+        selectedFrame = 0;
+        await JS.InvokeVoidAsync("highlightDebugLine", currentDebugLine);
+        StateHasChanged();
+    }
+
+    private async Task StepOutBack()
+    {
+        if (debugStepIndex <= 0) return;
+        int depth = debugTrace[debugStepIndex].CallDepth;
+        int prev = debugStepIndex - 1;
+        while (prev > 0 && debugTrace[prev].CallDepth >= depth)
+            prev--;
+        debugStepIndex = prev;
         selectedFrame = 0;
         await JS.InvokeVoidAsync("highlightDebugLine", currentDebugLine);
         StateHasChanged();

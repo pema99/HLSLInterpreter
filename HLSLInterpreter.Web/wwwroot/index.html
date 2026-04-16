@@ -558,6 +558,10 @@
                     var btn = document.querySelector('[title="' + title + '"]');
                     if (btn && !btn.disabled) btn.click();
                 }
+                function clickDbg(action) {
+                    var btn = document.querySelector('[data-dbg="' + action + '"]');
+                    if (btn && !btn.disabled) btn.click();
+                }
                 function toggleBreakpointAtCursor() {
                     if (window._dotNetDebugRef) {
                         var pos = window._monacoEditor.getPosition();
@@ -565,19 +569,19 @@
                     }
                 }
                 window._monacoEditor.addCommand(monaco.KeyCode.F5, function () {
-                    var cont = document.querySelector('.btn-dbg-continue');
+                    var cont = document.querySelector('[data-dbg="continue"]');
                     var start = document.querySelector('.btn-debug-start');
                     if (cont && !cont.disabled) cont.click();
                     else if (start && !start.disabled) start.click();
                 });
-                window._monacoEditor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F5, function () {
-                    clickBtn('Stop debugging');
-                });
+                window._monacoEditor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F5, function () { clickDbg('continue-back'); });
                 window._monacoEditor.addCommand(monaco.KeyCode.F9, function () { toggleBreakpointAtCursor(); });
-                window._monacoEditor.addCommand(monaco.KeyCode.F10, function () { clickBtn('Step over'); });
-                window._monacoEditor.addCommand(monaco.KeyCode.F11, function () { clickBtn('Step in'); });
-                window._monacoEditor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F11, function () { clickBtn('Step out'); });
-                window._monacoEditor.addCommand(monaco.KeyCode.F12, function () { clickBtn('Step back'); });
+                window._monacoEditor.addCommand(monaco.KeyCode.F10, function () { clickDbg('step-over'); });
+                window._monacoEditor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F10, function () { clickDbg('step-over-back'); });
+                window._monacoEditor.addCommand(monaco.KeyCode.F11, function () { clickDbg('step-in'); });
+                window._monacoEditor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F11, function () { clickDbg('step-in-back'); });
+                window._monacoEditor.addCommand(monaco.KeyCode.F12, function () { clickDbg('step-out'); });
+                window._monacoEditor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F12, function () { clickDbg('step-out-back'); });
 
                 window.monacoEditorInitialized = true;
             });
@@ -589,38 +593,43 @@
             var mc = document.getElementById('monaco-container');
             if (mc && mc.contains(document.activeElement)) return;
 
+            function clickDbgGlobal(action) {
+                var btn = document.querySelector('[data-dbg="' + action + '"]');
+                if (btn && !btn.disabled) btn.click();
+            }
             if (e.key === 'F5' && !e.shiftKey) {
                 e.preventDefault();
-                var cont = document.querySelector('.btn-dbg-continue');
+                var cont = document.querySelector('[data-dbg="continue"]');
                 var start = document.querySelector('.btn-debug-start');
                 if (cont && !cont.disabled) cont.click();
                 else if (start && !start.disabled) start.click();
             } else if (e.key === 'F5' && e.shiftKey) {
                 e.preventDefault();
-                var stop = document.querySelector('.btn-stop');
-                if (stop) stop.click();
+                clickDbgGlobal('continue-back');
             } else if (e.key === 'F9') {
                 e.preventDefault();
                 if (window._monacoEditor && window._dotNetDebugRef) {
                     var pos = window._monacoEditor.getPosition();
                     if (pos) window._dotNetDebugRef.invokeMethodAsync('ToggleBreakpoint', pos.lineNumber);
                 }
-            } else if (e.key === 'F10') {
+            } else if (e.key === 'F10' && !e.shiftKey) {
                 e.preventDefault();
-                var btn = document.querySelector('[title="Step over"]');
-                if (btn && !btn.disabled) btn.click();
+                clickDbgGlobal('step-over');
+            } else if (e.key === 'F10' && e.shiftKey) {
+                e.preventDefault();
+                clickDbgGlobal('step-over-back');
             } else if (e.key === 'F11' && !e.shiftKey) {
                 e.preventDefault();
-                var btn = document.querySelector('[title="Step in"]');
-                if (btn && !btn.disabled) btn.click();
+                clickDbgGlobal('step-in');
             } else if (e.key === 'F11' && e.shiftKey) {
                 e.preventDefault();
-                var btn = document.querySelector('[title="Step out"]');
-                if (btn && !btn.disabled) btn.click();
-            } else if (e.key === 'F12') {
+                clickDbgGlobal('step-in-back');
+            } else if (e.key === 'F12' && !e.shiftKey) {
                 e.preventDefault();
-                var btn = document.querySelector('[title="Step back"]');
-                if (btn && !btn.disabled) btn.click();
+                clickDbgGlobal('step-out');
+            } else if (e.key === 'F12' && e.shiftKey) {
+                e.preventDefault();
+                clickDbgGlobal('step-out-back');
             }
         });
 

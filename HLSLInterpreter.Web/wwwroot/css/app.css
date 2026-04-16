@@ -353,13 +353,36 @@
 }
 
 .btn-dbg-continue {
+    background: #1a7a3a;
+    border-color: #1a7a3a;
+    color: white;
+}
+
+.btn-dbg-continue:hover:not(:disabled) {
+    background: #22964a;
+}
+
+.btn-dbg-continue-back {
     background: #0e639c;
     border-color: #0e639c;
     color: white;
 }
 
-.btn-dbg-continue:hover:not(:disabled) {
+.btn-dbg-continue-back:hover:not(:disabled) {
     background: #1177bb;
+}
+
+.dbg-controls-sep {
+    width: 1px;
+    height: 20px;
+    background: #555;
+    margin: 0 2px;
+    flex-shrink: 0;
+}
+
+.btn-icon-mirror {
+    display: inline-block;
+    transform: scaleX(-1);
 }
 
 .btn-stop {
