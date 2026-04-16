@@ -11,7 +11,7 @@ namespace HLSL
     public class HLSLRunner
     {
         [Serializable]
-        private class TestFailException : Exception
+        public class TestFailException : Exception
         {
             public TestFailException() { }
             public TestFailException(string message) : base(message) { }
@@ -19,7 +19,7 @@ namespace HLSL
         }
 
         [Serializable]
-        private class TestPassException : Exception
+        public class TestPassException : Exception
         {
             public TestPassException() { }
             public TestPassException(string message) : base(message) { }
@@ -27,7 +27,7 @@ namespace HLSL
         }
 
         [Serializable]
-        private class TestIgnoreException : Exception
+        public class TestIgnoreException : Exception
         {
             public TestIgnoreException() { }
             public TestIgnoreException(string message) : base(message) { }
