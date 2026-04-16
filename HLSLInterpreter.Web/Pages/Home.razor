@@ -3,6 +3,7 @@
 @inject NavigationManager Nav
 @using HLSL
 @using UnityShaderParser.HLSL
+@using UnityShaderParser.Common
 @using System.Globalization
 @using System.IO.Compression
 @using System.Text
@@ -485,6 +486,7 @@ float4 main(uint2 thread : SV_DispatchThreadID)
     private bool isRunning;
     private bool hasError;
     private string errorMessage = "";
+    private Exception? lastException;
     private int warpX = 16;
     private int warpY = 16;
     private bool hasImage = false;
@@ -605,6 +607,7 @@ float4 main(uint2 thread : SV_DispatchThreadID)
         isRunning = true;
         hasError = false;
         errorMessage = "";
+        lastException = null;
         output = null;
         hasImage = false;
         imagePixels = null;
@@ -655,6 +658,7 @@ float4 main(uint2 thread : SV_DispatchThreadID)
         isRunning = true;
         hasError = false;
         errorMessage = "";
+        lastException = null;
         output = null;
         hasImage = false;
         imagePixels = null;
@@ -710,15 +714,26 @@ float4 main(uint2 thread : SV_DispatchThreadID)
                 });
             };
 
-            runner.ProcessCode(code);
-            var threadArg = BuildThreadArg(wx, wy, threadCount);
-            HLSLValue result = CallMain(threadArg);
-            TryExtractImage(result, wx, wy);
+            runner.ProcessCode(code, out var diagnostics, out _);
+            var compileErrors = diagnostics.Where(d => (d.Kind & DiagnosticFlags.OnlyErrors) != 0).ToList();
+            if (compileErrors.Count > 0)
+            {
+                hasError = true;
+                errorMessage = string.Join("\n", compileErrors.Select(d => $"Line {d.Location.Line}, col {d.Location.Column}: {d.Text}"));
+                lastException = null;
+            }
+            else
+            {
+                var threadArg = BuildThreadArg(wx, wy, threadCount);
+                HLSLValue result = CallMain(threadArg);
+                TryExtractImage(result, wx, wy);
+            }
         }
         catch (Exception ex)
         {
             hasError = true;
             errorMessage = ex.Message;
+            lastException = ex;
         }
         finally
         {
@@ -730,8 +745,9 @@ float4 main(uint2 thread : SV_DispatchThreadID)
         needsImageRender = hasImage;
         isRunning = false;
 
-        if (hasError)
+        if (hasError && !(lastException is HLSLRunner.TestFailException && debugTrace.Count > 0))
         {
+            // Compile/parse/runtime error — nothing useful to debug
             needsSectionHeightRestore = true;
             StateHasChanged();
             return;
@@ -739,13 +755,14 @@ float4 main(uint2 thread : SV_DispatchThreadID)
 
         isDebugging = true;
         immediateCollapsed = false;
-        consoleCollapsed = true;
+        // On assert failure: keep console open so the error is visible
+        consoleCollapsed = !hasError;
         imageCollapsed = true;
 
-        // Position at first step
+        // On assert failure: position at the last recorded step (the failing statement)
         if (debugTrace.Count > 0)
         {
-            debugStepIndex = 0;
+            debugStepIndex = hasError ? debugTrace.Count - 1 : 0;
             await JS.InvokeVoidAsync("highlightDebugLine", currentDebugLine);
         }
 
