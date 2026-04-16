@@ -366,7 +366,7 @@
             {
                 <!-- Console -->
                 <div class="debug-section debug-section-console @(consoleCollapsed ? "section-collapsed" : "")"
-                     style="--section-h: 200px;">
+                     style="--section-h: 240px;">
                     <div class="panel-header collapsible-header" @onclick="() => consoleCollapsed = !consoleCollapsed">
                         <div class="panel-header-left">
                             <span class="collapse-icon @(consoleCollapsed ? "" : "expanded")">&#x203A;</span>
@@ -782,8 +782,11 @@ float4 main(uint2 thread : SV_DispatchThreadID)
         if (debugStepIndex >= debugTrace.Count - 1) return;
         int depth = debugTrace[debugStepIndex].CallDepth;
         int next = debugStepIndex + 1;
-        while (next < debugTrace.Count - 1 && debugTrace[next].CallDepth > depth)
-            next++;
+        if (depth > 0)
+        {
+            while (next < debugTrace.Count - 1 && debugTrace[next].CallDepth > depth)
+                next++;
+        }
         debugStepIndex = next;
         selectedFrame = 0;
         await JS.InvokeVoidAsync("highlightDebugLine", currentDebugLine);
