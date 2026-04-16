@@ -46,12 +46,7 @@
                     <span class="warp-sep">(@(inspectedThread % warpX), @(inspectedThread / warpX))</span>
                 </div>
             }
-            <div class="warp-control">
-                <label class="warp-label">Warp size</label>
-                <input class="warp-input" type="number" min="1" max="32" @bind="warpX" @bind:event="oninput" disabled="@(isRunning || isDebugging)" title="Warp X" />
-                <span class="warp-sep">×</span>
-                <input class="warp-input" type="number" min="1" max="32" @bind="warpY" @bind:event="oninput" disabled="@(isRunning || isDebugging)" title="Warp Y" />
-            </div>
+            <button class="btn-settings" @onclick="OpenSettings" title="Settings">&#x2699;&#xFE0F; Settings</button>
             <button class="btn-run" @onclick="Run" disabled="@(isRunning || isDebugging)">
                 @if (isRunning)
                 {
@@ -432,6 +427,40 @@
     </div>
 </div>
 
+@if (showSettings)
+{
+    <div class="modal-overlay" @onclick="CloseSettings">
+        <div class="modal-dialog" @onclick:stopPropagation="true">
+            <div class="modal-header">Settings</div>
+            <div class="modal-body">
+                <div class="settings-row">
+                    <label class="settings-label">Entry point</label>
+                    <input class="settings-text-input" type="text" @bind="entryPoint" @bind:event="oninput" disabled="@(isRunning || isDebugging)" title="Function name to call" />
+                </div>
+                <div class="settings-row">
+                    <label class="settings-label">Group offset</label>
+                    <div class="warp-control">
+                        <input class="warp-input" type="number" min="0" @bind="groupOffsetX" @bind:event="oninput" disabled="@(isRunning || isDebugging)" title="Group X" />
+                        <span class="warp-sep">×</span>
+                        <input class="warp-input" type="number" min="0" @bind="groupOffsetY" @bind:event="oninput" disabled="@(isRunning || isDebugging)" title="Group Y" />
+                    </div>
+                </div>
+                <div class="settings-row">
+                    <label class="settings-label">Warp size</label>
+                    <div class="warp-control">
+                        <input class="warp-input" type="number" min="1" max="32" @bind="warpX" @bind:event="oninput" disabled="@(isRunning || isDebugging)" title="Warp X" />
+                        <span class="warp-sep">×</span>
+                        <input class="warp-input" type="number" min="1" max="32" @bind="warpY" @bind:event="oninput" disabled="@(isRunning || isDebugging)" title="Warp Y" />
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-modal-save" @onclick="CloseSettings">Close</button>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private static readonly string DefaultCode =
 @"static float TWIST = 12.0;
@@ -493,6 +522,14 @@ float4 main(uint2 thread : SV_DispatchThreadID)
     private Exception? lastException;
     private int warpX = 16;
     private int warpY = 16;
+    private string entryPoint = "main";
+    private int groupOffsetX = 0;
+    private int groupOffsetY = 0;
+
+    // --- Settings ---
+    private bool showSettings = false;
+    private void OpenSettings() { showSettings = true; }
+    private void CloseSettings() { showSettings = false; }
     private bool hasImage = false;
     private bool needsImageRender = false;
     private int imageWidth, imageHeight;
@@ -636,7 +673,7 @@ float4 main(uint2 thread : SV_DispatchThreadID)
             runner.SetVariable("WARP_SIZE_Y", new ScalarValue(ScalarType.Uint, new HLSLRegister<object>((uint)wy)));
             runner.ProcessCode(code);
 
-            var threadArg = BuildThreadArg(wx, wy, threadCount);
+            var threadArg = BuildThreadArg(wx, wy, threadCount, groupOffsetX, groupOffsetY);
             HLSLValue result = CallMain(threadArg);
             TryExtractImage(result, wx, wy);
         }
@@ -728,7 +765,7 @@ float4 main(uint2 thread : SV_DispatchThreadID)
             }
             else
             {
-                var threadArg = BuildThreadArg(wx, wy, threadCount);
+                var threadArg = BuildThreadArg(wx, wy, threadCount, groupOffsetX, groupOffsetY);
                 HLSLValue result = CallMain(threadArg);
                 TryExtractImage(result, wx, wy);
             }
@@ -1047,11 +1084,11 @@ float4 main(uint2 thread : SV_DispatchThreadID)
     }
 
     // --- Helpers shared by Run and StartDebug ---
-    private static VectorValue BuildThreadArg(int wx, int wy, int threadCount)
+    private static VectorValue BuildThreadArg(int wx, int wy, int threadCount, int groupOffsetX = 0, int groupOffsetY = 0)
     {
         var threadIds = new object[threadCount][];
         for (int i = 0; i < threadCount; i++)
-            threadIds[i] = new object[] { (uint)(i % wx), (uint)(i / wx) };
+            threadIds[i] = new object[] { (uint)(i % wx + groupOffsetX * wx), (uint)(i / wx + groupOffsetY * wy) };
         return new VectorValue(ScalarType.Uint, new HLSLRegister<object[]>(threadIds).Converge());
     }
 
@@ -1059,23 +1096,23 @@ float4 main(uint2 thread : SV_DispatchThreadID)
     {
         try
         {
-            return runner.CallFunction("main", threadArg);
+            return runner.CallFunction(entryPoint, threadArg);
         }
-        catch (Exception ex) when (ex.Message.Contains("Unknown function 'main' called."))
+        catch (Exception ex) when (ex.Message.Contains($"Unknown function '{entryPoint}' called."))
         {
-            return runner.CallFunction("main");
+            return runner.CallFunction(entryPoint);
         }
     }
 
-    private static HLSLValue CallMainWith(HLSLRunner r, VectorValue threadArg)
+    private static HLSLValue CallMainWith(HLSLRunner r, VectorValue threadArg, string entryPoint)
     {
         try
         {
-            return r.CallFunction("main", threadArg);
+            return r.CallFunction(entryPoint, threadArg);
         }
-        catch (Exception ex) when (ex.Message.Contains("Unknown function 'main' called."))
+        catch (Exception ex) when (ex.Message.Contains($"Unknown function '{entryPoint}' called."))
         {
-            return r.CallFunction("main");
+            return r.CallFunction(entryPoint);
         }
     }
 
@@ -1124,10 +1161,15 @@ float4 main(uint2 thread : SV_DispatchThreadID)
             Console.SetOut(sw);
             try
             {
-                evalRunner.ProcessCode(debugCode);
-                var threadArg = BuildThreadArg(wx, wy, threadCount);
-                try { CallMainWith(evalRunner, threadArg); }
-                catch (OperationCanceledException) { }
+                bool cancelledInProcessCode = false;
+                try { evalRunner.ProcessCode(debugCode); }
+                catch (OperationCanceledException) { cancelledInProcessCode = true; }
+                if (!cancelledInProcessCode)
+                {
+                    var threadArg = BuildThreadArg(wx, wy, threadCount, groupOffsetX, groupOffsetY);
+                    try { CallMainWith(evalRunner, threadArg, entryPoint); }
+                    catch (OperationCanceledException) { }
+                }
             }
             finally { Console.SetOut(oldOut); }
 

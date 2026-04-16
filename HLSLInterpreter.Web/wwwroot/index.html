@@ -135,6 +135,56 @@
             top: 50%;
             transform: translateY(-50%);
         }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.55);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        .modal-dialog {
+            background: #252526;
+            border: 1px solid #454545;
+            border-radius: 6px;
+            width: 300px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+            display: flex;
+            flex-direction: column;
+        }
+        .modal-header {
+            padding: 12px 16px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            border-bottom: 1px solid #3c3c3c;
+            color: #e8e8e8;
+        }
+        .modal-body {
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .modal-footer {
+            padding: 12px 16px;
+            border-top: 1px solid #3c3c3c;
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+        .btn-modal-save {
+            background: #0e639c;
+            border: 1px solid #0e639c;
+            color: white;
+            border-radius: 4px;
+            padding: 5px 14px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+        .btn-modal-save:hover { background: #1177bb; }
     </style>
 </head>
 
@@ -883,7 +933,7 @@
             document.addEventListener('mousemove', function (e) {
                 if (!activeHandle) return;
                 if (activeHandle === 'horizontal') {
-                    const newWidth = Math.max(160, Math.min(900, startSize - (e.clientX - startPos)));
+                    const newWidth = Math.max(160, startSize - (e.clientX - startPos));
                     document.querySelector('.output-panel').style.width = newWidth + 'px';
                     const canvas = document.getElementById('color-canvas');
                     if (canvas && canvas.width && canvas.height)
