@@ -958,6 +958,21 @@ float4 main(uint2 thread : SV_DispatchThreadID)
         return Convert.ToString(v, CultureInfo.InvariantCulture) ?? "null";
     }
 
+    [JSInvokable]
+    public string? GetHoverValue(string identifier)
+    {
+        if (!isDebugging || debugStepIndex < 0 || debugStepIndex >= debugTrace.Count)
+            return null;
+        var step = debugTrace[debugStepIndex];
+        // Check locals in the current (innermost) frame first
+        if (step.FrameVariables.Length > 0 && step.FrameVariables[0].TryGetValue(identifier, out var localVal))
+            return FormatValue(localVal, inspectedThread);
+        // Fall back to globals
+        if (step.GlobalVariables.TryGetValue(identifier, out var globalVal))
+            return FormatValue(globalVal, inspectedThread);
+        return null;
+    }
+
     // --- Helpers shared by Run and StartDebug ---
     private static VectorValue BuildThreadArg(int wx, int wy, int threadCount)
     {
