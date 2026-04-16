@@ -323,17 +323,17 @@
                     @if (!consoleCollapsed)
                     {
                         <div class="output-body debug-console-body">
-                            @if (!string.IsNullOrEmpty(CurrentDebugOutput))
+                            @if (hasError)
+                            {
+                                <pre class="error-text">@errorMessage</pre>
+                            }
+                            else if (!string.IsNullOrEmpty(CurrentDebugOutput))
                             {
                                 <pre class="output-text">@CurrentDebugOutput</pre>
                             }
                             else
                             {
                                 <div class="hint">No output yet.</div>
-                            }
-                            @if (hasError)
-                            {
-                                <pre class="error-text">@errorMessage</pre>
                             }
                         </div>
                         <div class="resize-v-handle" title="Drag to resize"></div>
@@ -366,7 +366,7 @@
             {
                 <!-- Console -->
                 <div class="debug-section debug-section-console @(consoleCollapsed ? "section-collapsed" : "")"
-                     style="--section-h: 200px;">
+                     style="--section-h: 240px;">
                     <div class="panel-header collapsible-header" @onclick="() => consoleCollapsed = !consoleCollapsed">
                         <div class="panel-header-left">
                             <span class="collapse-icon @(consoleCollapsed ? "" : "expanded")">&#x203A;</span>
@@ -388,16 +388,13 @@
                             {
                                 <div class="hint">No output.</div>
                             }
+                            else if (hasError)
+                            {
+                                <pre class="error-text">@errorMessage</pre>
+                            }
                             else
                             {
-                                @if (!string.IsNullOrEmpty(output))
-                                {
-                                    <pre class="output-text">@output</pre>
-                                }
-                                @if (hasError)
-                                {
-                                    <pre class="error-text">@errorMessage</pre>
-                                }
+                                <pre class="output-text">@output</pre>
                             }
                         </div>
                         <div class="resize-v-handle" title="Drag to resize"></div>
@@ -432,18 +429,41 @@
 
 @code {
     private static readonly string DefaultCode =
-@"float4 main(uint2 thread : SV_DispatchThreadID)
+@"static float TWIST = 12.0;
+static float PERIOD = 32.0;
+static float ARMS = 3.0;
+
+float3 hueShift (float3 color, float shift)
 {
-    // Calculate UV coord
-    float2 resolution = float2(WARP_SIZE_X - 1, WARP_SIZE_Y - 1);
-    float2 uv = float2(thread) / resolution;
+    float3 axis = 0.55735;
+    float3 grayscale = dot(0.55735, color);
+    float3 radial = color - axis;
+    float3 tangent = cross(axis, radial);
+    return radial * cos(shift * 6.2832) +
+        tangent * sin(shift * 6.2832) + axis;
+}
 
-    // Debug a specific pixel
-    if (thread.x == 1 && thread.y <= 1)
-        PRINTF(""Thread (%d, %d) value: %d"", thread.x, thread.y, uv);
-
-    // Output some color
-    return float4(uv.x, uv.y, 0.5, 1.0);
+float4 main(uint2 thread : SV_DispatchThreadID)
+{
+    float2 res = float2(WARP_SIZE_X, WARP_SIZE_Y);
+    float2 uv = (thread / res) - 0.5;
+    float dist = length(uv);
+    float angle = atan2(uv.y, uv.x) + 0.4;
+    float wave = sin(dist * TWIST - angle * ARMS);
+    wave = wave * 0.5 + 0.5;
+    if (wave < 0.5)
+    {
+        PRINTF(""First branch taken due to %d wave value!"", wave);
+        float3 base = float3(1.0, 0.3, 0.1);
+        float3 color = hueShift(base, wave + dist);
+        return float4(color, 1);
+    }
+    else
+    {
+        float periodic = sin(dist*PERIOD);
+        float inverse = cos(dist*PERIOD);
+        return float4(periodic, 0, inverse, 1);
+    }
 }
 ";
 
@@ -465,8 +485,8 @@
     private bool isRunning;
     private bool hasError;
     private string errorMessage = "";
-    private int warpX = 8;
-    private int warpY = 8;
+    private int warpX = 16;
+    private int warpY = 16;
     private bool hasImage = false;
     private bool needsImageRender = false;
     private int imageWidth, imageHeight;
@@ -640,9 +660,6 @@
         imagePixels = null;
         debugTrace = new();
         debugStepIndex = -1;
-        immediateCollapsed = false;
-        consoleCollapsed = true;
-        imageCollapsed = true;
         await JS.InvokeVoidAsync("saveSectionHeights");
         StateHasChanged();
         await Task.Yield();
@@ -712,7 +729,18 @@
         output = sw.ToString();
         needsImageRender = hasImage;
         isRunning = false;
+
+        if (hasError)
+        {
+            needsSectionHeightRestore = true;
+            StateHasChanged();
+            return;
+        }
+
         isDebugging = true;
+        immediateCollapsed = false;
+        consoleCollapsed = true;
+        imageCollapsed = true;
 
         // Position at first step
         if (debugTrace.Count > 0)
@@ -754,8 +782,11 @@
         if (debugStepIndex >= debugTrace.Count - 1) return;
         int depth = debugTrace[debugStepIndex].CallDepth;
         int next = debugStepIndex + 1;
-        while (next < debugTrace.Count - 1 && debugTrace[next].CallDepth > depth)
-            next++;
+        if (depth > 0)
+        {
+            while (next < debugTrace.Count - 1 && debugTrace[next].CallDepth > depth)
+                next++;
+        }
         debugStepIndex = next;
         selectedFrame = 0;
         await JS.InvokeVoidAsync("highlightDebugLine", currentDebugLine);
