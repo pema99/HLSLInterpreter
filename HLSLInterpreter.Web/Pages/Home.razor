@@ -428,6 +428,7 @@
     </div>
 </div>
 
+
 @code {
     private static readonly string DefaultCode =
 @"static float TWIST = 12.0;
@@ -498,7 +499,8 @@ float4 main(uint2 thread : SV_DispatchThreadID)
     private bool isDebugging = false;
     private List<DebugStep> debugTrace = new();
     private int debugStepIndex = -1;
-    private HashSet<int> breakpoints = new();
+    private record struct BreakpointInfo(string? Condition, bool CurrentThreadOnly);
+    private Dictionary<int, BreakpointInfo> breakpoints = new();
     private int _inspectedThread = 0;
     private DotNetObjectReference<Home>? dotNetRef;
     private bool needsThreadGridInit = false;
@@ -826,12 +828,77 @@ float4 main(uint2 thread : SV_DispatchThreadID)
     private async Task ContinueToBreakpoint()
     {
         int next = debugStepIndex + 1;
-        while (next < debugTrace.Count && !breakpoints.Contains(debugTrace[next].Line))
+        while (next < debugTrace.Count)
+        {
+            if (breakpoints.TryGetValue(debugTrace[next].Line, out var bp))
+            {
+                if (string.IsNullOrEmpty(bp.Condition) || EvaluateBreakpointCondition(bp, next))
+                    break;
+            }
             next++;
+        }
         debugStepIndex = Math.Min(next, debugTrace.Count - 1);
         selectedFrame = 0;
         await JS.InvokeVoidAsync("highlightDebugLine", currentDebugLine);
         StateHasChanged();
+    }
+
+    private bool EvaluateBreakpointCondition(BreakpointInfo bp, int stepIndex)
+    {
+        try
+        {
+            var result = EvaluateExpressionAtStep(bp.Condition!, stepIndex);
+            if (result is not ScalarValue sv) return false;
+            if (bp.CurrentThreadOnly)
+            {
+                int idx = Math.Min(inspectedThread, sv.ThreadCount - 1);
+                return Convert.ToBoolean(sv.Value.Get(idx));
+            }
+            // Any thread: fire if at least one thread satisfies the condition
+            for (int i = 0; i < sv.ThreadCount; i++)
+                if (Convert.ToBoolean(sv.Value.Get(i))) return true;
+            return false;
+        }
+        catch { return false; }
+    }
+
+    // Replays the debug trace up to stepIndex and evaluates expr in the live scope at that point.
+    private HLSLValue? EvaluateExpressionAtStep(string expr, int stepIndex)
+    {
+        int wx = Math.Max(1, warpX);
+        int wy = Math.Max(1, warpY);
+        int threadCount = wx * wy;
+
+        var evalRunner = new HLSLRunner(wx, wy);
+        evalRunner.SetVariable("WARP_SIZE_X", new ScalarValue(ScalarType.Uint, new HLSLRegister<object>((uint)wx)));
+        evalRunner.SetVariable("WARP_SIZE_Y", new ScalarValue(ScalarType.Uint, new HLSLRegister<object>((uint)wy)));
+
+        HLSLValue? evalResult = null;
+        int stepCount = 0;
+
+        evalRunner.DebugHook = _ =>
+        {
+            if (stepCount == stepIndex)
+            {
+                evalResult = evalRunner.EvaluateExpression(expr);
+                throw new OperationCanceledException();
+            }
+            stepCount++;
+        };
+
+        var sw = new System.IO.StringWriter();
+        var oldOut = Console.Out;
+        Console.SetOut(sw);
+        try
+        {
+            evalRunner.ProcessCode(debugCode);
+            var threadArg = BuildThreadArg(wx, wy, threadCount);
+            try { CallMainWith(evalRunner, threadArg); }
+            catch (OperationCanceledException) { }
+        }
+        finally { Console.SetOut(oldOut); }
+
+        return evalResult;
     }
 
 
@@ -859,13 +926,36 @@ float4 main(uint2 thread : SV_DispatchThreadID)
     [JSInvokable]
     public async Task ToggleBreakpoint(int line)
     {
-        if (breakpoints.Contains(line))
+        if (breakpoints.ContainsKey(line))
             breakpoints.Remove(line);
         else
-            breakpoints.Add(line);
+            breakpoints[line] = new BreakpointInfo(null, false);
 
-        await JS.InvokeVoidAsync("setBreakpoints", breakpoints.ToArray());
+        await SyncBreakpointDecorations();
         StateHasChanged();
+    }
+
+    [JSInvokable]
+    public async Task SetBreakpointCondition(int line, string condition, bool currentThreadOnly)
+    {
+        if (breakpoints.ContainsKey(line))
+        {
+            var cond = string.IsNullOrWhiteSpace(condition) ? null : condition.Trim();
+            breakpoints[line] = new BreakpointInfo(cond, currentThreadOnly);
+        }
+        await SyncBreakpointDecorations();
+        StateHasChanged();
+    }
+
+    private async Task SyncBreakpointDecorations()
+    {
+        var data = breakpoints.Select(kvp => new {
+            line = kvp.Key,
+            hasCondition = !string.IsNullOrEmpty(kvp.Value.Condition),
+            condition = kvp.Value.Condition ?? "",
+            currentThreadOnly = kvp.Value.CurrentThreadOnly
+        });
+        await JS.InvokeVoidAsync("setBreakpoints", data);
     }
 
     // --- Value formatting ---
@@ -1034,46 +1124,15 @@ float4 main(uint2 thread : SV_DispatchThreadID)
         if (string.IsNullOrEmpty(expr) || debugStepIndex < 0 || string.IsNullOrEmpty(debugCode)) return;
         immediateInput = "";
 
-        int wx = Math.Max(1, warpX);
-        int wy = Math.Max(1, warpY);
-        int threadCount = wx * wy;
-
         string resultStr;
         bool isError = false;
 
         try
         {
-            var evalRunner = new HLSLRunner(wx, wy);
-            evalRunner.SetVariable("WARP_SIZE_X", new ScalarValue(ScalarType.Uint, new HLSLRegister<object>((uint)wx)));
-            evalRunner.SetVariable("WARP_SIZE_Y", new ScalarValue(ScalarType.Uint, new HLSLRegister<object>((uint)wy)));
-
-            HLSLValue evalResult = null;
-            Exception evalError = null;
-            int stepCount = 0;
-            int targetStep = debugStepIndex;
-
-            evalRunner.DebugHook = _ =>
-            {
-                if (stepCount == targetStep)
-                {
-                    try { evalResult = evalRunner.EvaluateExpression(expr); }
-                    catch (Exception ex) { evalError = ex; }
-                    throw new OperationCanceledException();
-                }
-                stepCount++;
-            };
-
-            var sw = new System.IO.StringWriter();
-            var oldOut = Console.Out;
-            Console.SetOut(sw);
-            try
-            {
-                evalRunner.ProcessCode(debugCode);
-                var threadArg = BuildThreadArg(wx, wy, threadCount);
-                try { CallMainWith(evalRunner, threadArg); }
-                catch (OperationCanceledException) { }
-            }
-            finally { Console.SetOut(oldOut); }
+            HLSLValue? evalResult = null;
+            Exception? evalError = null;
+            try { evalResult = EvaluateExpressionAtStep(expr, debugStepIndex); }
+            catch (Exception ex) { evalError = ex; }
 
             if (evalError != null) { resultStr = evalError.Message; isError = true; }
             else if (evalResult != null) resultStr = FormatValue(evalResult, inspectedThread);
@@ -1182,6 +1241,6 @@ float4 main(uint2 thread : SV_DispatchThreadID)
     {
         dotNetRef?.Dispose();
         await JS.InvokeVoidAsync("highlightDebugLine", 0);
-        await JS.InvokeVoidAsync("setBreakpoints", Array.Empty<int>());
+        await JS.InvokeVoidAsync("setBreakpoints", Array.Empty<object>());
     }
 }

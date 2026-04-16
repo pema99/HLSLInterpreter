@@ -964,3 +964,131 @@
 .blazor-error-boundary::after {
     content: "An error has occurred.";
 }
+
+/* Conditional breakpoint glyph — hollow diamond */
+.dbg-cond-breakpoint-glyph {
+    cursor: pointer;
+}
+.dbg-cond-breakpoint-glyph::before {
+    content: '◆';
+    color: #e8a000;
+    font-size: 11px;
+    line-height: 1;
+    position: absolute;
+    right: 1px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+/* Breakpoint condition modal */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-dialog {
+    background: #252526;
+    border: 1px solid #3c3c3c;
+    border-radius: 6px;
+    width: 420px;
+    max-width: 90vw;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-header {
+    padding: 12px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    color: #bbbbbb;
+    background: #2d2d2d;
+    border-bottom: 1px solid #3c3c3c;
+    border-radius: 6px 6px 0 0;
+}
+
+.modal-body {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.modal-hint {
+    font-size: 12px;
+    color: #888;
+    line-height: 1.4;
+}
+
+.modal-input {
+    width: 100%;
+    height: 30px;
+    padding: 0 8px;
+    background: #3c3c3c;
+    border: 1px solid #555;
+    border-radius: 3px;
+    color: #d4d4d4;
+    font-size: 13px;
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+    box-sizing: border-box;
+}
+
+.modal-input:focus {
+    outline: none;
+    border-color: #007acc;
+}
+
+.modal-footer {
+    padding: 10px 16px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    border-top: 1px solid #3c3c3c;
+}
+
+.btn-modal-cancel {
+    height: 28px;
+    padding: 0 14px;
+    background: #3c3c3c;
+    color: #d4d4d4;
+    border: 1px solid #555;
+    border-radius: 3px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.btn-modal-cancel:hover {
+    background: #4e4e4e;
+}
+
+.btn-modal-save {
+    height: 28px;
+    padding: 0 14px;
+    background: #0e639c;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.btn-modal-save:hover {
+    background: #1177bb;
+}
+
+.modal-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #cccccc;
+    cursor: pointer;
+    user-select: none;
+}
