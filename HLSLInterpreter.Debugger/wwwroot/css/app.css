@@ -5,7 +5,7 @@
     height: 100vh;
     background: #1e1e1e;
     color: #d4d4d4;
-    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-family: 'Inter', 'Segoe UI', sans-serif;
 }
 
 /* Top bar */
@@ -104,7 +104,7 @@
     justify-content: center;
     gap: 6px;
     height: 30px;
-    width: 96px;
+    width: 100px;
     padding: 0 16px;
     background: #0e639c;
     color: white;
@@ -212,6 +212,7 @@
     border: 1px solid #555;
     border-radius: 3px;
     color: #d4d4d4;
+    font-family: 'Inter', 'Segoe UI', sans-serif;
     font-size: 11px;
     cursor: pointer;
 }
@@ -330,7 +331,7 @@
     color: #9cdcfe;
     white-space: pre-wrap;
     word-break: break-word;
-    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-family: 'JetBrains Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace;
     margin: 0 0 8px 0;
 }
 
@@ -339,7 +340,7 @@
     color: #f48771;
     white-space: pre-wrap;
     word-break: break-word;
-    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-family: 'JetBrains Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace;
     margin: 0;
 }
 
@@ -399,7 +400,7 @@
     color: #d4d4d4;
     border: 1px solid #555;
     border-radius: 3px;
-    font-size: 14px;
+    font-size: 20px;
     cursor: pointer;
     transition: background 0.15s;
     box-sizing: border-box;
@@ -448,9 +449,14 @@
     transform: scaleX(-1);
 }
 
+.icon-step-into      { display: inline-block; transform: rotate(-45deg); }
+.icon-step-out       { display: inline-block; transform: rotate(45deg); }
+.icon-step-into-back { display: inline-block; transform: scaleX(-1) rotate(-45deg); }
+.icon-step-out-back  { display: inline-block; transform: scaleX(-1) rotate(45deg); }
+
 .btn-stop {
     height: 30px;
-    width: 96px;
+    width: 100px;
     padding: 0 12px;
     background: #6b1414;
     color: #f48771;
@@ -493,6 +499,7 @@
     border: 1px solid #555;
     border-radius: 3px;
     font-size: 13px;
+    font-weight: 500;
     cursor: pointer;
     white-space: nowrap;
     transition: background 0.15s;
@@ -511,7 +518,7 @@
     justify-content: center;
     gap: 5px;
     height: 30px;
-    width: 96px;
+    width: 100px;
     padding: 0 12px;
     background: #3c3c3c;
     color: #d4d4d4;
@@ -549,7 +556,7 @@
     border: 1px solid #555;
     border-radius: 3px;
     font-size: 13px;
-    font-family: 'Consolas', monospace;
+    font-family: 'JetBrains Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace;
     box-sizing: border-box;
     flex: 1;
     min-width: 0;
@@ -580,13 +587,14 @@
     justify-content: center;
     gap: 4px;
     height: 30px;
-    width: 96px;
+    width: 100px;
     padding: 0 12px;
     background: #3c3c3c;
     color: #d4d4d4;
     border: 1px solid #555;
     border-radius: 3px;
     font-size: 13px;
+    font-weight: 500;
     cursor: pointer;
     transition: background 0.15s;
     box-sizing: border-box;
@@ -632,7 +640,7 @@
 .var-list {
     width: 100%;
     font-size: 12px;
-    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-family: 'JetBrains Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace;
 }
 
 .var-subsection-header {
@@ -645,6 +653,7 @@
     z-index: 1;
     border-bottom: 1px solid #3c3c3c;
     padding: 4px 10px 4px 6px;
+    font-family: 'Inter', 'Segoe UI', sans-serif;
     font-size: 10px;
     font-weight: 600;
     color: #999;
@@ -719,7 +728,7 @@
     width: 100%;
     border-collapse: collapse;
     font-size: 12px;
-    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-family: 'JetBrains Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace;
     table-layout: fixed;
 }
 
@@ -866,7 +875,7 @@
 .imm-entry {
     padding: 4px 10px;
     border-bottom: 1px solid #2d2d2d;
-    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-family: 'JetBrains Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace;
     font-size: 12px;
 }
 
@@ -900,7 +909,7 @@
 
 .imm-prompt-inline {
     color: #569cd6;
-    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-family: 'JetBrains Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace;
     font-size: 12px;
     user-select: none;
 }
@@ -911,7 +920,7 @@
     border: 1px solid #3c3c3c;
     border-radius: 3px;
     color: #d4d4d4;
-    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-family: 'JetBrains Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace;
     font-size: 12px;
     padding: 3px 6px;
     outline: none;

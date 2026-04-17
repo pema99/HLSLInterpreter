@@ -1,8 +1,9 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
+button, input, select, textarea { font-family: inherit; }
 
 html, body {
     height: 100%;
-    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-family: 'Inter', 'Segoe UI', sans-serif;
     background: #1e1e1e;
     color: #d4d4d4;
     overflow: hidden;

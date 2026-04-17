@@ -27,15 +27,15 @@
             @if (isDebugging)
             {
                 <div class="debug-controls">
-                    <button class="btn-dbg btn-dbg-continue" data-dbg="continue" @onclick="ContinueToBreakpoint" disabled="@(debugStepIndex >= debugTrace.Count - 1)" title="Continue (F5)">&#x25B6;</button>
-                    <button class="btn-dbg" data-dbg="step-over" @onclick="StepOver" disabled="@(debugStepIndex >= debugTrace.Count - 1)" title="Step over (F10)">&#x21B7;</button>
-                    <button class="btn-dbg" data-dbg="step-in" @onclick="StepForward" disabled="@(debugStepIndex >= debugTrace.Count - 1)" title="Step in (F11)">&#x2935;</button>
-                    <button class="btn-dbg" data-dbg="step-out" @onclick="StepOut" disabled="@(debugStepIndex >= debugTrace.Count - 1)" title="Step out (F12)">&#x2934;</button>
+                    <button class="btn-dbg btn-dbg-continue" data-dbg="continue" @onclick="ContinueToBreakpoint" disabled="@(debugStepIndex >= debugTrace.Count - 1)" title="Continue (F5)"><i class="mdi mdi-play-outline"></i></button>
+                    <button class="btn-dbg" data-dbg="step-over" @onclick="StepOver" disabled="@(debugStepIndex >= debugTrace.Count - 1)" title="Step over (F10)"><i class="mdi mdi-debug-step-over"></i></button>
+                    <button class="btn-dbg" data-dbg="step-in" @onclick="StepForward" disabled="@(debugStepIndex >= debugTrace.Count - 1)" title="Step in (F11)"><i class="mdi mdi-debug-step-into icon-step-into"></i></button>
+                    <button class="btn-dbg" data-dbg="step-out" @onclick="StepOut" disabled="@(debugStepIndex >= debugTrace.Count - 1)" title="Step out (F12)"><i class="mdi mdi-debug-step-out icon-step-out"></i></button>
                     <div class="dbg-controls-sep"></div>
-                    <button class="btn-dbg btn-dbg-continue-back" data-dbg="continue-back" @onclick="ContinueToBreakpointBack" disabled="@(debugStepIndex <= 0)" title="Continue back (Shift+F5)"><span class="btn-icon-mirror">&#x25B6;</span></button>
-                    <button class="btn-dbg" data-dbg="step-over-back" @onclick="StepOverBack" disabled="@(debugStepIndex <= 0)" title="Step over back (Shift+F10)"><span class="btn-icon-mirror">&#x21B7;</span></button>
-                    <button class="btn-dbg" data-dbg="step-in-back" @onclick="StepBack" disabled="@(debugStepIndex <= 0)" title="Step in back (Shift+F11)"><span class="btn-icon-mirror">&#x2935;</span></button>
-                    <button class="btn-dbg" data-dbg="step-out-back" @onclick="StepOutBack" disabled="@(debugStepIndex <= 0)" title="Step out back (Shift+F12)"><span class="btn-icon-mirror">&#x2934;</span></button>
+                    <button class="btn-dbg btn-dbg-continue-back" data-dbg="continue-back" @onclick="ContinueToBreakpointBack" disabled="@(debugStepIndex <= 0)" title="Continue back (Shift+F5)"><i class="mdi mdi-play-outline btn-icon-mirror"></i></button>
+                    <button class="btn-dbg" data-dbg="step-over-back" @onclick="StepOverBack" disabled="@(debugStepIndex <= 0)" title="Step over back (Shift+F10)"><i class="mdi mdi-debug-step-over btn-icon-mirror"></i></button>
+                    <button class="btn-dbg" data-dbg="step-in-back" @onclick="StepBack" disabled="@(debugStepIndex <= 0)" title="Step in back (Shift+F11)"><i class="mdi mdi-debug-step-into icon-step-into-back"></i></button>
+                    <button class="btn-dbg" data-dbg="step-out-back" @onclick="StepOutBack" disabled="@(debugStepIndex <= 0)" title="Step out back (Shift+F12)"><i class="mdi mdi-debug-step-out icon-step-out-back"></i></button>
                 </div>
             }
         </div>

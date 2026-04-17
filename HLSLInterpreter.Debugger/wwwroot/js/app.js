@@ -389,6 +389,7 @@ window.initMonaco = function (containerId, initialCode, dotNetRef) {
             value: initialCode,
             language: 'hlsl',
             theme: 'hlsl-dark',
+            fontFamily: "'JetBrains Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace",
             fontSize: 16,
             lineNumbers: 'on',
             lineNumbersMinChars: 3,
