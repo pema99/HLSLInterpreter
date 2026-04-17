@@ -178,6 +178,8 @@ namespace HLSL
                     score += 2; // Promotion is almost as good
                 else if (CanDemoteTo(evaluator, from, to))
                     score += 1; // Demotion is a last resort
+                else
+                    return -1;  // No viable conversion, never pick!
             }
             return score;
         }
