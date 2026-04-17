@@ -407,8 +407,8 @@ namespace HLSL
                     }
                     else
                     {
-                        int threadCount = Math.Max(matrix.ThreadCount, ((NumericValue)val).ThreadCount);
-                            var expanded = (MatrixValue)matrix.Vectorize(threadCount);
+                        int threadCount = Math.Max(matrix.ThreadCount, val.ThreadCount);
+                        var expanded = threadCount > 1 ? (MatrixValue)matrix.Vectorize(threadCount) : matrix;
                             parentRef.Set(new MatrixValue(matrix.Type, matrix.Rows, columnCount, expanded.Values.MapThreads((threadData, threadIndex) =>
                             {
                                 int row = Convert.ToInt32(indexVal.Value.Get(threadIndex));
