@@ -3,5 +3,6 @@
 **/obj/
 **/*.user
 **/publish/
+combine.sh
 .claude
 CLAUDE.md
