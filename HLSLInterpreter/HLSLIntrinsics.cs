@@ -609,7 +609,8 @@ namespace HLSL
         
         public static NumericValue Sign(NumericValue x)
         {
-            return Select(x == 0, 0, Select(x > 0, 1, -1)).Cast(ScalarType.Int);
+            var zero = HLSLTypeUtils.GetZeroValue(x);
+            return Select(x == zero, zero, Select(x > zero, 1, -1)).Cast(ScalarType.Int);
         }
 
         public static NumericValue F32tof16(NumericValue x)
@@ -919,7 +920,7 @@ namespace HLSL
 
         public static NumericValue Round(NumericValue x)
         {
-            return ToFloatLike(x).Map(val => MathF.Round(Convert.ToSingle(val), MidpointRounding.AwayFromZero));
+            return ToFloatLike(x).Map(val => MathF.Round(Convert.ToSingle(val), MidpointRounding.ToEven));
         }
         
         public static NumericValue Rsqrt(NumericValue x)
