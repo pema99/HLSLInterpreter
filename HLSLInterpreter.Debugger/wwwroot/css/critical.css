@@ -1,0 +1,175 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+    height: 100%;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #1e1e1e;
+    color: #d4d4d4;
+    overflow: hidden;
+}
+
+#app {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.loading-progress {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.loading-progress circle {
+    fill: none;
+    stroke: #007acc;
+    stroke-width: 0.6rem;
+    transform-origin: 50% 50%;
+    transform: rotate(-90deg);
+}
+
+.loading-progress circle:last-child {
+    stroke: #333;
+    animation: loading-progress-spin 1.5s linear infinite;
+}
+
+@keyframes loading-progress-spin {
+    100% { transform: rotate(270deg); }
+}
+
+.loading-progress-text {
+    position: fixed;
+    top: calc(50% + 3.5rem);
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #888;
+    font-size: 0.85rem;
+    text-align: center;
+}
+
+#blazor-error-ui {
+    background: #c00;
+    bottom: 0;
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+    color: white;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 0.75rem;
+    top: 0.5rem;
+}
+
+/* Debug toolbar button overrides */
+.btn-dbg-continue {
+    background: #1a7a3a;
+    border-color: #1a7a3a;
+    color: white;
+}
+.btn-dbg-continue:hover:not(:disabled) { background: #22964a; }
+
+.btn-dbg-continue-back {
+    background: #0e639c;
+    border-color: #0e639c;
+    color: white;
+}
+.btn-dbg-continue-back:hover:not(:disabled) { background: #1177bb; }
+
+.btn-icon-mirror {
+    display: inline-block;
+    transform: scaleX(-1);
+}
+
+/* Debug: breakpoint glyph — red circle, right-aligned in glyph margin */
+.dbg-breakpoint-glyph {
+    cursor: pointer;
+}
+.dbg-breakpoint-glyph::before {
+    content: '';
+    display: block;
+    background: #e51400;
+    border-radius: 50%;
+    width: 10px;
+    height: 10px;
+    position: absolute;
+    right: 3px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+/* Debug: current statement line highlight */
+.dbg-current-line {
+    background: rgba(255, 204, 0, 0.12) !important;
+}
+
+/* Debug: current line arrow glyph — right-aligned in glyph margin */
+.dbg-current-glyph::before {
+    content: '';
+    display: block;
+    width: 0;
+    height: 0;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+    border-left: 9px solid #ffcc00;
+    position: absolute;
+    right: 2px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+/* Modal */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+.modal-dialog {
+    background: #252526;
+    border: 1px solid #454545;
+    border-radius: 6px;
+    width: 300px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    display: flex;
+    flex-direction: column;
+}
+.modal-header {
+    padding: 12px 16px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    border-bottom: 1px solid #3c3c3c;
+    color: #e8e8e8;
+}
+.modal-body {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.modal-footer {
+    padding: 12px 16px;
+    border-top: 1px solid #3c3c3c;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+.btn-modal-save {
+    background: #0e639c;
+    border: 1px solid #0e639c;
+    color: white;
+    border-radius: 4px;
+    padding: 5px 14px;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+.btn-modal-save:hover { background: #1177bb; }

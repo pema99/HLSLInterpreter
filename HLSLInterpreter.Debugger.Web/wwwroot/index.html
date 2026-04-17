@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HLSL Interpreter</title>
+    <base href="/hlsl/" />
+    <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <link rel="stylesheet" href="_content/HLSLInterpreter.Debugger/css/critical.css" />
+    <link rel="stylesheet" href="_content/HLSLInterpreter.Debugger/css/app.css" />
+    <link href="HLSLInterpreter.Debugger.Web.styles.css" rel="stylesheet" />
+</head>
+
+<body>
+    <div id="app">
+        <svg class="loading-progress" width="80" height="80" viewBox="0 0 80 80">
+            <circle r="30%" cx="50%" cy="50%" />
+            <circle r="30%" cx="50%" cy="50%" />
+        </svg>
+        <div class="loading-progress-text">Loading HLSL Interpreter...</div>
+    </div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="." class="reload">Reload</a>
+        <span class="dismiss">&#10006;</span>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs/loader.js"></script>
+    <script src="_content/HLSLInterpreter.Debugger/js/app.js"></script>
+    <script src="_framework/blazor.webassembly.js"></script>
+</body>
+
+</html>

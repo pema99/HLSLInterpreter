@@ -1,13 +1,7 @@
 .vs/
-HLSLInterpreter/bin/
-HLSLInterpreter/obj/
-HLSLInterpreter.Tests/bin/
-HLSLInterpreter.Tests/obj/
-HLSLInterpreter.Examples/bin/
-HLSLInterpreter.Examples/obj/
-HLSLInterpreter.Web/bin/
-HLSLInterpreter.Web/obj/
-HLSLInterpreter.Web/publish/
-HLSLInterpreter.Web/*.user
+**/bin/
+**/obj/
+**/*.user
+**/publish/
 .claude
 CLAUDE.md
