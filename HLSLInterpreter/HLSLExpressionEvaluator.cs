@@ -178,7 +178,7 @@ namespace HLSL
                     inoutCopyoutRefs ??= new ReferenceValue[args.Length];
 
                     inoutCopyoutRefs[i] = inoutRef;
-                    argValue = inoutRef.Get();
+                    argValue = inoutRef.Get().Copy();
                 }
                 context.AddVariable(param.Declarator.Name, HLSLOverloadResolution.CastForParameter(this, argValue, param.ParamType));
             }
