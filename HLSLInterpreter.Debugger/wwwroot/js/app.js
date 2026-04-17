@@ -366,12 +366,12 @@ window.initMonaco = function (containerId, initialCode, dotNetRef) {
             base: 'vs-dark',
             inherit: true,
             rules: [
-                { token: 'keyword.control',   foreground: 'c586c0' },   // purple  – if/else/for/return/discard
-                { token: 'keyword.modifier',  foreground: '569cd6' },   // blue    – static/const/inout/…
-                { token: 'keyword.type',      foreground: '4ec9b0' },   // teal    – float/int/Texture2D/…
-                { token: 'keyword.literal',   foreground: '569cd6' },   // blue    – true/false
-                { token: 'keyword.directive', foreground: '9b9b9b' },   // grey    – #define/#include
-                { token: 'support.function',  foreground: 'dcdcaa' },   // yellow  – intrinsics
+                { token: 'keyword.control',   foreground: 'c586c0' },   // purple  - if/else/for/return/discard
+                { token: 'keyword.modifier',  foreground: '569cd6' },   // blue    - static/const/inout/...
+                { token: 'keyword.type',      foreground: '4ec9b0' },   // teal    - float/int/Texture2D/...
+                { token: 'keyword.literal',   foreground: '569cd6' },   // blue    - true/false
+                { token: 'keyword.directive', foreground: '9b9b9b' },   // grey    - #define/#include
+                { token: 'support.function',  foreground: 'dcdcaa' },   // yellow  - intrinsics
                 { token: 'annotation',        foreground: 'c8c8c8' },
                 { token: 'annotation.bracket',foreground: 'c8c8c8' },
                 { token: 'number',            foreground: 'b5cea8' },
@@ -414,10 +414,10 @@ window.initMonaco = function (containerId, initialCode, dotNetRef) {
             var file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
             if (!file) return;
             if (window.chrome && window.chrome.webview && typeof window.chrome.webview.postMessageWithAdditionalObjects === 'function') {
-                // Desktop (WebView2): send the File object to the host, which reads the path and content in C#
+                // On desktop (WebView2), send the File to the host so it can read the path and content in C#
                 window.chrome.webview.postMessageWithAdditionalObjects('FileDrop', [file]);
             } else {
-                // Web fallback: read content via FileReader (filesystem path not available)
+                // On the web, read via FileReader since the filesystem path isn't available
                 var reader = new FileReader();
                 reader.onload = function (ev) {
                     if (window._dotNetDebugRef)
@@ -429,7 +429,7 @@ window.initMonaco = function (containerId, initialCode, dotNetRef) {
             }
         });
 
-        // Gutter click → toggle breakpoint
+        // Gutter click to toggle a breakpoint
         window._monacoEditor.onMouseDown(function (e) {
             var t = e.target.type;
             if ((t === monaco.editor.MouseTargetType.GUTTER_LINE_NUMBERS ||

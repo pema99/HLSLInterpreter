@@ -914,7 +914,7 @@ float4 main(uint2 thread : SV_DispatchThreadID)
 
         if (hasError && !(lastException is HLSLRunner.TestFailException && debugTrace.Count > 0))
         {
-            // Compile/parse/runtime error — nothing useful to debug
+            // Compile/parse/runtime error, nothing useful to debug
             needsSectionHeightRestore = true;
             StateHasChanged();
             return;
@@ -923,11 +923,11 @@ float4 main(uint2 thread : SV_DispatchThreadID)
         isDebugging = true;
         debugTabIndex = activeTabIndex;
         immediateCollapsed = false;
-        // On assert failure: keep console open so the error is visible
+        // Keep console open when failing so the error is visible
         consoleCollapsed = !hasError;
         imageCollapsed = true;
 
-        // On assert failure: position at the last recorded step (the failing statement)
+        // When failing, start at the last recorded step so the failing statement is highlighted
         if (debugTrace.Count > 0)
         {
             debugStepIndex = hasError ? debugTrace.Count - 1 : 0;
@@ -1328,7 +1328,7 @@ float4 main(uint2 thread : SV_DispatchThreadID)
 
             if (evalError != null) { resultStr = evalError.Message; isError = true; }
             else if (evalResult != null) resultStr = FormatValue(evalResult, inspectedThread);
-            else { resultStr = "(step not reached — expression may be after this point)"; isError = true; }
+            else { resultStr = "(step not reached - expression may be after this point)"; isError = true; }
         }
         catch (Exception ex)
         {

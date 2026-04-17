@@ -407,7 +407,7 @@ namespace HLSL
                     throw Error(node, "Groupshared variables cannot have initializers.");
             }
 
-            // Inline struct definition: register the struct and its static methods before processing declarators.
+            // Register the inline struct and its static methods before processing declarators.
             if (node.Kind is StructTypeNode inlineStruct)
             {
                 context.AddStruct(inlineStruct.Name.GetName(), inlineStruct);

@@ -87,7 +87,7 @@ html, body {
     transform: scaleX(-1);
 }
 
-/* Debug: breakpoint glyph — red circle, right-aligned in glyph margin */
+/* Breakpoint glyph, right-aligned red circle in the gutter */
 .dbg-breakpoint-glyph {
     cursor: pointer;
 }
@@ -104,12 +104,12 @@ html, body {
     transform: translateY(-50%);
 }
 
-/* Debug: current statement line highlight */
+/* Current statement line highlight */
 .dbg-current-line {
     background: rgba(255, 204, 0, 0.12) !important;
 }
 
-/* Debug: current line arrow glyph — right-aligned in glyph margin */
+/* Current line arrow glyph, right-aligned in the gutter */
 .dbg-current-glyph::before {
     content: '';
     display: block;

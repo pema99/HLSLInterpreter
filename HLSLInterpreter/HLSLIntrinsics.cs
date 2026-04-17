@@ -626,7 +626,6 @@ namespace HLSL
 
                 uint half;
 
-                // Handle special cases
                 if (exponent == 0xFF) // Inf or NaN
                 {
                     half = (sign << 15) | 0x7C00 | (mantissa != 0 ? 0x200u : 0);
@@ -2028,8 +2027,6 @@ namespace HLSL
                 executionState.KillThreadGlobally(threadIndex);
         }
         #endregion
-
-        // Resource methods live in HLSLIntrinsics.Resources.cs
 
     }
 }
