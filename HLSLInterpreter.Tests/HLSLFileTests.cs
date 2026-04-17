@@ -36,7 +36,7 @@ namespace HLSL.Tests
 
         public static IEnumerable<TestCaseData> DiscoverTests()
         {
-            foreach (string file in Directory.GetFiles(ShadersDirectory, "*.hlsl").OrderBy(f => f))
+            foreach (string file in Directory.GetFiles(ShadersDirectory, "*.hlsl", SearchOption.AllDirectories).OrderBy(f => f))
             {
                 string fileName = Path.GetFileNameWithoutExtension(file);
                 HLSLRunner.TestRun[] tests = LoadFile(file).DiscoverTests();
