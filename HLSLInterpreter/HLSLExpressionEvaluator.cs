@@ -840,6 +840,17 @@ namespace HLSL
         
         public override HLSLValue VisitPrefixUnaryExpressionNode(PrefixUnaryExpressionNode node)
         {
+            // Unfolds increment/decrement chains
+            bool TryGetBaseLValueReference(ExpressionNode node, out ReferenceValue reference, out bool isGroupshared)
+            {
+                if (node is PrefixUnaryExpressionNode prefixUnary &&
+                    (prefixUnary.Operator == OperatorKind.Increment || prefixUnary.Operator == OperatorKind.Decrement))
+                {
+                    return TryGetBaseLValueReference(prefixUnary.Expression, out reference, out isGroupshared);
+                }
+                return TryGetLValueReference(node, out reference, out isGroupshared);
+            }
+
             // Special case for negative to handle INT_MIN
             if (node.Operator == OperatorKind.Minus && node.Expression is LiteralExpressionNode literal && literal.Kind == LiteralKind.Integer)
             {
