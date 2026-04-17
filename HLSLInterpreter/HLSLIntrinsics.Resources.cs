@@ -511,11 +511,11 @@ namespace HLSL
             for (int thread = 0; thread < threadCount; thread++)
             {
                 int off = Convert.ToInt32(scalarOff.GetThreadValue(thread));
-                float old = BitConverter.UInt32BitsToSingle(ReadUint32(rv, off));
+                float old = BitConverter.ToSingle(BitConverter.GetBytes(ReadUint32(rv, off)), 0);
                 float val = Convert.ToSingle(scalarVal.GetThreadValue(thread));
                 originals[thread] = new ScalarValue(ScalarType.Float, HLSLValueUtils.MakeScalarSGPR(old));
                 if (state.IsThreadActive(thread))
-                    WriteUint32(rv, off, BitConverter.SingleToUInt32Bits(val));
+                    WriteUint32(rv, off, BitConverter.ToUInt32(BitConverter.GetBytes(val), 0));
             }
             if (args[2] is ReferenceValue outRef)
                 outRef.Set((NumericValue)HLSLValueUtils.MergeThreadValues(originals));
@@ -578,10 +578,10 @@ namespace HLSL
             {
                 int off = Convert.ToInt32(scalarOff.GetThreadValue(thread));
                 uint oldBits = ReadUint32(rv, off);
-                uint cmpBits = BitConverter.SingleToUInt32Bits(Convert.ToSingle(scalarCmp.GetThreadValue(thread)));
-                uint valBits = BitConverter.SingleToUInt32Bits(Convert.ToSingle(scalarVal.GetThreadValue(thread)));
+                uint cmpBits = BitConverter.ToUInt32(BitConverter.GetBytes(Convert.ToSingle(scalarCmp.GetThreadValue(thread))), 0);
+                uint valBits = BitConverter.ToUInt32(BitConverter.GetBytes(Convert.ToSingle(scalarVal.GetThreadValue(thread))), 0);
                 if (originals is not null)
-                    originals[thread] = new ScalarValue(ScalarType.Float, HLSLValueUtils.MakeScalarSGPR(BitConverter.UInt32BitsToSingle(oldBits)));
+                    originals[thread] = new ScalarValue(ScalarType.Float, HLSLValueUtils.MakeScalarSGPR(BitConverter.ToSingle(BitConverter.GetBytes(oldBits), 0)));
                 if (state.IsThreadActive(thread) && oldBits == cmpBits) WriteUint32(rv, off, valBits);
             }
             if (originals is not null)
@@ -872,7 +872,7 @@ namespace HLSL
 
         // Upper bound on meaningful LOD for a resource, used to clamp computed LODs.
         private static float MaxLodForResource(ResourceValue rv)
-            => MathF.Log2(MathF.Max(rv.SizeX, MathF.Max(rv.SizeY, rv.SizeZ))) + 1;
+            => (float)(Math.Log(MathF.Max(rv.SizeX, MathF.Max(rv.SizeY, rv.SizeZ))) / Math.Log(2)) + 1;
 
         // Returns face-local UV in [0, 1] per thread. Used by CalculateRho to get face-space derivatives.
         private static VectorValue CubeDirectionToFaceUV(VectorValue dir)
