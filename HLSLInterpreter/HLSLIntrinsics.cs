@@ -175,6 +175,7 @@ namespace HLSL
             ["isfinite"] = N1(Isfinite),
             ["isinf"] = N1(Isinf),
             ["isnan"] = N1(Isnan),
+            ["isnormal"] = N1(Isnormal),
             ["ldexp"] = N2(Ldexp),
             ["length"] = N1(Length),
             ["lerp"] = N3(Lerp),
@@ -819,6 +820,11 @@ namespace HLSL
         public static NumericValue Isinf(NumericValue x)
         {
             return ToFloatLike(x).Map(val => float.IsInfinity(Convert.ToSingle(val))).Cast(ScalarType.Bool);
+        }
+
+        public static NumericValue Isnormal(NumericValue x)
+        {
+            return ToFloatLike(x).Map(val => float.IsNormal(Convert.ToSingle(val))).Cast(ScalarType.Bool);
         }
 
         public static NumericValue Ldexp(NumericValue x, NumericValue exp)
