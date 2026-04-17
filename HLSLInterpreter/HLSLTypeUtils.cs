@@ -244,9 +244,9 @@ namespace HLSL
                 (int rightRows, int rightColumns) = right.TensorSize;
                 int newRows = Math.Max(leftRows, rightRows);
                 int newColumns = Math.Max(leftColumns, rightColumns);
-                if (leftRows != newRows || leftColumns != newColumns)
+                if (leftRows != newRows || leftColumns != newColumns || left is not MatrixValue)
                     left = left.BroadcastToMatrix(newRows, newColumns);
-                if (rightRows != newRows || rightColumns != newColumns)
+                if (rightRows != newRows || rightColumns != newColumns || right is not MatrixValue)
                     right = right.BroadcastToMatrix(newRows, newColumns);
             }
 
@@ -255,8 +255,6 @@ namespace HLSL
                 (int leftSize, _) = left.TensorSize;
                 (int rightSize, _) = right.TensorSize;
                 int newSize = Math.Max(leftSize, rightSize);
-                // Also broadcast a ScalarValue to VectorValue even when sizes are equal,
-                // so Map2 always receives two operands of the same concrete type.
                 if (leftSize != newSize || (left is ScalarValue && right is VectorValue))
                     left = left.BroadcastToVector(newSize);
                 if (rightSize != newSize || (right is ScalarValue && left is VectorValue))
