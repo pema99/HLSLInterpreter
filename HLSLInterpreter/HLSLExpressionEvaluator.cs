@@ -98,7 +98,7 @@ namespace HLSL
             // Try as an implicit this.method() call (e.g. calling an inherited method from within a method body)
             if (context.GetReference("this")?.Get() is StructValue thisStruct)
             {
-                if (TryFindMethod(thisStruct.Name, name, out var method))
+                if (TryFindMethod(thisStruct.Name, name, args, out var method))
                     return CallMethodNode(thisStruct, method, args);
             }
 
@@ -107,7 +107,7 @@ namespace HLSL
 
         public HLSLValue CallMethod(StructValue str, string methodName, HLSLValue[] args)
         {
-            if (TryFindMethod(str.Name, methodName, out var method))
+            if (TryFindMethod(str.Name, methodName, args, out var method))
                 return CallMethodNode(str, method, args);
 
             throw Error($"Unknown method '{methodName}' called.");
@@ -520,7 +520,7 @@ namespace HLSL
             return value;
         }
 
-        private bool TryFindMethod(string structName, string methodName, out FunctionDefinitionNode function)
+        private bool TryFindMethod(string structName, string methodName, HLSLValue[] args, out FunctionDefinitionNode function)
         {
             function = null;
 
@@ -528,26 +528,30 @@ namespace HLSL
             if (structDef == null)
                 return false;
 
+            var candidates = new List<FunctionDefinitionNode>();
             foreach (var method in structDef.Methods)
             {
                 if (method is FunctionDefinitionNode func && method.Name.GetName() == methodName)
-                {
-                    function = func;
-                    return true;
-                }
+                    candidates.Add(func);
+            }
+
+            if (candidates.Count > 0)
+            {
+                function = HLSLOverloadResolution.PickOverload(this, candidates, args) ?? candidates[0];
+                return true;
             }
 
             foreach (var baseTypeName in structDef.Inherits)
             {
                 string baseName = baseTypeName.GetName();
-                if (TryFindMethod(baseName, methodName, out function))
+                if (TryFindMethod(baseName, methodName, args, out function))
                     return true;
 
                 // Couldn't find method, try with qualified name.
                 if (structName.Contains("::"))
                 {
                     string namespacePrefix = structName.Substring(0, structName.LastIndexOf("::"));
-                    if (TryFindMethod($"{namespacePrefix}::{baseName}", methodName, out function))
+                    if (TryFindMethod($"{namespacePrefix}::{baseName}", methodName, args, out function))
                         return true;
                 }
             }
@@ -649,10 +653,11 @@ namespace HLSL
                     return new ScalarValue(ScalarType.String, new HLSLRegister<object>(node.Lexeme));
                 case LiteralKind.Float:
                     string floatLexeme = node.Lexeme;
-                    if (floatLexeme.EndsWith('f'))
-                        floatLexeme = floatLexeme.Substring(0, node.Lexeme.Length - 1);
+                    bool isHalfLiteral = floatLexeme.EndsWith('h') || floatLexeme.EndsWith('H');
+                    if (floatLexeme.EndsWith('f') || floatLexeme.EndsWith('F') || isHalfLiteral)
+                        floatLexeme = floatLexeme.Substring(0, floatLexeme.Length - 1);
                     if (float.TryParse(floatLexeme, NumberStyles.Any, CultureInfo.InvariantCulture, out float parsedFloat))
-                        return new ScalarValue(ScalarType.Float, new HLSLRegister<object>(parsedFloat));
+                        return new ScalarValue(isHalfLiteral ? ScalarType.Half : ScalarType.Float, new HLSLRegister<object>(parsedFloat));
                     else
                         throw Error(node, $"Invalid float literal '{node.Lexeme}'.");
                 case LiteralKind.Integer:
@@ -727,13 +732,23 @@ namespace HLSL
                     {
                         return SetValueSimpleNamed(name, matInner.SwizzleAssign(fieldAccess.Name, (NumericValue)value));
                     }
-                    else
+                    else if (variable is StructValue structVal)
                     {
-                        var structVal = (StructValue)variable;
                         if (executionState.IsVaryingExecution())
                             value = SplatActiveThreadValues(structVal.Members[fieldAccess.Name.Identifier], value);
                         structVal.Members[fieldAccess.Name.Identifier] = value;
                         return value;
+                    }
+                    else if (variable is ReferenceValue refStruct && refStruct.Get() is StructValue structInner)
+                    {
+                        if (executionState.IsVaryingExecution())
+                            value = SplatActiveThreadValues(structInner.Members[fieldAccess.Name.Identifier], value);
+                        structInner.Members[fieldAccess.Name.Identifier] = value;
+                        return value;
+                    }
+                    else
+                    {
+                        throw Error(node, $"Expected a struct, vector, or matrix for field assignment.");
                     }
                 }
                 // This fallback case can handle everything, but we keep the above branches for performance.
@@ -906,7 +921,7 @@ namespace HLSL
             var target = Visit(node.Target);
             if (target is StructValue str)
             {
-                if (TryFindMethod(str.Name, node.Name.Identifier, out var method))
+                if (TryFindMethod(str.Name, node.Name.Identifier, args, out var method))
                 {
                     // Handle out/inout parameters
                     for (int i = 0; i < args.Length; i++)
