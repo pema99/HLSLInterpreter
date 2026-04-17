@@ -1,6 +1,8 @@
 @page "/"
 @inject IJSRuntime JS
 @inject NavigationManager Nav
+@inject PermalinkBaseUrl PermalinkBase
+@inject InitialCodeOverride InitialCode
 @using HLSL
 @using UnityShaderParser.HLSL
 @using UnityShaderParser.Common
@@ -610,8 +612,8 @@ float4 main(uint2 thread : SV_DispatchThreadID)
         {
             dotNetRef = DotNetObjectReference.Create(this);
 
-            // Load code from permalink if present
-            string initialCode = DefaultCode;
+            // Load code from permalink, file argument, or default
+            string initialCode = InitialCode.Code ?? DefaultCode;
             var param = GetQueryParam(Nav.Uri, "c");
             if (!string.IsNullOrEmpty(param))
             {
@@ -1271,8 +1273,8 @@ float4 main(uint2 thread : SV_DispatchThreadID)
     {
         string code = await JS.InvokeAsync<string>("getMonacoValue");
         string encoded = CompressCode(code);
-        var uri = new Uri(Nav.Uri);
-        string permalink = $"{uri.GetLeftPart(UriPartial.Path)}?c={encoded}";
+        string baseUrl = PermalinkBase.Url ?? new Uri(Nav.Uri).GetLeftPart(UriPartial.Path);
+        string permalink = $"{baseUrl.TrimEnd('/')}/?c={encoded}";
         await JS.InvokeVoidAsync("copyToClipboard", permalink);
     }
 

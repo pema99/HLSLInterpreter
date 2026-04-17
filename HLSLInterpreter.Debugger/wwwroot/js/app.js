@@ -406,6 +406,20 @@ window.initMonaco = function (containerId, initialCode, dotNetRef) {
             function () { document.querySelector('.btn-run').click(); }
         );
 
+        // Drag-and-drop a file onto the editor to open it
+        var editorDom = document.getElementById(containerId);
+        editorDom.addEventListener('dragover', function (e) { e.preventDefault(); });
+        editorDom.addEventListener('drop', function (e) {
+            e.preventDefault();
+            var file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+            if (!file) return;
+            var reader = new FileReader();
+            reader.onload = function (ev) {
+                window._monacoEditor.setValue(ev.target.result);
+            };
+            reader.readAsText(file);
+        });
+
         // Gutter click → toggle breakpoint
         window._monacoEditor.onMouseDown(function (e) {
             var t = e.target.type;
