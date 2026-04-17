@@ -10,5 +10,7 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
 builder.Services.AddSingleton(new PermalinkBaseUrl { Url = null });
 builder.Services.AddSingleton(new InitialCodeOverride { Code = null });
+builder.Services.AddSingleton(new TabbedEditor { Enabled = false });
+builder.Services.AddSingleton<FileDialogService>();
 
 await builder.Build().RunAsync();

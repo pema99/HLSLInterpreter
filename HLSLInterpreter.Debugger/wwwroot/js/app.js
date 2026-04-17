@@ -413,11 +413,20 @@ window.initMonaco = function (containerId, initialCode, dotNetRef) {
             e.preventDefault();
             var file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
             if (!file) return;
-            var reader = new FileReader();
-            reader.onload = function (ev) {
-                window._monacoEditor.setValue(ev.target.result);
-            };
-            reader.readAsText(file);
+            if (window.chrome && window.chrome.webview && typeof window.chrome.webview.postMessageWithAdditionalObjects === 'function') {
+                // Desktop (WebView2): send the File object to the host, which reads the path and content in C#
+                window.chrome.webview.postMessageWithAdditionalObjects('FileDrop', [file]);
+            } else {
+                // Web fallback: read content via FileReader (filesystem path not available)
+                var reader = new FileReader();
+                reader.onload = function (ev) {
+                    if (window._dotNetDebugRef)
+                        window._dotNetDebugRef.invokeMethodAsync('OpenFileInTab', file.name, ev.target.result, '');
+                    else
+                        window._monacoEditor.setValue(ev.target.result);
+                };
+                reader.readAsText(file);
+            }
         });
 
         // Gutter click → toggle breakpoint

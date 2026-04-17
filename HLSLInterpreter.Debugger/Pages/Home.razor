@@ -3,6 +3,8 @@
 @inject NavigationManager Nav
 @inject PermalinkBaseUrl PermalinkBase
 @inject InitialCodeOverride InitialCode
+@inject TabbedEditor TabbedEditorConfig
+@inject FileDialogService FileDialogs
 @using HLSL
 @using UnityShaderParser.HLSL
 @using UnityShaderParser.Common
@@ -74,7 +76,18 @@
     <div class="main-split">
         <div class="editor-panel">
             <div class="panel-header">
-                <span>Input</span>
+                @if (TabbedEditorConfig.Enabled)
+                {
+                    <div class="editor-toolbar-group">
+                        <button class="btn-editor-toolbar" @onclick="OpenFileDialog" title="Open file">Open</button>
+                        <button class="btn-editor-toolbar" @onclick="SaveFileDialog" title="Save">Save</button>
+                        <button class="btn-editor-toolbar" @onclick="SaveFileAsDialog" title="Save As">Save As</button>
+                    </div>
+                }
+                else
+                {
+                    <span>Input</span>
+                }
                 <select class="footer-select" title="Font size" @onchange="OnFontSizeChanged">
                     @foreach (var size in fontSizes)
                     {
@@ -82,6 +95,20 @@
                     }
                 </select>
             </div>
+            @if (TabbedEditorConfig.Enabled)
+            {
+                <div class="editor-tabs">
+                    @for (int i = 0; i < editorTabs.Count; i++)
+                    {
+                        var idx = i;
+                        <div class="editor-tab @(idx == activeTabIndex ? "active" : "")"
+                             @onclick="() => SwitchTab(idx)">
+                            @editorTabs[idx].Name
+                            <span class="editor-tab-close" @onclick="() => CloseTab(idx)" @onclick:stopPropagation>&#x2715;</span>
+                        </div>
+                    }
+                </div>
+            }
             <div id="monaco-container" class="editor-container"></div>
         </div>
 
@@ -517,6 +544,90 @@ float4 main(uint2 thread : SV_DispatchThreadID)
 
     // --- Core state ---
     private HLSLRunner runner = new HLSLRunner();
+    // --- Tabs ---
+    private class EditorTab { public string Name = ""; public string Code = ""; public string? Path = null; }
+    private List<EditorTab> editorTabs = new();
+    private int activeTabIndex = 0;
+
+    private async Task SwitchTab(int index)
+    {
+        if (index == activeTabIndex) return;
+        editorTabs[activeTabIndex].Code = await JS.InvokeAsync<string>("getMonacoValue");
+        if (isDebugging) await JS.InvokeVoidAsync("highlightDebugLine", 0);
+        activeTabIndex = index;
+        await JS.InvokeVoidAsync("setMonacoValue", editorTabs[activeTabIndex].Code);
+        if (isDebugging && activeTabIndex == debugTabIndex)
+            await JS.InvokeVoidAsync("highlightDebugLine", currentDebugLine);
+    }
+
+    private async Task CloseTab(int index)
+    {
+        if (editorTabs.Count <= 1) return;
+        if (index == activeTabIndex)
+        {
+            int newActive = index > 0 ? index - 1 : 1;
+            activeTabIndex = newActive;
+            await JS.InvokeVoidAsync("setMonacoValue", editorTabs[newActive].Code);
+        }
+        editorTabs.RemoveAt(index);
+        if (activeTabIndex > index) activeTabIndex--;
+    }
+
+    private async Task OpenFileDialog()
+    {
+        var (path, content) = await FileDialogs.OpenFile();
+        if (path == null || content == null) return;
+        var existing = editorTabs.FindIndex(t => t.Path == path);
+        if (existing >= 0) { await SwitchTab(existing); return; }
+        editorTabs[activeTabIndex].Code = await JS.InvokeAsync<string>("getMonacoValue");
+        string name = System.IO.Path.GetFileName(path);
+        editorTabs.Add(new EditorTab { Name = name, Code = content, Path = path });
+        activeTabIndex = editorTabs.Count - 1;
+        await JS.InvokeVoidAsync("setMonacoValue", content);
+        StateHasChanged();
+    }
+
+    private async Task SaveFileDialog()
+    {
+        string code = await JS.InvokeAsync<string>("getMonacoValue");
+        string? savedPath = await FileDialogs.SaveFile(code, editorTabs[activeTabIndex].Path);
+        if (savedPath == null) return;
+        editorTabs[activeTabIndex].Path = savedPath;
+        editorTabs[activeTabIndex].Name = System.IO.Path.GetFileName(savedPath);
+        editorTabs[activeTabIndex].Code = code;
+        StateHasChanged();
+    }
+
+    private async Task SaveFileAsDialog()
+    {
+        string code = await JS.InvokeAsync<string>("getMonacoValue");
+        string? savedPath = await FileDialogs.SaveFileAs(code);
+        if (savedPath == null) return;
+        editorTabs[activeTabIndex].Path = savedPath;
+        editorTabs[activeTabIndex].Name = System.IO.Path.GetFileName(savedPath);
+        editorTabs[activeTabIndex].Code = code;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public async Task OpenFileInTab(string name, string content, string? path = null)
+    {
+        if (!TabbedEditorConfig.Enabled) return;
+        var existing = editorTabs.FindIndex(t => t.Name == name);
+        if (existing >= 0)
+        {
+            await SwitchTab(existing);
+        }
+        else
+        {
+            editorTabs[activeTabIndex].Code = await JS.InvokeAsync<string>("getMonacoValue");
+            editorTabs.Add(new EditorTab { Name = name, Code = content, Path = string.IsNullOrEmpty(path) ? null : path });
+            activeTabIndex = editorTabs.Count - 1;
+            await JS.InvokeVoidAsync("setMonacoValue", content);
+        }
+        StateHasChanged();
+    }
+
     private string? output;
     private bool isRunning;
     private bool hasError;
@@ -539,6 +650,7 @@ float4 main(uint2 thread : SV_DispatchThreadID)
 
     // --- Debug state ---
     private bool isDebugging = false;
+    private int debugTabIndex = -1;
     private List<DebugStep> debugTrace = new();
     private int debugStepIndex = -1;
     private HashSet<int> breakpoints = new();
@@ -606,6 +718,12 @@ float4 main(uint2 thread : SV_DispatchThreadID)
         }
     }
 
+    protected override void OnInitialized()
+    {
+        if (TabbedEditorConfig.Enabled)
+            editorTabs.Add(new EditorTab { Name = InitialCode.Name ?? "new.hlsl", Code = InitialCode.Code ?? DefaultCode, Path = InitialCode.Path });
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
@@ -621,7 +739,13 @@ float4 main(uint2 thread : SV_DispatchThreadID)
                 catch { }
             }
 
+            if (TabbedEditorConfig.Enabled && editorTabs.Count > 0)
+                editorTabs[0].Code = initialCode;
+
             await JS.InvokeVoidAsync("initMonaco", "monaco-container", initialCode, dotNetRef);
+
+            if (TabbedEditorConfig.Enabled)
+                FileDialogs.FileDropped = async (name, content, path) => await OpenFileInTab(name, content, path);
         }
 
         if (needsSectionHeightRestore)
@@ -673,7 +797,7 @@ float4 main(uint2 thread : SV_DispatchThreadID)
             runner.SetWarpSize(wx, wy);
             runner.SetVariable("WARP_SIZE_X", new ScalarValue(ScalarType.Uint, new HLSLRegister<object>((uint)wx)));
             runner.SetVariable("WARP_SIZE_Y", new ScalarValue(ScalarType.Uint, new HLSLRegister<object>((uint)wy)));
-            runner.ProcessCode(code);
+            runner.ProcessCode(code, MakeParserConfig());
 
             var threadArg = BuildThreadArg(wx, wy, threadCount, groupOffsetX, groupOffsetY);
             HLSLValue result = CallMain(threadArg);
@@ -757,7 +881,7 @@ float4 main(uint2 thread : SV_DispatchThreadID)
                 });
             };
 
-            runner.ProcessCode(code, out var diagnostics, out _);
+            runner.ProcessCode(code, MakeParserConfig(), out var diagnostics, out _);
             var compileErrors = diagnostics.Where(d => (d.Kind & DiagnosticFlags.OnlyErrors) != 0).ToList();
             if (compileErrors.Count > 0)
             {
@@ -797,6 +921,7 @@ float4 main(uint2 thread : SV_DispatchThreadID)
         }
 
         isDebugging = true;
+        debugTabIndex = activeTabIndex;
         immediateCollapsed = false;
         // On assert failure: keep console open so the error is visible
         consoleCollapsed = !hasError;
@@ -815,8 +940,15 @@ float4 main(uint2 thread : SV_DispatchThreadID)
     }
 
     // --- Debug navigation ---
+    private async Task EnsureOnDebugTab()
+    {
+        if (debugTabIndex >= 0 && activeTabIndex != debugTabIndex)
+            await SwitchTab(debugTabIndex);
+    }
+
     private async Task StepForward()
     {
+        await EnsureOnDebugTab();
         if (debugStepIndex < debugTrace.Count - 1)
         {
             debugStepIndex++;
@@ -828,6 +960,7 @@ float4 main(uint2 thread : SV_DispatchThreadID)
 
     private async Task StepBack()
     {
+        await EnsureOnDebugTab();
         if (debugStepIndex > 0)
         {
             debugStepIndex--;
@@ -839,6 +972,7 @@ float4 main(uint2 thread : SV_DispatchThreadID)
 
     private async Task StepOver()
     {
+        await EnsureOnDebugTab();
         if (debugStepIndex >= debugTrace.Count - 1) return;
         int depth = debugTrace[debugStepIndex].CallDepth;
         int next = debugStepIndex + 1;
@@ -855,6 +989,7 @@ float4 main(uint2 thread : SV_DispatchThreadID)
 
     private async Task StepOut()
     {
+        await EnsureOnDebugTab();
         if (debugStepIndex >= debugTrace.Count - 1) return;
         int depth = debugTrace[debugStepIndex].CallDepth;
         int next = debugStepIndex + 1;
@@ -868,6 +1003,7 @@ float4 main(uint2 thread : SV_DispatchThreadID)
 
     private async Task ContinueToBreakpoint()
     {
+        await EnsureOnDebugTab();
         int next = debugStepIndex + 1;
         while (next < debugTrace.Count && !breakpoints.Contains(debugTrace[next].Line))
             next++;
@@ -879,6 +1015,7 @@ float4 main(uint2 thread : SV_DispatchThreadID)
 
     private async Task ContinueToBreakpointBack()
     {
+        await EnsureOnDebugTab();
         int prev = debugStepIndex - 1;
         while (prev > 0 && !breakpoints.Contains(debugTrace[prev].Line))
             prev--;
@@ -890,6 +1027,7 @@ float4 main(uint2 thread : SV_DispatchThreadID)
 
     private async Task StepOverBack()
     {
+        await EnsureOnDebugTab();
         if (debugStepIndex <= 0) return;
         int depth = debugTrace[debugStepIndex].CallDepth;
         int prev = debugStepIndex - 1;
@@ -903,6 +1041,7 @@ float4 main(uint2 thread : SV_DispatchThreadID)
 
     private async Task StepOutBack()
     {
+        await EnsureOnDebugTab();
         if (debugStepIndex <= 0) return;
         int depth = debugTrace[debugStepIndex].CallDepth;
         int prev = debugStepIndex - 1;
@@ -926,6 +1065,7 @@ float4 main(uint2 thread : SV_DispatchThreadID)
     {
         await JS.InvokeVoidAsync("saveSectionHeights");
         isDebugging = false;
+        debugTabIndex = -1;
         debugTrace = new();
         debugStepIndex = -1;
         consoleCollapsed = false;
@@ -1086,6 +1226,17 @@ float4 main(uint2 thread : SV_DispatchThreadID)
     }
 
     // --- Helpers shared by Run and StartDebug ---
+    private HLSLParserConfig MakeParserConfig()
+    {
+        string? filePath = TabbedEditorConfig.Enabled && editorTabs.Count > 0
+            ? editorTabs[activeTabIndex].Path
+            : null;
+        return new HLSLParserConfig
+        {
+            BasePath = filePath != null ? System.IO.Path.GetDirectoryName(filePath) ?? "" : ""
+        };
+    }
+
     private static VectorValue BuildThreadArg(int wx, int wy, int threadCount, int groupOffsetX = 0, int groupOffsetY = 0)
     {
         var threadIds = new object[threadCount][];
@@ -1164,7 +1315,7 @@ float4 main(uint2 thread : SV_DispatchThreadID)
             try
             {
                 bool cancelledInProcessCode = false;
-                try { evalRunner.ProcessCode(debugCode); }
+                try { evalRunner.ProcessCode(debugCode, MakeParserConfig()); }
                 catch (OperationCanceledException) { cancelledInProcessCode = true; }
                 if (!cancelledInProcessCode)
                 {

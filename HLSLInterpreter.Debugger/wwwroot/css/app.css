@@ -222,6 +222,69 @@
 }
 
 
+/* Tab bar */
+.editor-tabs {
+    display: flex;
+    flex-direction: row;
+    background: #2d2d2d;
+    border-bottom: 1px solid #1e1e1e;
+    overflow-x: auto;
+    flex-shrink: 0;
+    scrollbar-width: none;
+}
+.editor-tabs::-webkit-scrollbar { display: none; }
+.editor-tab {
+    padding: 0 16px;
+    height: 35px;
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+    color: #969696;
+    cursor: pointer;
+    white-space: nowrap;
+    border-right: 1px solid #1e1e1e;
+    user-select: none;
+    flex-shrink: 0;
+}
+.editor-tab:hover { color: #d4d4d4; background: #2a2d2e; }
+.editor-tab.active {
+    color: #d4d4d4;
+    background: #1e1e1e;
+    border-top: 1px solid #007acc;
+}
+.editor-tab-close {
+    margin-left: 8px;
+    font-size: 11px;
+    opacity: 0;
+    border-radius: 3px;
+    padding: 1px 3px;
+    line-height: 1;
+}
+.editor-tab:hover .editor-tab-close,
+.editor-tab.active .editor-tab-close { opacity: 0.6; }
+.editor-tab-close:hover { opacity: 1 !important; background: rgba(255,255,255,0.1); }
+
+.editor-toolbar-group {
+    display: flex;
+    align-items: stretch;
+    height: 100%;
+    margin-left: -12px; /* bleed to panel-header left padding */
+}
+.btn-editor-toolbar {
+    padding: 0 12px;
+    height: 100%;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: #bbbbbb;
+    background: transparent;
+    border: none;
+    border-right: 1px solid #3c3c3c;
+    cursor: pointer;
+}
+.btn-editor-toolbar:hover { background: rgba(255,255,255,0.07); color: #e8e8e8; }
+
 /* Monaco editor container */
 .editor-container {
     flex: 1;
