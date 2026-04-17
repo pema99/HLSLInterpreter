@@ -390,6 +390,7 @@ window.initMonaco = function (containerId, initialCode, dotNetRef) {
             language: 'hlsl',
             theme: 'hlsl-dark',
             fontFamily: "'JetBrains Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace",
+            fontLigatures: false,
             fontSize: 16,
             lineNumbers: 'on',
             lineNumbersMinChars: 3,
@@ -469,6 +470,10 @@ window.initMonaco = function (containerId, initialCode, dotNetRef) {
         window._monacoEditor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F11, function () { clickDbg('step-in-back'); });
         window._monacoEditor.addCommand(monaco.KeyCode.F12, function () { clickDbg('step-out'); });
         window._monacoEditor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F12, function () { clickDbg('step-out-back'); });
+
+        document.fonts.ready.then(function () {
+            monaco.editor.remeasureFonts();
+        });
 
         window.monacoEditorInitialized = true;
     });
@@ -722,6 +727,15 @@ window.setMonacoValue = function (value) {
 window.setMonacoFontSize = function (size) {
     if (window._monacoEditor) {
         window._monacoEditor.updateOptions({ fontSize: size });
+    }
+};
+
+window.setMonacoReadOnly = function (readOnly) {
+    if (window._monacoEditor) {
+        window._monacoEditor.updateOptions({
+            readOnly: readOnly,
+            readOnlyMessage: { value: 'Cannot edit code while debugging. Stop the debug session first.' }
+        });
     }
 };
 

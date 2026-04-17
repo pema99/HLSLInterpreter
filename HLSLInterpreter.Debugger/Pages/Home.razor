@@ -921,6 +921,7 @@ float4 main(uint2 thread : SV_DispatchThreadID)
         }
 
         isDebugging = true;
+        await JS.InvokeVoidAsync("setMonacoReadOnly", true);
         debugTabIndex = activeTabIndex;
         immediateCollapsed = false;
         // Keep console open when failing so the error is visible
@@ -1065,6 +1066,7 @@ float4 main(uint2 thread : SV_DispatchThreadID)
     {
         await JS.InvokeVoidAsync("saveSectionHeights");
         isDebugging = false;
+        await JS.InvokeVoidAsync("setMonacoReadOnly", false);
         debugTabIndex = -1;
         debugTrace = new();
         debugStepIndex = -1;
