@@ -366,12 +366,12 @@ window.initMonaco = function (containerId, initialCode, dotNetRef) {
             base: 'vs-dark',
             inherit: true,
             rules: [
-                { token: 'keyword.control',   foreground: 'c586c0' },   // purple  – if/else/for/return/discard
-                { token: 'keyword.modifier',  foreground: '569cd6' },   // blue    – static/const/inout/…
-                { token: 'keyword.type',      foreground: '4ec9b0' },   // teal    – float/int/Texture2D/…
-                { token: 'keyword.literal',   foreground: '569cd6' },   // blue    – true/false
-                { token: 'keyword.directive', foreground: '9b9b9b' },   // grey    – #define/#include
-                { token: 'support.function',  foreground: 'dcdcaa' },   // yellow  – intrinsics
+                { token: 'keyword.control',   foreground: 'c586c0' },   // purple  - if/else/for/return/discard
+                { token: 'keyword.modifier',  foreground: '569cd6' },   // blue    - static/const/inout/...
+                { token: 'keyword.type',      foreground: '4ec9b0' },   // teal    - float/int/Texture2D/...
+                { token: 'keyword.literal',   foreground: '569cd6' },   // blue    - true/false
+                { token: 'keyword.directive', foreground: '9b9b9b' },   // grey    - #define/#include
+                { token: 'support.function',  foreground: 'dcdcaa' },   // yellow  - intrinsics
                 { token: 'annotation',        foreground: 'c8c8c8' },
                 { token: 'annotation.bracket',foreground: 'c8c8c8' },
                 { token: 'number',            foreground: 'b5cea8' },
@@ -389,6 +389,7 @@ window.initMonaco = function (containerId, initialCode, dotNetRef) {
             value: initialCode,
             language: 'hlsl',
             theme: 'hlsl-dark',
+            fontFamily: "'JetBrains Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace",
             fontSize: 16,
             lineNumbers: 'on',
             lineNumbersMinChars: 3,
@@ -406,7 +407,30 @@ window.initMonaco = function (containerId, initialCode, dotNetRef) {
             function () { document.querySelector('.btn-run').click(); }
         );
 
-        // Gutter click → toggle breakpoint
+        // Drag-and-drop a file onto the editor to open it
+        var editorDom = document.getElementById(containerId);
+        editorDom.addEventListener('dragover', function (e) { e.preventDefault(); });
+        editorDom.addEventListener('drop', function (e) {
+            e.preventDefault();
+            var file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+            if (!file) return;
+            if (window.chrome && window.chrome.webview && typeof window.chrome.webview.postMessageWithAdditionalObjects === 'function') {
+                // On desktop (WebView2), send the File to the host so it can read the path and content in C#
+                window.chrome.webview.postMessageWithAdditionalObjects('FileDrop', [file]);
+            } else {
+                // On the web, read via FileReader since the filesystem path isn't available
+                var reader = new FileReader();
+                reader.onload = function (ev) {
+                    if (window._dotNetDebugRef)
+                        window._dotNetDebugRef.invokeMethodAsync('OpenFileInTab', file.name, ev.target.result, '');
+                    else
+                        window._monacoEditor.setValue(ev.target.result);
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        // Gutter click to toggle a breakpoint
         window._monacoEditor.onMouseDown(function (e) {
             var t = e.target.type;
             if ((t === monaco.editor.MouseTargetType.GUTTER_LINE_NUMBERS ||

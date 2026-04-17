@@ -112,7 +112,7 @@ namespace HLSL
 
         private bool TryFindVariable(string name, out Dictionary<string, HLSLValue> resolvedScope, out string resolvedName, out HLSLValue resolvedValue, out bool isGlobal)
         {
-            // Local scope: search all scopes except the global one, stopping at a function boundary.
+            // Search local scopes, stopping at the innermost function boundary.
             var localScopes = environment.Take(environment.Count - 1);
             foreach (var scope in localScopes)
             {

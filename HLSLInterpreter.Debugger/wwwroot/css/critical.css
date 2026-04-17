@@ -1,8 +1,9 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
+button, input, select, textarea { font-family: inherit; }
 
 html, body {
     height: 100%;
-    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-family: 'Inter', 'Segoe UI', sans-serif;
     background: #1e1e1e;
     color: #d4d4d4;
     overflow: hidden;
@@ -87,7 +88,7 @@ html, body {
     transform: scaleX(-1);
 }
 
-/* Debug: breakpoint glyph — red circle, right-aligned in glyph margin */
+/* Breakpoint glyph, right-aligned red circle in the gutter */
 .dbg-breakpoint-glyph {
     cursor: pointer;
 }
@@ -104,12 +105,12 @@ html, body {
     transform: translateY(-50%);
 }
 
-/* Debug: current statement line highlight */
+/* Current statement line highlight */
 .dbg-current-line {
     background: rgba(255, 204, 0, 0.12) !important;
 }
 
-/* Debug: current line arrow glyph — right-aligned in glyph margin */
+/* Current line arrow glyph, right-aligned in the gutter */
 .dbg-current-glyph::before {
     content: '';
     display: block;

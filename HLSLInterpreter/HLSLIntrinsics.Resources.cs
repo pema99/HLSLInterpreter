@@ -249,14 +249,14 @@ namespace HLSL
             if (methodName == "GetDimensions")
             {
                 // For read-only (non-RW, non-MS) textures the mip+levels overload has arg 0
-                // as an INPUT mip level; every other arg is an OUT param.
+                // as an INPUT mip level, every other arg is an OUT param.
                 // For RW textures, buffers, and MS textures every arg is OUT.
                 if (rv.IsTexture && !rv.IsWriteable && !IsMSTexture(rv))
                 {
                     // For cube textures GetDimensions outputs width + height (2 values), not Dimension (3).
                     int outOnlyCount = (rv.IsCube ? 2 : rv.Dimension) + (rv.IsArray ? 1 : 0);
                     if (argCount > outOnlyCount)
-                        return paramIndex > 0;   // arg 0 is the mip input; the rest are OUT
+                        return paramIndex > 0;   // arg 0 is the mip input, the rest are OUT
                 }
                 return true;  // RW / buffer / MS or out-only overload, all args are OUT
             }
