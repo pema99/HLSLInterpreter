@@ -51,12 +51,11 @@ void IncrementBoth(inout int x, inout int y)
 [Test]
 void FuncArg_InoutAlias_IncrementSameVar_AliasedReadsAndWrites()
 {
-    // x and y alias the same slot containing v.
-    // x = x + 1 reads v=0, writes v=1.
-    // y = y + 1 reads v=1 (already updated), writes v=2.
+    // DXC uses copy-in/copy-out: both x and y copy v=0 on entry.
+    // x = x + 1 → x=1, y = y + 1 → y=1. On exit, y's copy-out (v=1) wins.
     int v = 0;
     IncrementBoth(v, v);
-    ASSERT(v == 2);
+    ASSERT(v == 1);
 }
 
 void IncrementBothF(inout float x, inout float y)
@@ -68,9 +67,10 @@ void IncrementBothF(inout float x, inout float y)
 [Test]
 void FuncArg_InoutAlias_Float_AliasedReadsAndWrites()
 {
+    // x is a reference to v (v=5→6), y is a copy of the original 5 (y=6), copy-out: v=6
     float v = 5.0;
     IncrementBothF(v, v);
-    ASSERT(v == 7.0);
+    ASSERT(v == 6.0);
 }
 
 // ============================================================================
@@ -97,6 +97,18 @@ void FuncArg_InoutAlias_DifferentVars_BothModified()
     p.X = 0.0;
     SetFieldAndStruct(x, p);
     ASSERT(x == 4.0);
+    ASSERT(p.X == 5.0);
+}
+
+[Test]
+void FuncArg_InoutAlias_StructFieldAndStruct_CopyoutWins()
+{
+    // p.X is passed as the float ref (f), p is passed as inout struct (aliased -> copy).
+    // f=4.0 writes directly to p.X via reference; p.X=5.0 writes to the copy.
+    // Copy-out restores p from the copy, so p.X ends up as 5.0.
+    Pup p;
+    p.X = 0.0;
+    SetFieldAndStruct(p.X, p);
     ASSERT(p.X == 5.0);
 }
 

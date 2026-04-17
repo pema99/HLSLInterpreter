@@ -56,13 +56,9 @@ namespace HLSL
                 context.PushReturn();
                 executionState.PushExecutionMask(ExecutionScope.Function);
 
-                for (int i = 0; i < func.Parameters.Count; i++)
-                {
-                    var param = func.Parameters[i];
-                    var declarator = param.Declarator;
-                    context.AddVariable(declarator.Name, HLSLOverloadResolution.CastForParameter(this, args[i], param.ParamType));
-                }
+                var inoutCopyoutRefs = BindFunctionParameters(func.Parameters, args);
                 interpreter.Visit(func.Body);
+                CopyBackReferenceParameters(func.Parameters, inoutCopyoutRefs);
 
                 executionState.PopExecutionMask();
                 context.PopScope();
@@ -165,6 +161,43 @@ namespace HLSL
             else
             {
                 throw Error(node, $"Expected a scalar expression, but got a {value.GetType().Name}.");
+            }
+        }
+
+        private ReferenceValue[] BindFunctionParameters(List<FormalParameterNode> parameters, HLSLValue[] args)
+        {
+            ReferenceValue[] inoutCopyoutRefs = null;
+            for (int i = 0; i < parameters.Count; i++)
+            {
+                var param = parameters[i];
+                bool isInout = param.Modifiers.Contains(BindingModifier.Inout) || param.Modifiers.Contains(BindingModifier.Out);
+                HLSLValue argValue = args[i];
+                if (isInout && argValue is ReferenceValue inoutRef)
+                {
+                    // Lazy init for perf
+                    inoutCopyoutRefs ??= new ReferenceValue[args.Length];
+
+                    inoutCopyoutRefs[i] = inoutRef;
+                    argValue = inoutRef.Get();
+                }
+                context.AddVariable(param.Declarator.Name, HLSLOverloadResolution.CastForParameter(this, argValue, param.ParamType));
+            }
+            return inoutCopyoutRefs;
+        }
+
+        // Copy-back from reference parameters (see https://www.abolishcrlf.org/horror/2025-03-31-inout.html)
+        private void CopyBackReferenceParameters(List<FormalParameterNode> parameters, ReferenceValue[] inoutCopyoutRefs)
+        {
+            if (inoutCopyoutRefs == null)
+                return;
+
+            for (int i = 0; i < parameters.Count; i++)
+            {
+                if (inoutCopyoutRefs[i] != null)
+                {
+                    var localVal = context.GetVariable(parameters[i].Declarator.Name);
+                    inoutCopyoutRefs[i].Set(HLSLTypeUtils.CastForAssignment(inoutCopyoutRefs[i].Get(), localVal));
+                }
             }
         }
 
@@ -409,14 +442,14 @@ namespace HLSL
                     {
                         int threadCount = Math.Max(matrix.ThreadCount, val.ThreadCount);
                         var expanded = threadCount > 1 ? (MatrixValue)matrix.Vectorize(threadCount) : matrix;
-                            parentRef.Set(new MatrixValue(matrix.Type, matrix.Rows, columnCount, expanded.Values.MapThreads((threadData, threadIndex) =>
-                            {
-                                int row = Convert.ToInt32(indexVal.Value.Get(threadIndex));
-                                var matData = (object[])threadData.Clone();
+                        parentRef.Set(new MatrixValue(matrix.Type, matrix.Rows, columnCount, expanded.Values.MapThreads((threadData, threadIndex) =>
+                        {
+                            int row = Convert.ToInt32(indexVal.Value.Get(threadIndex));
+                            var matData = (object[])threadData.Clone();
                             Array.Copy((object[])((NumericValue)val).GetThreadValue(threadIndex), 0, matData, row * columnCount, columnCount);
-                                return matData;
-                            })));
-                        }
+                            return matData;
+                        })));            
+                    }
                 });
         }
 
@@ -592,12 +625,9 @@ namespace HLSL
                     }));
             }
 
-            for (int i = 0; i < method.Parameters.Count; i++)
-            {
-                var param = method.Parameters[i];
-                context.AddVariable(param.Declarator.Name, HLSLOverloadResolution.CastForParameter(this, args[i], param.ParamType));
-            }
+            var inoutCopyoutRefs = BindFunctionParameters(method.Parameters, args);
             interpreter.Visit(method.Body);
+            CopyBackReferenceParameters(method.Parameters, inoutCopyoutRefs);
 
             executionState.PopExecutionMask();
             context.PopScope();
