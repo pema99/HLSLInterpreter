@@ -856,11 +856,19 @@ namespace HLSL
                 case OperatorKind.Minus: return -num;
                 case OperatorKind.Not: return !num;
                 case OperatorKind.BitFlip: return ~num;
+                // Fast path
                 case OperatorKind.Increment when node.Expression is NamedExpressionNode named:
                     SetValueSimpleNamed(named.GetName(), num + 1);
                     return num + 1;
                 case OperatorKind.Decrement when node.Expression is NamedExpressionNode named:
                     SetValueSimpleNamed(named.GetName(), num - 1);
+                    return num - 1;
+                // Slow path
+                case OperatorKind.Increment when TryGetBaseLValueReference(node.Expression, out var incRef, out _):
+                    incRef.Set(num + 1);
+                    return num + 1;
+                case OperatorKind.Decrement when TryGetBaseLValueReference(node.Expression, out var decRef, out _):
+                    decRef.Set(num - 1);
                     return num - 1;
             }
             throw Error(node, "Invalid prefix unary expression.");
@@ -871,11 +879,19 @@ namespace HLSL
             var num = EvaluateNumeric(node.Expression);
             switch (node.Operator)
             {
+                // Fast path
                 case OperatorKind.Increment when node.Expression is NamedExpressionNode named:
                     SetValueSimpleNamed(named.GetName(), num + 1);
                     return num;
                 case OperatorKind.Decrement when node.Expression is NamedExpressionNode named:
                     SetValueSimpleNamed(named.GetName(), num - 1);
+                    return num;
+                // Slow path
+                case OperatorKind.Increment when TryGetLValueReference(node.Expression, out var incRef):
+                    incRef.Set(num + 1);
+                    return num;
+                case OperatorKind.Decrement when TryGetLValueReference(node.Expression, out var decRef):
+                    decRef.Set(num - 1);
                     return num;
             }
             throw Error(node, "Invalid postfix unary expression.");
@@ -1158,6 +1174,8 @@ namespace HLSL
                     var structType = context.GetStruct(named.GetName());
                     int size = HLSLTypeUtils.GetTypeSizeDwords(context, structType, node.ArrayRanks);
                     return HLSLValueUtils.PackScalars(context, Enumerable.Repeat(scalar, size).ToArray(), structType, node.ArrayRanks);
+                case ScalarTypeNode scalarType: // Vector truncation
+                    return HLSLValueUtils.FlattenToScalars(numeric)[0].Cast(scalarType.Kind);
                 default:
                     throw Error(node, "Invalid cast.");
             }
