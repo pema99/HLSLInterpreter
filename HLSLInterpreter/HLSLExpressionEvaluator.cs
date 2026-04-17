@@ -36,20 +36,20 @@ namespace HLSL
 
         public HLSLValue CallFunction(string name, params HLSLValue[] args)
         {
+            // Enter namespace
+            string[] namespaces = null;
+            if (name.Contains("::"))
+            {
+                namespaces = name.Split("::");
+                for (int i = 0; i < namespaces.Length - 1; i++)
+                    context.EnterNamespace(namespaces[i]);
+            }
+
             FunctionDefinitionNode func = context.GetFunction(this, name, args);
             if (func != null)
             {
                 if (args.Length != func.Parameters.Count)
                     throw Error($"Argument count mismatch in call to '{name}'.");
-
-                // Enter namespace
-                string[] namespaces = null;
-                if (name.Contains("::"))
-                {
-                    namespaces = name.Split("::");
-                    for (int i = 0; i < namespaces.Length - 1; i++)
-                        context.EnterNamespace(namespaces[i]);
-                }
 
                 // Call function
                 context.PushScope(isFunction: true, functionName: name);
@@ -408,15 +408,15 @@ namespace HLSL
                     else
                     {
                         int threadCount = Math.Max(matrix.ThreadCount, ((NumericValue)val).ThreadCount);
-                        var expanded = (MatrixValue)matrix.Vectorize(threadCount);
-                        parentRef.Set(new MatrixValue(matrix.Type, matrix.Rows, columnCount, expanded.Values.MapThreads((threadData, threadIndex) =>
-                        {
-                            int row = Convert.ToInt32(indexVal.Value.Get(threadIndex));
-                            var matData = (object[])threadData.Clone();
+                            var expanded = (MatrixValue)matrix.Vectorize(threadCount);
+                            parentRef.Set(new MatrixValue(matrix.Type, matrix.Rows, columnCount, expanded.Values.MapThreads((threadData, threadIndex) =>
+                            {
+                                int row = Convert.ToInt32(indexVal.Value.Get(threadIndex));
+                                var matData = (object[])threadData.Clone();
                             Array.Copy((object[])((NumericValue)val).GetThreadValue(threadIndex), 0, matData, row * columnCount, columnCount);
-                            return matData;
-                        })));
-                    }
+                                return matData;
+                            })));
+                        }
                 });
         }
 
@@ -524,7 +524,7 @@ namespace HLSL
         {
             function = null;
 
-            var structDef = context.GetStruct(structName);
+            var structDef = context.GetStructType(structName);
             if (structDef == null)
                 return false;
 
@@ -537,7 +537,7 @@ namespace HLSL
 
             if (candidates.Count > 0)
             {
-                function = HLSLOverloadResolution.PickOverload(this, candidates, args) ?? candidates[0];
+                function = HLSLOverloadResolution.PickOverload(this, context, candidates, args) ?? candidates[0];
                 return true;
             }
 
@@ -886,7 +886,7 @@ namespace HLSL
                 case OperatorKind.Decrement when node.Expression is NamedExpressionNode named:
                     SetValueSimpleNamed(named.GetName(), num - 1);
                     return num;
-                // Slow path
+                                    // Slow path
                 case OperatorKind.Increment when TryGetLValueReference(node.Expression, out var incRef):
                     incRef.Set(num + 1);
                     return num;
@@ -992,7 +992,16 @@ namespace HLSL
             {
                 args[i] = Visit(node.Arguments[i]);
             }
-            
+
+            // Enter namespace
+            string[] namespaces = null;
+            if (name.Contains("::"))
+            {
+                namespaces = name.Split("::");
+                for (int i = 0; i < namespaces.Length - 1; i++)
+                    context.EnterNamespace(namespaces[i]);
+            }
+
             // Handle out/inout parameters
             FunctionDefinitionNode func = context.GetFunction(this, name, args);
             for (int i = 0; i < args.Length; i++)
@@ -1010,7 +1019,14 @@ namespace HLSL
                         args[i] = lvalRef;
                 }
             }
-          
+
+            // Exit namespace
+            if (namespaces != null)
+            {
+                for (int i = 0; i < namespaces.Length - 1; i++)
+                    context.ExitNamespace();
+            }
+
             return CallFunction(name, args);
         }
 
@@ -1171,7 +1187,7 @@ namespace HLSL
                     int cols = Convert.ToInt32(EvaluateScalar(genMatrixType.SecondDimension).Cast(ScalarType.Int).GetThreadValue(0));
                     return numeric.BroadcastToMatrix(rows, cols).Cast(genMatrixType.Kind);
                 case UserDefinedNamedTypeNode named when numeric is ScalarValue scalar:
-                    var structType = context.GetStruct(named.GetName());
+                    var structType = context.GetStructType(named.GetName());
                     int size = HLSLTypeUtils.GetTypeSizeDwords(context, structType, node.ArrayRanks);
                     return HLSLValueUtils.PackScalars(context, Enumerable.Repeat(scalar, size).ToArray(), structType, node.ArrayRanks);
                 case ScalarTypeNode scalarType: // Vector truncation
