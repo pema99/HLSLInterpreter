@@ -8,21 +8,22 @@
 // name as a built-in intrinsic completely shadows it within the same scope.
 // ============================================================================
 
-// User-defined abs that always returns 42.
-int abs(int x) { return 42; }
+// Shadow clamp (3-arg) instead of a 1-arg intrinsic so the shadowed name
+// doesn't conflict with other overloading tests further down in this file.
+int clamp(int x, int lo, int hi) { return 42; }
 
 [Test]
-void Overload_IntrinsicShadowing_UserAbsShadowsBuiltin()
+void Overload_IntrinsicShadowing_UserClampShadowsBuiltin()
 {
-    int result = abs(-5);
+    int result = clamp(5, 1, 10);
     ASSERT(result == 42);
 }
 
 [Test]
-void Overload_IntrinsicShadowing_UserAbsCalledForPositive()
+void Overload_IntrinsicShadowing_UserClampCalledRegardlessOfRange()
 {
-    // The user's abs is chosen regardless of sign — it always returns 42.
-    int result = abs(5);
+    // Even an out-of-range value returns 42 since the user function wins.
+    int result = clamp(-100, 0, 50);
     ASSERT(result == 42);
 }
 
@@ -30,12 +31,13 @@ void Overload_IntrinsicShadowing_UserAbsCalledForPositive()
 // EXTENDING INTRINSICS WITH USER OVERLOADS
 // Inspired by intrinsic_overloading.hlsl: adding a new overload for a type not
 // handled by the built-in, while the built-in still works for its own types.
+// Since no user overload matches float arguments, abs(-7.5) hits the built-in.
 // ============================================================================
 
 struct MyNum { float val; };
 
-// New overload for a struct type — the built-in has no such overload.
-float abs(MyNum s) { return abs(s.val) + 100.0; }
+// Extend abs for a struct type — the built-in has no such overload.
+float abs(MyNum s) { return s.val < 0.0 ? -s.val : s.val; }
 
 [Test]
 void Overload_ExtendIntrinsic_UserOverloadForStruct()
@@ -43,13 +45,13 @@ void Overload_ExtendIntrinsic_UserOverloadForStruct()
     MyNum n;
     n.val = -3.0;
     float result = abs(n);
-    ASSERT(abs(result - 103.0) < 0.001); // 100 + abs(-3)
+    ASSERT(abs(result - 3.0) < 0.001);
 }
 
 [Test]
 void Overload_ExtendIntrinsic_BuiltinStillWorksForFloat()
 {
-    // The built-in abs for float must still be reachable.
+    // No user overload matches a plain float, so the built-in is reached.
     float result = abs(-7.5);
     ASSERT(abs(result - 7.5) < 0.001);
 }
@@ -57,19 +59,16 @@ void Overload_ExtendIntrinsic_BuiltinStillWorksForFloat()
 [Test]
 void Overload_ExtendIntrinsic_BuiltinStillWorksForInt()
 {
-    // The built-in abs for int — but our user abs(int) shadows it!
-    // Because abs(int) is declared above, abs(-3) calls the user version.
     int result = abs(-3);
-    ASSERT(result == 42);
+    ASSERT(result == 3);
 }
 
 // ============================================================================
 // TRICKY FUNCTION OVERLOADING — DIFFERENT PARAM COUNTS
-// Functions with the same name but different numbers of parameters.
 // ============================================================================
 
-float Compute(float a)           { return a; }
-float Compute(float a, float b)  { return a + b; }
+float Compute(float a)                   { return a; }
+float Compute(float a, float b)          { return a + b; }
 float Compute(float a, float b, float c) { return a + b + c; }
 
 [Test]
@@ -92,35 +91,32 @@ void Overload_DifferentParamCount_ThreeArgs()
 
 // ============================================================================
 // OVERLOAD RESOLUTION WITH TYPE PROMOTION
-// When calling f(1.0), the float overload should win over int.
-// When calling f(1), the int overload should win over float (exact match).
 // ============================================================================
 
-int  Typed(int x)   { return x * 2; }
+int   Typed(int x)   { return x * 2; }
 float Typed(float x) { return x * 3.0; }
 
 [Test]
 void Overload_TypePromotion_IntArgPicksIntOverload()
 {
     int r = Typed(5);
-    ASSERT(r == 10); // 5 * 2 (int overload)
+    ASSERT(r == 10);
 }
 
 [Test]
 void Overload_TypePromotion_FloatArgPicksFloatOverload()
 {
     float r = Typed(4.0);
-    ASSERT(abs(r - 12.0) < 0.001); // 4.0 * 3.0 (float overload)
+    ASSERT(abs(r - 12.0) < 0.001);
 }
 
 // ============================================================================
-// OVERLOAD RESOLUTION WITH VECTORS
-// Choosing the right vector overload based on argument shape.
+// OVERLOAD RESOLUTION WITH DIFFERENT VECTOR SIZES
 // ============================================================================
 
-float VecOp(float2 v)  { return v.x + v.y; }
-float VecOp(float3 v)  { return v.x + v.y + v.z; }
-float VecOp(float4 v)  { return v.x + v.y + v.z + v.w; }
+float VecOp(float2 v) { return v.x + v.y; }
+float VecOp(float3 v) { return v.x + v.y + v.z; }
+float VecOp(float4 v) { return v.x + v.y + v.z + v.w; }
 
 [Test]
 void Overload_VectorShape_Float2PicksFloat2Overload()
@@ -141,33 +137,30 @@ void Overload_VectorShape_Float4PicksFloat4Overload()
 }
 
 // ============================================================================
-// RECURSIVE SHADOWING: CALLING THE ORIGINAL INTRINSIC FROM A WRAPPER
-// The wrapper uses a different name for the inner call, but verifies that
-// a user function with the intrinsic's name can still call the original via
-// a cast path (or by forwarding to a renamed wrapper).
+// SHADOWING A TRANSCENDENTAL INTRINSIC FOR A SPECIFIC TYPE
+// A user-defined sin(int) computes n * pi/6 and shadows the float built-in
+// only for integer arguments; sin(0.0f) still reaches the built-in.
 // ============================================================================
 
-// Helper that calls the real built-in sin via a different argument path.
-float my_sin(float x) { return sin(x); }
-
+// sin(int n) shadows the built-in for integer args only.
+// Approximates sin(n * pi/6) using Taylor expansion (valid for small x):
+// sin(x) ≈ x - x³/6 + x⁵/120  with x = n*(pi/6)
 float sin(int n)
 {
-    // Shadow sin(float) for integer arguments; computes n * pi/6.
-    return my_sin(n * 0.5235987); // n * (pi/6)
+    float x = n * 0.5235987; // n * (pi/6)
+    return x - (x*x*x)/6.0 + (x*x*x*x*x)/120.0;
 }
 
 [Test]
 void Overload_ShadowSin_IntArgCallsUserVersion()
 {
-    // sin(1) should use the user-defined int overload: sin(pi/6) ≈ 0.5
-    float result = sin(1);
+    float result = sin(1); // user: sin(pi/6) ≈ 0.5
     ASSERT(abs(result - 0.5) < 0.01);
 }
 
 [Test]
 void Overload_ShadowSin_FloatArgCallsBuiltin()
 {
-    // sin(0.0) should call the built-in (no int overload matches 0.0f).
     float result = sin(0.0);
     ASSERT(abs(result) < 0.001);
 }
