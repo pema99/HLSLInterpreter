@@ -297,9 +297,9 @@ namespace HLSL
                     return new StructValue(ctx.GetQualifiedName(st.Name.GetName()), members);
                 }
                 case NamedTypeNode namedType:
-                    return PackScalars(ctx, scalars, ctx.GetStruct(namedType.GetName()));
+                    return PackScalars(ctx, scalars, ctx.GetStructType(namedType.GetName()));
                 case QualifiedNamedTypeNode qualType:
-                    return PackScalars(ctx, scalars, ctx.GetStruct(qualType.GetName()));
+                    return PackScalars(ctx, scalars, ctx.GetStructType(qualType.GetName()));
                 default:
                     throw new NotImplementedException();
             }

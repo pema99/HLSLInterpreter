@@ -69,7 +69,7 @@ namespace HLSL
 
         public ResourceValue CreateMockResource(string structName, PredefinedObjectType resourceType, TypeNode[] templateArgs)
         {
-            var structDef = context.GetStruct(structName) ?? throw Error($"Unknown type '{structName}'.");
+            var structDef = context.GetStructType(structName) ?? throw Error($"Unknown type '{structName}'.");
             var mockStruct = CreateStructValue(structDef);
 
             bool HasMethod(string name)
@@ -283,7 +283,7 @@ namespace HLSL
                         for (int i = 0; i < namespaces.Length - 1; i++)
                             context.EnterNamespace(namespaces[i]);
 
-                        var qualNamedStruct = context.GetStruct(qualifiedNamedTypeNodeType.GetName());
+                        var qualNamedStruct = context.GetStructType(qualifiedNamedTypeNodeType.GetName());
                         if (qualNamedStruct == null)
                             throw Error(decl, $"Undefined named type '{qualifiedNamedTypeNodeType.GetName()}'.");
                         defaultValue = CreateStructValue(qualNamedStruct);
@@ -292,7 +292,7 @@ namespace HLSL
                             context.ExitNamespace();
                         break;
                     case NamedTypeNode namedTypeNodeType:
-                        var namedStruct = context.GetStruct(namedTypeNodeType.GetName());
+                        var namedStruct = context.GetStructType(namedTypeNodeType.GetName());
                         if (namedStruct == null)
                             throw Error(decl, $"Undefined named type '{namedTypeNodeType.GetName()}'.");
                         defaultValue = CreateStructValue(namedStruct);

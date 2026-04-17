@@ -37,7 +37,7 @@ namespace HLSL
             return value;
         }
 
-        public static bool TypeEquals(HLSLExpressionEvaluator evaluator, HLSLValue from, TypeNode to, IList<ArrayRankNode> arrayRanks = null)
+        public static bool TypeEquals(HLSLExpressionEvaluator evaluator, HLSLInterpreterContext context, HLSLValue from, TypeNode to, IList<ArrayRankNode> arrayRanks = null)
         {
             if (to is ScalarTypeNode scalarType &&
                 from is ScalarValue scalarValue &&
@@ -65,14 +65,20 @@ namespace HLSL
                 && Convert.ToInt32(((ScalarValue)evaluator.Visit(genMatType.FirstDimension)).Cast(ScalarType.Int).GetThreadValue(0)) == genMatValue.Rows
                 && Convert.ToInt32(((ScalarValue)evaluator.Visit(genMatType.SecondDimension)).Cast(ScalarType.Int).GetThreadValue(0)) == genMatValue.Columns)
                 return true;
-            if (to is StructTypeNode strType &&
-                from is StructValue strValue &&
-                strType.Name.GetName() == strValue.Name)
-                return true;
-            if (to is NamedTypeNode namedType &&
-                from is StructValue namedStrValue &&
-                namedType.GetName()== namedStrValue.Name)
-                return true;
+            if (to is StructTypeNode strType && from is StructValue strValue)
+            {
+                string toName = strType.Name.GetName();
+                string qualifiedToName = context.GetQualifiedStructName(toName) ?? toName;
+                if (qualifiedToName == strValue.Name)
+                    return true;
+            }
+            if (to is NamedTypeNode namedType && from is StructValue namedStrValue)
+            {
+                string toName = namedType.GetName();
+                string qualifiedToName = context.GetQualifiedStructName(toName) ?? toName;
+                if (qualifiedToName == namedStrValue.Name)
+                    return true;
+            }
             if (to is QualifiedNamedTypeNode qualNamedType &&
                 from is StructValue qualNamedStrValue &&
                qualNamedType.GetName() == qualNamedStrValue.Name)
@@ -96,11 +102,11 @@ namespace HLSL
                 arrayRanks[0].Dimension is LiteralExpressionNode litDim &&
                 int.Parse(litDim.Lexeme) == arrValue.Values.Length)
             {
-                return TypeEquals(evaluator, arrValue.Values[0], to, arrayRanks.Skip(1).ToList());
+                return TypeEquals(evaluator, context, arrValue.Values[0], to, arrayRanks.Skip(1).ToList());
             }
             if (from is ReferenceValue reference)
             {
-                return TypeEquals(evaluator, reference.Get(), to, arrayRanks);
+                return TypeEquals(evaluator, context, reference.Get(), to, arrayRanks);
             }
 
             return false;
@@ -162,7 +168,7 @@ namespace HLSL
         }
 
         // Given a function and a list of parameters, evaluate how well the function matches the parameters
-        public static int GetOverloadScore(HLSLExpressionEvaluator evaluator, FunctionDefinitionNode candidate, IList<HLSLValue> parameters)
+        public static int GetOverloadScore(HLSLExpressionEvaluator evaluator, HLSLInterpreterContext context, FunctionDefinitionNode candidate, IList<HLSLValue> parameters)
         {
             if (parameters.Count != candidate.Parameters.Count)
                 return -1;
@@ -176,7 +182,7 @@ namespace HLSL
 
                 var to = evaluator.ResolveType(candidate.Parameters[i].ParamType);
 
-                if (TypeEquals(evaluator, from, to, candidate.Parameters[i].Declarator.ArrayRanks))
+                if (TypeEquals(evaluator, context, from, to, candidate.Parameters[i].Declarator.ArrayRanks))
                     score += 3; // Exact match, best case
                 else if (CanPromoteTo(evaluator, from, to))
                     score += 2; // Promotion is almost as good
@@ -189,13 +195,13 @@ namespace HLSL
         }
 
         // Pick a function overload from a list of candidates based on the parameters. Returns null if no viable overload.
-        public static FunctionDefinitionNode PickOverload(HLSLExpressionEvaluator evaluator, IEnumerable<FunctionDefinitionNode> candidates, IList<HLSLValue> parameters)
+        public static FunctionDefinitionNode PickOverload(HLSLExpressionEvaluator evaluator, HLSLInterpreterContext context, IEnumerable<FunctionDefinitionNode> candidates, IList<HLSLValue> parameters)
         {
             int bestScore = -1;
             FunctionDefinitionNode selected = null;
             foreach (var candidate in candidates)
             {
-                int score = GetOverloadScore(evaluator, candidate, parameters);
+                int score = GetOverloadScore(evaluator, context, candidate, parameters);
                 if (score > bestScore)
                 {
                     bestScore = score;
