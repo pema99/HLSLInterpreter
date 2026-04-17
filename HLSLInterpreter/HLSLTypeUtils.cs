@@ -356,10 +356,10 @@ namespace HLSL
                 case StructTypeNode str:
                     elementSize = GetStructFields(str, ctx).Sum(f => GetTypeSizeDwords(ctx, f.Kind, f.Decl.ArrayRanks));
                     break;
-                case NamedTypeNode namedType when ctx.GetStruct(namedType.GetName()) is { } s:
+                case NamedTypeNode namedType when ctx.GetStructType(namedType.GetName()) is { } s:
                     elementSize = GetTypeSizeDwords(ctx, s);
                     break;
-                case QualifiedNamedTypeNode qualType when ctx.GetStruct(qualType.GetName()) is { } s:
+                case QualifiedNamedTypeNode qualType when ctx.GetStructType(qualType.GetName()) is { } s:
                     elementSize = GetTypeSizeDwords(ctx, s);
                     break;
                 default:
@@ -373,7 +373,7 @@ namespace HLSL
         {
             foreach (var baseTypeName in structType.Inherits)
             {
-                var baseStruct = ctx.GetStruct(baseTypeName.GetName());
+                var baseStruct = ctx.GetStructType(baseTypeName.GetName());
                 if (baseStruct != null)
                 {
                     foreach (var kv in GetStructFields(baseStruct, ctx))

@@ -257,7 +257,7 @@ namespace HLSL
                 {
                     if (scope.Functions.TryGetValue(candidate, out var funcs))
                     {
-                        var overload = HLSLOverloadResolution.PickOverload(evaluator, funcs, args);
+                        var overload = HLSLOverloadResolution.PickOverload(evaluator, this, funcs, args);
                         if (overload != null)
                             return overload;
                     }
@@ -286,7 +286,7 @@ namespace HLSL
             overloads.Add(func);
         }
 
-        public StructTypeNode GetStruct(string name)
+        public StructTypeNode GetStructType(string name)
         {
             foreach (var scope in environment)
             {
@@ -294,6 +294,19 @@ namespace HLSL
                 {
                     if (scope.Structs.TryGetValue(candidate, out var structType))
                         return structType;
+                }
+            }
+            return null;
+        }
+
+        public string GetQualifiedStructName(string name)
+        {
+            foreach (var scope in environment)
+            {
+                foreach (string candidate in CandidateNames(name))
+                {
+                    if (scope.Structs.ContainsKey(candidate))
+                        return candidate;
                 }
             }
             return null;
