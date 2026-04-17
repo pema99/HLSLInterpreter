@@ -100,7 +100,7 @@ namespace HLSL
             }
             if (from is ReferenceValue reference)
             {
-                return TypeEquals(evaluator, reference.Get(), to);
+                return TypeEquals(evaluator, reference.Get(), to, arrayRanks);
             }
 
             return false;
