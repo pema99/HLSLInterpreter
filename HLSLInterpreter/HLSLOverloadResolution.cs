@@ -171,7 +171,11 @@ namespace HLSL
             for (int i = 0; i < parameters.Count; i++)
             {
                 var from = parameters[i];
+                if (from is ReferenceValue reference)
+                    from = reference.Get();
+
                 var to = evaluator.ResolveType(candidate.Parameters[i].ParamType);
+
                 if (TypeEquals(evaluator, from, to, candidate.Parameters[i].Declarator.ArrayRanks))
                     score += 3; // Exact match, best case
                 else if (CanPromoteTo(evaluator, from, to))
