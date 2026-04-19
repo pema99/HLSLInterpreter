@@ -681,7 +681,7 @@ void Intrinsic_Pow()
     
     // Zero exponent
     ASSERT(abs(pow(5.0, 0.0) - 1.0) < 0.001);
-    ASSERT(abs(pow(0.0, 0.0) - 1.0) < 0.001);
+    ASSERT(isnan(pow(0.0, 0.0)));
     
     // Fractional exponent (roots)
     ASSERT(abs(pow(4.0, 0.5) - 2.0) < 0.001);
@@ -697,6 +697,8 @@ void Intrinsic_Pow()
     
     // Large exponent
     ASSERT(abs(pow(2.0, 10.0) - 1024.0) < 0.1);
+
+    ASSERT(pow(0.0, 3.0) == 0);
 }
 
 [Test]

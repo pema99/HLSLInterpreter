@@ -876,7 +876,7 @@ namespace HLSL
             x = ToFloatLike(x);
             y = ToFloatLike(y);
             (x, y) = HLSLTypeUtils.Promote(x, y, false);
-            return HLSLValueUtils.Map2(x, y, (fx, fy) => MathF.Pow(Convert.ToSingle(fx), Convert.ToSingle(fy)));
+            return HLSLValueUtils.Map2(x, y, (fx, fy) => MathF.Exp(Convert.ToSingle(fy) * MathF.Log(Convert.ToSingle(fx))));
         }
 
         public static NumericValue Radians(NumericValue x)
