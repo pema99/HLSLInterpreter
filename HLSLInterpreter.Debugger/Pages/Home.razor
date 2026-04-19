@@ -506,10 +506,10 @@ float3 hueShift (float3 color, float shift)
         tangent * sin(shift * 6.2832) + axis;
 }
 
-float4 main(uint2 thread : SV_DispatchThreadID)
+float4 main(float4 position : SV_Position) : SV_Target
 {
     float2 res = float2(WARP_SIZE_X, WARP_SIZE_Y);
-    float2 uv = (thread / res) - 0.5;
+    float2 uv = (position.xy / res) - 0.5;
     float dist = length(uv);
     float angle = atan2(uv.y, uv.x) + 0.4;
     float wave = sin(dist * TWIST - angle * ARMS);
@@ -1243,8 +1243,13 @@ float4 main(uint2 thread : SV_DispatchThreadID)
     {
         var threadIds = new object[threadCount][];
         for (int i = 0; i < threadCount; i++)
-            threadIds[i] = new object[] { (uint)(i % wx + groupOffsetX * wx), (uint)(i / wx + groupOffsetY * wy) };
-        return new VectorValue(ScalarType.Uint, new HLSLRegister<object[]>(threadIds).Converge());
+            threadIds[i] = new object[] {
+                (float)(i % wx + groupOffsetX * wx) + 0.5f,
+                (float)(i / wx + groupOffsetY * wy) + 0.5f,
+                0.0f,
+                1.0f
+            };
+        return new VectorValue(ScalarType.Float, new HLSLRegister<object[]>(threadIds).Converge());
     }
 
     private HLSLValue CallMain(VectorValue threadArg)

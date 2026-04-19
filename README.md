@@ -314,7 +314,7 @@ void ScaleIsPositive([ValueSource("GenerateScales")] int scale, [Values(0.5, 1.0
 }
 ```
 
-This generates 6 test cases — one for every combination of `scale` and `x`:
+This generates 6 test cases, one for every combination of `scale` and `x`:
 
 ```
 ScaleIsPositive(1, 0.5)
