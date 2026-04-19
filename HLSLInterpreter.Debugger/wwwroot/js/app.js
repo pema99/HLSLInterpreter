@@ -751,7 +751,7 @@ window.setMonacoReadOnly = function (readOnly) {
             startSize = document.querySelector('.output-panel').getBoundingClientRect().width;
             e.preventDefault();
         } else if (e.target.classList.contains('resize-v-handle')) {
-            const section = e.target.closest('.image-section, .debug-section-image, .debug-section-console, .debug-section-vars, .debug-section-callstack, .debug-section-immediate');
+            const section = e.target.closest('.image-section, .debug-section-image, .debug-section-console, .debug-section-vars, .debug-section-callstack, .debug-section-immediate, .debug-section-asm');
             if (section) {
                 activeHandle = { type: 'vertical', section };
                 startPos = e.clientY;
@@ -795,4 +795,200 @@ window.setMonacoReadOnly = function (readOnly) {
         }
         activeHandle = null;
     });
+})();
+
+// HLSL -> DXBC disassembly via hlsl2asm.wasm (WASI)
+(function () {
+    let cachedWasmModule = null;
+
+    async function ensureWasm() {
+        if (!cachedWasmModule) {
+            cachedWasmModule = await WebAssembly.compileStreaming(
+                fetch('_content/HLSLInterpreter.Debugger/hlsl2asm.wasm')
+            );
+        }
+        return cachedWasmModule;
+    }
+
+    window.compileHlslToAsm = async function (hlslCode, profile, entryPoint) {
+        const encoder = new TextEncoder();
+        const decoder = new TextDecoder();
+        const stdinBytes = encoder.encode(hlslCode);
+        const args = ['hlsl2asm', '--profile', profile, '-b', 'd3d-asm', '--formatting=colour', '--entry', entryPoint || 'main'];
+        const argBuffers = args.map(function (a) { return encoder.encode(a + '\0'); });
+        const argTotalSize = argBuffers.reduce(function (s, b) { return s + b.length; }, 0);
+
+        let memory = null;
+        let stdout = '';
+        let stdinPos = 0;
+        let exitCode = 0;
+
+        const wasi = {
+            args_sizes_get: function (argc_ptr, buf_size_ptr) {
+                var v = new DataView(memory.buffer);
+                v.setUint32(argc_ptr, args.length, true);
+                v.setUint32(buf_size_ptr, argTotalSize, true);
+                return 0;
+            },
+            args_get: function (argv_ptr, buf_ptr) {
+                var v = new DataView(memory.buffer);
+                var b = new Uint8Array(memory.buffer);
+                var offset = buf_ptr;
+                for (var i = 0; i < argBuffers.length; i++) {
+                    v.setUint32(argv_ptr + i * 4, offset, true);
+                    b.set(argBuffers[i], offset);
+                    offset += argBuffers[i].length;
+                }
+                return 0;
+            },
+            environ_sizes_get: function (count_ptr, size_ptr) {
+                var v = new DataView(memory.buffer);
+                v.setUint32(count_ptr, 0, true);
+                v.setUint32(size_ptr, 0, true);
+                return 0;
+            },
+            environ_get: function () { return 0; },
+            fd_read: function (fd, iovs_ptr, iovs_len, nread_ptr) {
+                if (fd !== 0) return 8; // EBADF
+                var v = new DataView(memory.buffer);
+                var b = new Uint8Array(memory.buffer);
+                var total = 0;
+                for (var i = 0; i < iovs_len; i++) {
+                    var bptr = v.getUint32(iovs_ptr + i * 8, true);
+                    var blen = v.getUint32(iovs_ptr + i * 8 + 4, true);
+                    var avail = stdinBytes.length - stdinPos;
+                    var n = Math.min(blen, avail);
+                    if (n <= 0) break;
+                    b.set(stdinBytes.subarray(stdinPos, stdinPos + n), bptr);
+                    stdinPos += n;
+                    total += n;
+                }
+                v.setUint32(nread_ptr, total, true);
+                return 0;
+            },
+            fd_write: function (fd, iovs_ptr, iovs_len, nwritten_ptr) {
+                var v = new DataView(memory.buffer);
+                var b = new Uint8Array(memory.buffer);
+                var total = 0;
+                var text = '';
+                for (var i = 0; i < iovs_len; i++) {
+                    var bptr = v.getUint32(iovs_ptr + i * 8, true);
+                    var blen = v.getUint32(iovs_ptr + i * 8 + 4, true);
+                    text += decoder.decode(b.subarray(bptr, bptr + blen));
+                    total += blen;
+                }
+                if (fd === 1 || fd === 2) stdout += text;
+                v.setUint32(nwritten_ptr, total, true);
+                return 0;
+            },
+            fd_close: function () { return 0; },
+            fd_seek: function (fd, lo, hi, whence, newofs_ptr) { return 70; }, // ESPIPE
+            fd_fdstat_get: function (fd, buf_ptr) {
+                var v = new DataView(memory.buffer);
+                v.setUint8(buf_ptr, 2); // filetype: character_device
+                v.setUint16(buf_ptr + 2, 0, true);
+                v.setBigUint64(buf_ptr + 8, 0n, true);
+                v.setBigUint64(buf_ptr + 16, 0n, true);
+                return 0;
+            },
+            fd_fdstat_set_flags: function () { return 0; },
+            fd_filestat_get: function (fd, buf_ptr) {
+                if (fd > 2) return 8; // EBADF
+                // Fill __wasi_filestat_t (64 bytes): dev, ino, filetype, pad, nlink, size, atim, mtim, ctim
+                var v = new DataView(memory.buffer);
+                for (var i = 0; i < 64; i++) v.setUint8(buf_ptr + i, 0);
+                v.setUint8(buf_ptr + 16, 2); // filetype: character_device
+                return 0;
+            },
+            fd_prestat_get: function () { return 8; }, // EBADF
+            fd_prestat_dir_name: function () { return 8; },
+            path_open: function () { return 8; },
+            path_filestat_get: function () { return 8; },
+            random_get: function (buf_ptr, buf_len) {
+                crypto.getRandomValues(new Uint8Array(memory.buffer, buf_ptr, buf_len));
+                return 0;
+            },
+            clock_time_get: function (id, lo, hi, time_ptr) {
+                var v = new DataView(memory.buffer);
+                v.setBigUint64(time_ptr, BigInt(Date.now()) * 1000000n, true);
+                return 0;
+            },
+            sched_yield: function () { return 0; },
+            poll_oneoff: function () { return 52; }, // ENOSYS
+            proc_exit: function (code) {
+                exitCode = code;
+                throw { __wasiExit: true };
+            },
+        };
+
+        function ansiToHtml(text) {
+            var fgColors = {
+                30: '#555', 31: '#cd3131', 32: '#0dbc79', 33: '#e5e510',
+                34: '#2472c8', 35: '#bc3fbc', 36: '#11a8cd', 37: '#d4d4d4',
+                90: '#888', 91: '#f14c4c', 92: '#23d18b', 93: '#f5f543',
+                94: '#3b8eea', 95: '#d670d6', 96: '#29b8db', 97: '#fff',
+            };
+            var html = '', currentColor = null, currentBold = false, spanOpen = false;
+            var htmlEscape = function (s) {
+                return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            };
+            var segments = text.split(/(\x1b\[[0-9;]*m)/);
+            for (var i = 0; i < segments.length; i++) {
+                var seg = segments[i];
+                var m = seg.match(/^\x1b\[([0-9;]*)m$/);
+                if (m) {
+                    var codes = m[1] === '' ? [0] : m[1].split(';').map(Number);
+                    var prevColor = currentColor, prevBold = currentBold;
+                    var didReset = false;
+                    for (var j = 0; j < codes.length; j++) {
+                        var c = codes[j];
+                        if (c === 0) { currentColor = null; currentBold = false; didReset = true; }
+                        else if (c === 1) currentBold = true;
+                        else if (c === 22) currentBold = false;
+                        else if (fgColors[c]) currentColor = fgColors[c];
+                    }
+                    // vkd3d resets color between the base opcode and its modifier suffix (e.g. "if" + "_nz").
+                    // Splice the suffix out of the next text segment so only the "_word" token inherits
+                    // the previous color, not the rest of the line.
+                    if (didReset && currentColor === null && i + 1 < segments.length) {
+                        var next = segments[i + 1];
+                        if (next && next[0] === '_') {
+                            var suffixEnd = next.search(/[^_a-zA-Z0-9]/);
+                            var suffix = suffixEnd === -1 ? next : next.slice(0, suffixEnd);
+                            var remainder = suffixEnd === -1 ? '' : next.slice(suffixEnd);
+                            // Emit the suffix with the previous style, then continue with remainder unstyled
+                            if (spanOpen) { html += '</span>'; spanOpen = false; }
+                            var suffixStyle = (prevColor ? 'color:' + prevColor + ';' : '') +
+                                             (prevBold ? 'font-weight:bold;' : '');
+                            if (suffixStyle) html += '<span style="' + suffixStyle + '">' + htmlEscape(suffix) + '</span>';
+                            else html += htmlEscape(suffix);
+                            // Replace the consumed segment so the main loop sees only the remainder
+                            segments[i + 1] = remainder;
+                        }
+                    }
+                    if (spanOpen) { html += '</span>'; spanOpen = false; }
+                    var style = (currentColor ? 'color:' + currentColor + ';' : '') +
+                                (currentBold ? 'font-weight:bold;' : '');
+                    if (style) { html += '<span style="' + style + '">'; spanOpen = true; }
+                } else {
+                    html += htmlEscape(seg);
+                }
+            }
+            if (spanOpen) html += '</span>';
+            return html;
+        }
+
+        try {
+            var wasmModule = await ensureWasm();
+            var instance = await WebAssembly.instantiate(wasmModule, { wasi_snapshot_preview1: wasi });
+            memory = instance.exports.memory;
+            try { instance.exports._start(); } catch (e) { if (!e || !e.__wasiExit) throw e; }
+            return exitCode === 0
+                ? ansiToHtml(stdout)
+                : '<span style="color:#cd3131">Compilation failed (exit ' + exitCode + '):</span>\n' + ansiToHtml(stdout);
+        } catch (e) {
+            if (e && e.__wasiExit) return exitCode === 0 ? stdout : 'Exit ' + exitCode + ':\n' + stdout;
+            return 'Error running hlsl2asm: ' + (e && e.message || String(e));
+        }
+    };
 })();

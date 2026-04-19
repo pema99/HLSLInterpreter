@@ -327,7 +327,7 @@
 }
 
 .output-text {
-    font-size: 15px;
+    font-size: 12px;
     color: #9cdcfe;
     white-space: pre-wrap;
     word-break: break-word;
@@ -336,7 +336,7 @@
 }
 
 .error-text {
-    font-size: 15px;
+    font-size: 12px;
     color: #f48771;
     white-space: pre-wrap;
     word-break: break-word;
@@ -977,6 +977,54 @@
     height: auto;
 }
 
+.debug-section-asm {
+    height: var(--section-h, 240px);
+    min-height: 0;
+    flex-shrink: 0;
+}
+
+.debug-section-asm.section-collapsed {
+    height: auto;
+}
+
+.asm-header-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.asm-profile-select {
+    height: 22px;
+    padding: 0 4px;
+    background: #3c3c3c;
+    border: 1px solid #555;
+    border-radius: 3px;
+    color: #d4d4d4;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.asm-profile-select:focus {
+    outline: none;
+    border-color: #007acc;
+}
+
+
+.asm-body {
+    flex: 1;
+    overflow: auto;
+    padding: 8px 12px;
+    min-height: 0;
+}
+
+.asm-output {
+    margin: 0;
+    font-family: 'JetBrains Mono', 'Cascadia Code', 'Consolas', monospace;
+    font-size: 12px;
+    color: #d4d4d4;
+    white-space: pre;
+}
+
 .debug-panel-spacer {
     flex: 1;
 }
@@ -1089,15 +1137,43 @@
 }
 
 /* Scrollbar */
-.output-body::-webkit-scrollbar {
+.output-panel::-webkit-scrollbar,
+.output-body::-webkit-scrollbar,
+.debug-vars-body::-webkit-scrollbar,
+.debug-console-body::-webkit-scrollbar,
+.callstack-pane::-webkit-scrollbar,
+.imm-body::-webkit-scrollbar,
+.asm-body::-webkit-scrollbar {
     width: 6px;
+    height: 6px;
 }
-.output-body::-webkit-scrollbar-track {
+.output-panel::-webkit-scrollbar-track,
+.output-body::-webkit-scrollbar-track,
+.debug-vars-body::-webkit-scrollbar-track,
+.debug-console-body::-webkit-scrollbar-track,
+.callstack-pane::-webkit-scrollbar-track,
+.imm-body::-webkit-scrollbar-track,
+.asm-body::-webkit-scrollbar-track {
     background: #1e1e1e;
 }
-.output-body::-webkit-scrollbar-thumb {
+.output-panel::-webkit-scrollbar-thumb,
+.output-body::-webkit-scrollbar-thumb,
+.debug-vars-body::-webkit-scrollbar-thumb,
+.debug-console-body::-webkit-scrollbar-thumb,
+.callstack-pane::-webkit-scrollbar-thumb,
+.imm-body::-webkit-scrollbar-thumb,
+.asm-body::-webkit-scrollbar-thumb {
     background: #555;
     border-radius: 3px;
+}
+.output-panel::-webkit-scrollbar-corner,
+.output-body::-webkit-scrollbar-corner,
+.debug-vars-body::-webkit-scrollbar-corner,
+.debug-console-body::-webkit-scrollbar-corner,
+.callstack-pane::-webkit-scrollbar-corner,
+.imm-body::-webkit-scrollbar-corner,
+.asm-body::-webkit-scrollbar-corner {
+    background: #1e1e1e;
 }
 
 #blazor-error-ui {

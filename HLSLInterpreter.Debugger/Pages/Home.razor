@@ -389,6 +389,63 @@
                     </div>
                 }
 
+                <!-- Disassembly -->
+                <div class="debug-section debug-section-asm @(asmCollapsed ? "section-collapsed" : "")">
+                    <div class="panel-header collapsible-header" @onclick="() => asmCollapsed = !asmCollapsed">
+                        <div class="panel-header-left">
+                            <span class="collapse-icon @(asmCollapsed ? "" : "expanded")">&#x203A;</span>
+                            <span>Disassembly</span>
+                        </div>
+                        @if (!asmCollapsed)
+                        {
+                            <div class="asm-header-controls" @onclick:stopPropagation>
+                                <select class="asm-profile-select" @bind="asmProfile" @bind:after="DisassembleAsync">
+                                    <option value="cs_4_0">cs_4_0</option>
+                                    <option value="cs_4_1">cs_4_1</option>
+                                    <option value="cs_5_0">cs_5_0</option>
+                                    <option value="cs_5_1">cs_5_1</option>
+                                    <option value="ds_5_0">ds_5_0</option>
+                                    <option value="ds_5_1">ds_5_1</option>
+                                    <option value="gs_4_0">gs_4_0</option>
+                                    <option value="gs_4_1">gs_4_1</option>
+                                    <option value="gs_5_0">gs_5_0</option>
+                                    <option value="gs_5_1">gs_5_1</option>
+                                    <option value="hs_5_0">hs_5_0</option>
+                                    <option value="hs_5_1">hs_5_1</option>
+                                    <option value="ps_3_0">ps_3_0</option>
+                                    <option value="ps_4_0">ps_4_0</option>
+                                    <option value="ps_4_1">ps_4_1</option>
+                                    <option value="ps_5_0">ps_5_0</option>
+                                    <option value="ps_5_1">ps_5_1</option>
+                                    <option value="vs_3_0">vs_3_0</option>
+                                    <option value="vs_4_0">vs_4_0</option>
+                                    <option value="vs_4_1">vs_4_1</option>
+                                    <option value="vs_5_0">vs_5_0</option>
+                                    <option value="vs_5_1">vs_5_1</option>
+                                </select>
+                            </div>
+                        }
+                    </div>
+                    @if (!asmCollapsed)
+                    {
+                        <div class="asm-body">
+                            @if (asmIsCompiling)
+                            {
+                                <div class="hint"><span class="spinner spinner-output"></span> Compiling...</div>
+                            }
+                            else if (string.IsNullOrEmpty(asmOutput))
+                            {
+                                <div class="hint">Press <strong>Run</strong> or <strong>Debug</strong> to disassemble.</div>
+                            }
+                            else
+                            {
+                                <pre class="asm-output">@((MarkupString)asmOutput)</pre>
+                            }
+                        </div>
+                        <div class="resize-v-handle" title="Drag to resize"></div>
+                    }
+                </div>
+
                 <div class="debug-panel-spacer"></div>
             }
             else
@@ -450,6 +507,63 @@
                     </div>
                 }
 
+                <!-- Disassembly -->
+                <div class="debug-section debug-section-asm @(asmCollapsed ? "section-collapsed" : "")">
+                    <div class="panel-header collapsible-header" @onclick="() => asmCollapsed = !asmCollapsed">
+                        <div class="panel-header-left">
+                            <span class="collapse-icon @(asmCollapsed ? "" : "expanded")">&#x203A;</span>
+                            <span>Disassembly</span>
+                        </div>
+                        @if (!asmCollapsed)
+                        {
+                            <div class="asm-header-controls" @onclick:stopPropagation>
+                                <select class="asm-profile-select" @bind="asmProfile" @bind:after="DisassembleAsync">
+                                    <option value="cs_4_0">cs_4_0</option>
+                                    <option value="cs_4_1">cs_4_1</option>
+                                    <option value="cs_5_0">cs_5_0</option>
+                                    <option value="cs_5_1">cs_5_1</option>
+                                    <option value="ds_5_0">ds_5_0</option>
+                                    <option value="ds_5_1">ds_5_1</option>
+                                    <option value="gs_4_0">gs_4_0</option>
+                                    <option value="gs_4_1">gs_4_1</option>
+                                    <option value="gs_5_0">gs_5_0</option>
+                                    <option value="gs_5_1">gs_5_1</option>
+                                    <option value="hs_5_0">hs_5_0</option>
+                                    <option value="hs_5_1">hs_5_1</option>
+                                    <option value="ps_3_0">ps_3_0</option>
+                                    <option value="ps_4_0">ps_4_0</option>
+                                    <option value="ps_4_1">ps_4_1</option>
+                                    <option value="ps_5_0">ps_5_0</option>
+                                    <option value="ps_5_1">ps_5_1</option>
+                                    <option value="vs_3_0">vs_3_0</option>
+                                    <option value="vs_4_0">vs_4_0</option>
+                                    <option value="vs_4_1">vs_4_1</option>
+                                    <option value="vs_5_0">vs_5_0</option>
+                                    <option value="vs_5_1">vs_5_1</option>
+                                </select>
+                            </div>
+                        }
+                    </div>
+                    @if (!asmCollapsed)
+                    {
+                        <div class="asm-body">
+                            @if (asmIsCompiling)
+                            {
+                                <div class="hint"><span class="spinner spinner-output"></span> Compiling...</div>
+                            }
+                            else if (string.IsNullOrEmpty(asmOutput))
+                            {
+                                <div class="hint">Press <strong>Run</strong> or <strong>Debug</strong> to disassemble.</div>
+                            }
+                            else
+                            {
+                                <pre class="asm-output">@((MarkupString)asmOutput)</pre>
+                            }
+                        </div>
+                        <div class="resize-v-handle" title="Drag to resize"></div>
+                    }
+                </div>
+
                 <div class="debug-panel-spacer"></div>
             }
         </div>
@@ -506,7 +620,7 @@ float3 hueShift (float3 color, float shift)
         tangent * sin(shift * 6.2832) + axis;
 }
 
-float4 main(uint2 thread : SV_DispatchThreadID)
+float4 main(uint2 thread : SV_Position) : SV_Target
 {
     float2 res = float2(WARP_SIZE_X, WARP_SIZE_Y);
     float2 uv = (thread / res) - 0.5;
@@ -671,6 +785,37 @@ float4 main(uint2 thread : SV_DispatchThreadID)
     private bool consoleCollapsed = false;
     private bool immediateCollapsed = false;
 
+    // --- Disassembly ---
+    private bool asmCollapsed = false;
+    private string asmProfile = "ps_5_0";
+    private string asmOutput = "";
+    private bool asmIsCompiling = false;
+
+    private const string HlslTestPreamble =
+        "#ifndef __HLSL_TEST_INCLUDED__\n" +
+        "#define __HLSL_TEST_INCLUDED__\n" +
+        "#ifndef __HLSL_TEST_RUNNER__\n" +
+        "    #define printf\n" +
+        "    #define PRINTF\n" +
+        "    #define ASSERT(x)\n" +
+        "    #define ASSERT_MSG(x, msg)\n" +
+        "    #define ASSERT_EQUAL(a, b)\n" +
+        "    #define ASSERT_NEAR(a, b, eps)\n" +
+        "    #define ASSERT_UNIFORM(x)\n" +
+        "    #define ASSERT_VARYING(x)\n" +
+        "    #define PASS_TEST\n" +
+        "    #define PASS_TEST_MSG(msg)\n" +
+        "    #define FAIL_TEST\n" +
+        "    #define FAIL_TEST_MSG(msg)\n" +
+        "    #define IGNORE_TEST\n" +
+        "    #define IGNORE_TEST_MSG(msg)\n" +
+        "    #define MOCK_RESOURCE(res, mock)\n" +
+        "    #define TEST_NAME \"Test\"\n" +
+        "    #define TEST_CASE\n" +
+        "    #define TEST_VALUE(x)\n" +
+        "#endif\n" +
+        "#endif\n";
+
     // --- Immediate window ---
     private string immediateInput = "";
     private List<ImmediateEntry> immediateHistory = new();
@@ -817,6 +962,7 @@ float4 main(uint2 thread : SV_DispatchThreadID)
         needsImageRender = hasImage;
         isRunning = false;
         StateHasChanged();
+        _ = DisassembleAsync();
     }
 
     // --- Debug: record trace ---
@@ -917,6 +1063,7 @@ float4 main(uint2 thread : SV_DispatchThreadID)
             // Compile/parse/runtime error, nothing useful to debug
             needsSectionHeightRestore = true;
             StateHasChanged();
+            _ = DisassembleAsync();
             return;
         }
 
@@ -927,6 +1074,7 @@ float4 main(uint2 thread : SV_DispatchThreadID)
         // Keep console open when failing so the error is visible
         consoleCollapsed = !hasError;
         imageCollapsed = true;
+        asmCollapsed = true;
 
         // When failing, start at the last recorded step so the failing statement is highlighted
         if (debugTrace.Count > 0)
@@ -938,6 +1086,7 @@ float4 main(uint2 thread : SV_DispatchThreadID)
         needsSectionHeightRestore = true;
         needsThreadGridInit = true;
         StateHasChanged();
+        _ = DisassembleAsync();
     }
 
     // --- Debug navigation ---
@@ -1072,6 +1221,7 @@ float4 main(uint2 thread : SV_DispatchThreadID)
         debugStepIndex = -1;
         consoleCollapsed = false;
         imageCollapsed = false;
+        asmCollapsed = false;
         await JS.InvokeVoidAsync("highlightDebugLine", 0);
         await JS.InvokeVoidAsync("disposeThreadGridResize");
         needsSectionHeightRestore = true;
@@ -1382,6 +1532,20 @@ float4 main(uint2 thread : SV_DispatchThreadID)
     }
 
     private static byte FloatToByte(float v) => (byte)(Math.Clamp(v, 0f, 1f) * 255f + 0.5f);
+
+    private async Task DisassembleAsync()
+    {
+        asmIsCompiling = true;
+        asmOutput = "";
+        StateHasChanged();
+        await Task.Yield();
+
+        string code = await JS.InvokeAsync<string>("getMonacoValue");
+        string preamble = $"#define WARP_SIZE_X {Math.Max(1, warpX)}\n#define WARP_SIZE_Y {Math.Max(1, warpY)}\n" + HlslTestPreamble;
+        asmOutput = await JS.InvokeAsync<string>("compileHlslToAsm", preamble + code, asmProfile, entryPoint);
+        asmIsCompiling = false;
+        StateHasChanged();
+    }
 
     // --- Permalink ---
     private static string GetQueryParam(string url, string key)
