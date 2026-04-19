@@ -1641,71 +1641,31 @@ namespace HLSL
             return retVal;
         }
 
-        public static NumericValue WaveActiveBitAnd(HLSLExecutionState executionState, NumericValue expr)
+        private static NumericValue WaveActiveReduce(HLSLExecutionState executionState, NumericValue expr, Func<NumericValue, NumericValue, NumericValue> op)
         {
-            NumericValue exprFirst = null;
-
-            for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
+            NumericValue acc = null;
+            for (int i = 0; i < executionState.GetThreadCount(); i++)
             {
-                if (!executionState.IsThreadActive(threadIndex))
+                if (!executionState.IsThreadActive(i))
                     continue;
 
-                if (exprFirst is null)
-                {
-                    exprFirst = expr.Scalarize(threadIndex);
-                }
+                var lane = expr.Scalarize(i);
+                if (acc is null)
+                    acc = lane;
                 else
-                {
-                    exprFirst = exprFirst & expr.Scalarize(threadIndex);
-                }
+                    acc = op(acc, lane);
             }
-
-            return exprFirst;
+            return acc;
         }
 
-        public static NumericValue WaveActiveBitOr(HLSLExecutionState executionState, NumericValue expr)
-        {
-            NumericValue exprFirst = null;
+        public static NumericValue WaveActiveBitAnd(HLSLExecutionState executionState, NumericValue expr) =>
+            WaveActiveReduce(executionState, expr, (a, b) => a & b);
 
-            for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
-            {
-                if (!executionState.IsThreadActive(threadIndex))
-                    continue;
+        public static NumericValue WaveActiveBitOr(HLSLExecutionState executionState, NumericValue expr) =>
+            WaveActiveReduce(executionState, expr, (a, b) => a | b);
 
-                if (exprFirst is null)
-                {
-                    exprFirst = expr.Scalarize(threadIndex);
-                }
-                else
-                {
-                    exprFirst = exprFirst | expr.Scalarize(threadIndex);
-                }
-            }
-
-            return exprFirst;
-        }
-
-        public static NumericValue WaveActiveBitXor(HLSLExecutionState executionState, NumericValue expr)
-        {
-            NumericValue exprFirst = null;
-
-            for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
-            {
-                if (!executionState.IsThreadActive(threadIndex))
-                    continue;
-
-                if (exprFirst is null)
-                {
-                    exprFirst = expr.Scalarize(threadIndex);
-                }
-                else
-                {
-                    exprFirst = exprFirst ^ expr.Scalarize(threadIndex);
-                }
-            }
-
-            return exprFirst;
-        }
+        public static NumericValue WaveActiveBitXor(HLSLExecutionState executionState, NumericValue expr) =>
+            WaveActiveReduce(executionState, expr, (a, b) => a ^ b);
 
         public static NumericValue WaveActiveCountBits(HLSLExecutionState executionState, NumericValue expr)
         {
@@ -1725,93 +1685,17 @@ namespace HLSL
             return count;
         }
 
-        public static NumericValue WaveActiveMax(HLSLExecutionState executionState, NumericValue expr)
-        {
-            NumericValue exprFirst = null;
+        public static NumericValue WaveActiveMax(HLSLExecutionState executionState, NumericValue expr) =>
+            WaveActiveReduce(executionState, expr, Max);
 
-            for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
-            {
-                if (!executionState.IsThreadActive(threadIndex))
-                    continue;
+        public static NumericValue WaveActiveMin(HLSLExecutionState executionState, NumericValue expr) =>
+            WaveActiveReduce(executionState, expr, Min);
 
-                if (exprFirst is null)
-                {
-                    exprFirst = expr.Scalarize(threadIndex);
-                }
-                else
-                {
-                    exprFirst = Max(exprFirst, expr.Scalarize(threadIndex));
-                }
-            }
+        public static NumericValue WaveActiveProduct(HLSLExecutionState executionState, NumericValue expr) =>
+            WaveActiveReduce(executionState, expr, (a, b) => a * b);
 
-            return exprFirst;
-        }
-
-        public static NumericValue WaveActiveMin(HLSLExecutionState executionState, NumericValue expr)
-        {
-            NumericValue exprFirst = null;
-
-            for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
-            {
-                if (!executionState.IsThreadActive(threadIndex))
-                    continue;
-
-                if (exprFirst is null)
-                {
-                    exprFirst = expr.Scalarize(threadIndex);
-                }
-                else
-                {
-                    exprFirst = Min(exprFirst, expr.Scalarize(threadIndex));
-                }
-            }
-
-            return exprFirst;
-        }
-
-        public static NumericValue WaveActiveProduct(HLSLExecutionState executionState, NumericValue expr)
-        {
-            NumericValue exprFirst = null;
-
-            for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
-            {
-                if (!executionState.IsThreadActive(threadIndex))
-                    continue;
-
-                if (exprFirst is null)
-                {
-                    exprFirst = expr.Scalarize(threadIndex);
-                }
-                else
-                {
-                    exprFirst = exprFirst * expr.Scalarize(threadIndex);
-                }
-            }
-
-            return exprFirst;
-        }
-
-        public static NumericValue WaveActiveSum(HLSLExecutionState executionState, NumericValue expr)
-        {
-            NumericValue exprFirst = null;
-
-            for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
-            {
-                if (!executionState.IsThreadActive(threadIndex))
-                    continue;
-
-                if (exprFirst is null)
-                {
-                    exprFirst = expr.Scalarize(threadIndex);
-                }
-                else
-                {
-                    exprFirst = exprFirst + expr.Scalarize(threadIndex);
-                }
-            }
-
-            return exprFirst;
-        }
+        public static NumericValue WaveActiveSum(HLSLExecutionState executionState, NumericValue expr) =>
+            WaveActiveReduce(executionState, expr, (a, b) => a + b);
 
         public static NumericValue WaveActiveAllTrue(HLSLExecutionState executionState, NumericValue expr)
         {
