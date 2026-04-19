@@ -1,0 +1,17 @@
+hlsl2asm.wasm
+=============
+
+This file is a WebAssembly binary of vkd3d-compiler, the HLSL shader compiler
+frontend from the vkd3d project (https://gitlab.winehq.org/wine/vkd3d).
+
+It is used to disassemble HLSL shader source code into human-readable DXBC
+assembly at runtime, entirely in the browser.
+
+Build instructions and source for this binary are available at:
+  https://github.com/pema99/hlsl-to-dxbc-wasm
+
+License
+-------
+vkd3d-compiler is part of the vkd3d project, licensed under the
+GNU Lesser General Public License v2.1 (LGPL-2.1).
+See: https://gitlab.winehq.org/wine/vkd3d/-/blob/master/LICENSE
