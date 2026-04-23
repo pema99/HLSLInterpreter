@@ -207,6 +207,8 @@ namespace HLSL
                             return value.Double != 0.0;
                         case ScalarType.Char:
                             return value.Char != '\0';
+                        case ScalarType.Void:
+                            return default;
                         default:
                             throw new InvalidOperationException();
                     }
@@ -236,6 +238,8 @@ namespace HLSL
                             return (int)value.Double;
                         case ScalarType.Char:
                             return (int)value.Char;
+                        case ScalarType.Void:
+                            return default;
                         default:
                             throw new InvalidOperationException();
                     }
@@ -265,6 +269,8 @@ namespace HLSL
                             return (uint)value.Double;
                         case ScalarType.Char:
                             return (uint)value.Char;
+                        case ScalarType.Void:
+                            return default;
                         default:
                             throw new InvalidOperationException();
                     }
@@ -297,6 +303,8 @@ namespace HLSL
                             return (float)value.Double;
                         case ScalarType.Char:
                             return (float)value.Char;
+                        case ScalarType.Void:
+                            return default;
                         default:
                             throw new InvalidOperationException();
                     }
@@ -324,6 +332,8 @@ namespace HLSL
                             return value;
                         case ScalarType.Char:
                             return (double)value.Char;
+                        case ScalarType.Void:
+                            return default;
                         default:
                             throw new InvalidOperationException();
                     }
@@ -351,6 +361,8 @@ namespace HLSL
                             return (char)value.Double;
                         case ScalarType.Char:
                             return value;
+                        case ScalarType.Void:
+                            return default;
                         default:
                             throw new InvalidOperationException();
                     }
