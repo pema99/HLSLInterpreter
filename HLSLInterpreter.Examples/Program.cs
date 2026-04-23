@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -87,6 +87,79 @@ public class Program
         }
     }
 
+    private static void RunShader(string shaderPath, ColorRGBA[,] outputColors)
+    {
+        string shaderSource = File.ReadAllText(shaderPath);
+
+        var config = new HLSLParserConfig()
+        {
+            PreProcessorMode = PreProcessorMode.ExpandAll,
+            Defines = new Dictionary<string, string>() { { "HLSL_TEST", "1" } }
+        };
+
+        var toks = ShaderParser.ParseTopLevelDeclarations(shaderSource, config, out var diags, out var prags);
+
+        int resolutionX = outputColors?.GetLength(0) ?? 92;
+        int resolutionY = outputColors?.GetLength(1) ?? 92;
+        int warpSize = 4;
+        int progress = 0;
+
+#if DEBUG
+        for (int y = 0; y < resolutionY / warpSize; y++)
+#else
+        Parallel.For(0, resolutionY / warpSize, y =>
+#endif
+        {
+            HLSLRunner runner = new HLSLRunner();
+            runner.ProcessCode(toks);
+            runner.SetVariable("_Time", new VectorValue(ScalarType.Float, new HLSLRegister<RawValue[]>(new RawValue[] { 0f, 0f })));
+            runner.SetVariable("_Resolution", new ScalarValue(ScalarType.Float, new HLSLRegister<RawValue>(1f)));
+
+            var uvs = new RawValue[warpSize * warpSize][];
+            for (int i = 0; i < uvs.Length; i++)
+                uvs[i] = new RawValue[2];
+
+            for (int x = 0; x < resolutionX / warpSize; x++)
+            {
+                var v2fdict = new Dictionary<string, HLSLValue>();
+                for (int warpY = 0; warpY < warpSize; warpY++)
+                {
+                    for (int warpX = 0; warpX < warpSize; warpX++)
+                    {
+                        uvs[warpY * warpSize + warpX][0] = ((float)x * warpSize + warpX) / resolutionX;
+                        uvs[warpY * warpSize + warpX][1] = 1.0f - ((float)y * warpSize + warpY) / resolutionY;
+                    }
+                }
+                v2fdict["uv"] = new VectorValue(ScalarType.Float, new HLSLRegister<RawValue[]>(uvs).Converge());
+                var v2f = new StructValue("v2f", v2fdict);
+
+                runner.SetWarpSize(warpSize, warpSize);
+                var color = runner.CallFunction("frag", v2f);
+                if (outputColors != null)
+                {
+                    for (int warpY = 0; warpY < warpSize; warpY++)
+                    {
+                        for (int warpX = 0; warpX < warpSize; warpX++)
+                        {
+                            var colorVec = ((VectorValue)color).Values.Get(warpY * warpSize + warpX);
+                            outputColors[x * warpSize + warpX, y * warpSize + warpY] = new ColorRGBA(
+                                (byte)(Math.Clamp(colorVec[0].Float, 0, 1) * 255),
+                                (byte)(Math.Clamp(colorVec[1].Float, 0, 1) * 255),
+                                (byte)(Math.Clamp(colorVec[2].Float, 0, 1) * 255),
+                                (byte)(Math.Clamp(colorVec[3].Float, 0, 1) * 255)
+                            );
+                        }
+                    }
+                }
+            }
+            if (outputColors != null)
+                Console.WriteLine($"{Interlocked.Add(ref progress, 1) / (float)(resolutionY / warpSize) * 100f}%");
+        }
+#if !DEBUG
+        );
+#endif
+    }
+
     public static void RunShaderToy()
     {
         string shaderFolderPath = @"Shaders/ShaderToy";
@@ -100,76 +173,15 @@ public class Program
         string shaderPath = shaders[int.Parse(Console.ReadKey().KeyChar.ToString())];
         Console.WriteLine();
 
-        string shaderSource = File.ReadAllText(shaderPath);
-
-        // Ignore macros for the purpose of editing
-        var config = new HLSLParserConfig()
-        {
-            PreProcessorMode = PreProcessorMode.ExpandAll,
-            Defines = new Dictionary<string, string>() { { "HLSL_TEST", "1" } }
-        };
-
-        var toks = ShaderParser.ParseTopLevelDeclarations(shaderSource, config, out var diags, out var prags);
-
         int resolutionX = 92;
         int resolutionY = 92;
-        int warpSize = 4;
         ColorRGBA[,] colors = new ColorRGBA[resolutionX, resolutionY];
-        int progress = 0;
 
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-#if DEBUG
-        for (int y = 0; y < resolutionY / warpSize; y++)
-#else
-        Parallel.For(0, resolutionY / warpSize, y =>
-#endif
-        {
-            HLSLRunner runner = new HLSLRunner();
-            runner.ProcessCode(toks);
-            runner.SetVariable("_Time", new VectorValue(ScalarType.Float, new HLSLRegister<object[]>(new object[] { 0f, 0f })));
-            runner.SetVariable("_Resolution", new ScalarValue(ScalarType.Float, new HLSLRegister<object>(1f)));
-
-            var uvs = new object[warpSize * warpSize][];
-            for (int i = 0; i < uvs.Length; i++)
-                uvs[i] = new object[2];
-
-            for (int x = 0; x < resolutionX / warpSize; x++)
-            {
-                var v2fdict = new Dictionary<string, HLSLValue>();
-                for (int warpY = 0; warpY < warpSize; warpY++)
-                {
-                    for (int warpX = 0; warpX < warpSize; warpX++)
-                    {
-                        uvs[warpY * warpSize + warpX][0] = ((float)x * warpSize + warpX) / resolutionX;
-                        uvs[warpY * warpSize + warpX][1] = 1.0f - ((float)y * warpSize + warpY) / resolutionY;
-                    }
-                }
-                v2fdict["uv"] = new VectorValue(ScalarType.Float, new HLSLRegister<object[]>(uvs).Converge());
-                var v2f = new StructValue("v2f", v2fdict);
-
-                runner.SetWarpSize(warpSize, warpSize);
-                var color = runner.CallFunction("frag", v2f);
-                for (int warpY = 0; warpY < warpSize; warpY++)
-                {
-                    for (int warpX = 0; warpX < warpSize; warpX++)
-                    {
-                        var colorVec = ((VectorValue)color).Values.Get(warpY * warpSize + warpX);
-                        colors[x * warpSize + warpX, y * warpSize + warpY] = new ColorRGBA(
-                            (byte)(Math.Clamp(Convert.ToSingle(colorVec[0]), 0, 1) * 255),
-                            (byte)(Math.Clamp(Convert.ToSingle(colorVec[1]), 0, 1) * 255),
-                            (byte)(Math.Clamp(Convert.ToSingle(colorVec[2]), 0, 1) * 255),
-                            (byte)(Math.Clamp(Convert.ToSingle(colorVec[3]), 0, 1) * 255)
-                        );
-                    }
-                }
-            }
-            Console.WriteLine($"{Interlocked.Add(ref progress, 1) / (float)(resolutionY / warpSize) * 100f}%");
-        }
-#if !DEBUG
-        );
-#endif
+        var sw = Stopwatch.StartNew();
+        RunShader(shaderPath, colors);
         sw.Stop();
         Console.WriteLine("Took " + sw.ElapsedMilliseconds / 1000.0f + " seconds.");
+
         BitmapWriter.WriteBmp("output.bmp", colors);
         Console.WriteLine($"Wrote output to {Path.GetFullPath("output.bmp")}");
 
@@ -180,6 +192,36 @@ public class Program
             UseShellExecute = true
         };
         p.Start();
+    }
+
+    public static void BenchmarkAll()
+    {
+        string shaderFolderPath = @"Shaders/ShaderToy";
+        var shaders = Directory.GetFiles(shaderFolderPath).OrderBy(p => p).ToArray();
+
+        Console.WriteLine("Warming up...");
+        for (int i = 0; i < 2; i++)
+            foreach (var shader in shaders)
+                RunShader(shader, null);
+
+        Console.WriteLine();
+        Console.WriteLine("Timed runs:");
+        var perShaderMs = new Dictionary<string, long>();
+        var total = Stopwatch.StartNew();
+        foreach (var shader in shaders)
+        {
+            var sw = Stopwatch.StartNew();
+            RunShader(shader, null);
+            sw.Stop();
+            perShaderMs[Path.GetFileName(shader)] = sw.ElapsedMilliseconds;
+        }
+        total.Stop();
+
+        Console.WriteLine();
+        foreach (var kv in perShaderMs)
+            Console.WriteLine($"  {kv.Key,-30} {kv.Value,8} ms");
+        Console.WriteLine();
+        Console.WriteLine($"  {"TOTAL",-30} {total.ElapsedMilliseconds,8} ms");
     }
 
     public static void Main()
