@@ -258,24 +258,28 @@ namespace HLSL
 
         public static ScalarValue[] RegisterToScalars(ScalarType type, HLSLRegister<RawValue[]> scalars)
         {
-            ScalarValue[] scalarValues = new ScalarValue[scalars.Get(0).Length];
+            int count = scalars.Get(0).Length;
+            ScalarValue[] scalarValues = new ScalarValue[count];
             if (scalars.IsUniform)
             {
-                for (int i = 0; i < scalarValues.Length; i++)
+                var uniform = scalars.UniformValue;
+                for (int i = 0; i < count; i++)
                 {
-                    scalarValues[i] = new ScalarValue(type, HLSLValueUtils.MakeScalarSGPR(scalars.UniformValue[i]));
+                    scalarValues[i] = new ScalarValue(type, new HLSLRegister<RawValue>(uniform[i]));
                 }
             }
             else
             {
-                for (int i = 0; i < scalarValues.Length; i++)
+                var varying = scalars.VaryingValues;
+                int threadCount = varying.Length;
+                for (int i = 0; i < count; i++)
                 {
-                    RawValue[] perThreadValues = new RawValue[scalars.Size];
-                    for (int threadIndex = 0; threadIndex < scalars.Size; threadIndex++)
+                    RawValue[] perThreadValues = new RawValue[threadCount];
+                    for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
                     {
-                        perThreadValues[threadIndex] = scalars.VaryingValues[threadIndex][i];
+                        perThreadValues[threadIndex] = varying[threadIndex][i];
                     }
-                    scalarValues[i] = new ScalarValue(type, HLSLValueUtils.MakeScalarVGPR(perThreadValues));
+                    scalarValues[i] = new ScalarValue(type, new HLSLRegister<RawValue>(perThreadValues));
                 }
             }
             return scalarValues;
