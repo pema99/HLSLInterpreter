@@ -335,6 +335,9 @@ namespace HLSL
 
         public override NumericValue Cast(ScalarType type)
         {
+            if (Type == type)
+                return this;
+
             return new ScalarValue(type, Value.Map(x => HLSLTypeUtils.CastNumeric(type, Type, x)));
         }
 
@@ -561,6 +564,9 @@ namespace HLSL
 
         public override NumericValue Cast(ScalarType type)
         {
+            if (Type == type)
+                return this;
+
             return new VectorValue(type, Values.Map(x =>
             {
                 RawValue[] res = new RawValue[x.Length];
@@ -773,6 +779,9 @@ namespace HLSL
 
         public override NumericValue Cast(ScalarType type)
         {
+            if (Type == type)
+                return this;
+
             return new MatrixValue(type, Rows, Columns, Values.Map(x =>
             {
                 RawValue[] res = new RawValue[x.Length];
