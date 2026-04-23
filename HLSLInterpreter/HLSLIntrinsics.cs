@@ -65,7 +65,9 @@ namespace HLSL
 
         private static NumericValue ToFloatLike(NumericValue value)
         {
-            if (HLSLTypeUtils.IsFloat(value.Type))
+            if (value.Type == ScalarType.Float)
+                return value;
+            if (HLSLTypeUtils.IsFloat(value.Type) && value.Type != ScalarType.Double)
                 return value;
             return value.Cast(ScalarType.Float);
         }
@@ -294,7 +296,7 @@ namespace HLSL
             if (HLSLTypeUtils.IsUint(x.Type))
                 return x;
 
-            return x.Map(val => Math.Abs(val.Float));
+            return ToFloatLike(x).Map(val => Math.Abs(val.Float));
         }
 
         public static NumericValue Acos(NumericValue x)

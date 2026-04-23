@@ -13,8 +13,8 @@ namespace HLSL
         {
             if (HLSLTypeUtils.IsInt(type)) return rv.Int.ToString(CultureInfo.InvariantCulture);
             if (HLSLTypeUtils.IsUint(type)) return rv.Uint.ToString(CultureInfo.InvariantCulture);
-            if (HLSLTypeUtils.IsFloat(type)) return rv.Float.ToString(CultureInfo.InvariantCulture);
             if (type == ScalarType.Double) return rv.Double.ToString(CultureInfo.InvariantCulture);
+            if (HLSLTypeUtils.IsFloat(type)) return rv.Float.ToString(CultureInfo.InvariantCulture);
             if (type == ScalarType.Bool) return rv.Bool.ToString(CultureInfo.InvariantCulture);
             if (type == ScalarType.Char) return rv.Char.ToString(CultureInfo.InvariantCulture);
             return rv.Int.ToString(CultureInfo.InvariantCulture);
