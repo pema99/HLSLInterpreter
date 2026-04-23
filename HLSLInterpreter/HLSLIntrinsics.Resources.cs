@@ -961,7 +961,7 @@ namespace HLSL
             var depth = ToFloatLike(CastToScalar(sampledValue));
             var cmp = ToFloatLike(CastToScalar(cmpVal));
             (depth, cmp) = HLSLTypeUtils.Promote(depth, cmp, false);
-            return HLSLValueUtils.Map2(depth, cmp, (a, b) => CompareScalars(sampler, a.Float, b.Float));
+            return HLSLOperators.BinOp(depth, cmp, ScalarType.Float, (_, a, b) => CompareScalars(sampler, a.Float, b.Float));
         }
 
         private static NumericValue WrapTexelCoord(NumericValue coord, NumericValue mipSize, SamplerStateValue.TextureAddressMode mode)
