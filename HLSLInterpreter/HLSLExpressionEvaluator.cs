@@ -472,19 +472,40 @@ namespace HLSL
                 }
             }
 
+            int totalScalars = 0;
             for (int i = 0; i < args.Length; i++)
+            {
                 args[i] = args[i].Cast(type.Kind);
+                if (args[i] is ScalarValue) totalScalars += 1;
+                else if (args[i] is VectorValue v) totalScalars += v.Size;
+                else if (args[i] is MatrixValue m) totalScalars += m.Rows * m.Columns;
+            }
 
             RawValue[][] lanes = new RawValue[maxThreadCount][];
             for (int threadIdx = 0; threadIdx < maxThreadCount; threadIdx++)
             {
-                List<RawValue> flattened = new List<RawValue>();
+                RawValue[] flattened = new RawValue[totalScalars];
+                int offset = 0;
                 foreach (var numeric in args)
                 {
-                    if (numeric is ScalarValue scalar) flattened.Add(scalar.Value.Get(threadIdx));
-                    if (numeric is VectorValue vector) flattened.AddRange(vector.Values.Get(threadIdx));
+                    if (numeric is ScalarValue scalar)
+                    {
+                        flattened[offset++] = scalar.Value.Get(threadIdx);
+                    }
+                    else if (numeric is VectorValue vector)
+                    {
+                        var src = vector.Values.Get(threadIdx);
+                        Array.Copy(src, 0, flattened, offset, src.Length);
+                        offset += src.Length;
+                    }
+                    else if (numeric is MatrixValue matrix)
+                    {
+                        var src = matrix.Values.Get(threadIdx);
+                        Array.Copy(src, 0, flattened, offset, src.Length);
+                        offset += src.Length;
+                    }
                 }
-                lanes[threadIdx] = flattened.ToArray();
+                lanes[threadIdx] = flattened;
             }
 
             switch (type)

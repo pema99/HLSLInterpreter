@@ -1042,3 +1042,19 @@ void Types_Half_Vector()
     ASSERT(abs((float)v.x - 1.0) < 0.01);
     ASSERT(abs((float)v.y - 2.0) < 0.01);
 }
+
+[Test]
+void Types_MatrixConstructor_MatrixArgFlattened()
+{
+    // float4x3 has 12 scalars (all 1); float4 adds 4 more = 16 scalars for float4x4
+    float4x3 b = 1;
+    float4x4 a = float4x4(b, float4(1, 2, 3, 4));
+    // Row 0: b[0][0..2], b[1][0]  -> 1,1,1,1
+    // Row 1: b[1][1..2], b[2][0..1] -> 1,1,1,1
+    // Row 2: b[2][2], b[3][0..2]  -> 1,1,1,1
+    // Row 3: float4(1,2,3,4)      -> 1,2,3,4
+    ASSERT(a[0][0] == 1 && a[0][1] == 1 && a[0][2] == 1 && a[0][3] == 1);
+    ASSERT(a[1][0] == 1 && a[1][1] == 1 && a[1][2] == 1 && a[1][3] == 1);
+    ASSERT(a[2][0] == 1 && a[2][1] == 1 && a[2][2] == 1 && a[2][3] == 1);
+    ASSERT(a[3][0] == 1 && a[3][1] == 2 && a[3][2] == 3 && a[3][3] == 4);
+}
