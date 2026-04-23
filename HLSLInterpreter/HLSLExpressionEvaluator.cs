@@ -636,6 +636,14 @@ namespace HLSL
             return context.PopReturn();
         }
 
+        // Cached common literals for optimization
+        private static readonly ScalarValue LiteralZeroInt = new ScalarValue(ScalarType.Int, new HLSLRegister<RawValue>((RawValue)0));
+        private static readonly ScalarValue LiteralOneInt = new ScalarValue(ScalarType.Int, new HLSLRegister<RawValue>((RawValue)1));
+        private static readonly ScalarValue LiteralZeroFloat = new ScalarValue(ScalarType.Float, new HLSLRegister<RawValue>((RawValue)0f));
+        private static readonly ScalarValue LiteralFloatOne = new ScalarValue(ScalarType.Float, new HLSLRegister<RawValue>((RawValue)1f));
+        private static readonly ScalarValue LiteralBoolTrue = new ScalarValue(ScalarType.Bool, new HLSLRegister<RawValue>((RawValue)true));
+        private static readonly ScalarValue LiteralBoolFalse = new ScalarValue(ScalarType.Bool, new HLSLRegister<RawValue>((RawValue)false));
+
         // Visit implementation
         protected override HLSLValue DefaultVisit(HLSLSyntaxNode node)
         {
@@ -688,7 +696,14 @@ namespace HLSL
                     if (floatLexeme.EndsWith('f') || floatLexeme.EndsWith('F') || isHalfLiteral)
                         floatLexeme = floatLexeme.Substring(0, floatLexeme.Length - 1);
                     if (float.TryParse(floatLexeme, NumberStyles.Any, CultureInfo.InvariantCulture, out float parsedFloat))
+                    {
+                        if (!isHalfLiteral)
+                        {
+                            if (parsedFloat == 0f) return LiteralZeroFloat;
+                            if (parsedFloat == 1f) return LiteralFloatOne;
+                        }
                         return new ScalarValue(isHalfLiteral ? ScalarType.Half : ScalarType.Float, new HLSLRegister<RawValue>(parsedFloat));
+                    }
                     else
                         throw Error(node, $"Invalid float literal '{node.Lexeme}'.");
                 case LiteralKind.Integer:
@@ -703,7 +718,11 @@ namespace HLSL
                     else
                     {
                         if (int.TryParse(node.Lexeme, NumberStyles.Any, CultureInfo.InvariantCulture, out int parsedInt))
+                        {
+                            if (parsedInt == 0) return LiteralZeroInt;
+                            if (parsedInt == 1) return LiteralOneInt;
                             return new ScalarValue(ScalarType.Int, new HLSLRegister<RawValue>(parsedInt));
+                        }
                         else if (node.Lexeme.StartsWith("0x") && int.TryParse(node.Lexeme.Substring(2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out int parsedHexInt))
                             return new ScalarValue(ScalarType.Int, new HLSLRegister<RawValue>(parsedHexInt));
                     }
@@ -715,7 +734,7 @@ namespace HLSL
                         throw Error(node, $"Invalid character literal '{node.Lexeme}'.");
                 case LiteralKind.Boolean:
                     if (bool.TryParse(node.Lexeme, out bool parsedBool))
-                        return new ScalarValue(ScalarType.Bool, new HLSLRegister<RawValue>(parsedBool));
+                        return parsedBool ? LiteralBoolTrue : LiteralBoolFalse;
                     else
                         throw Error(node, $"Invalid boolean literal '{node.Lexeme}'.");
                 case LiteralKind.Null:
