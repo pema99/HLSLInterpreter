@@ -72,7 +72,12 @@ namespace HLSL
             if (IsVarying)
             {
                 T[] input = VaryingValues;
-                return new HLSLRegister<U>(input.Select(mapper).ToArray());
+                U[] output = new U[input.Length];
+                for (int i = 0; i < input.Length; i++)
+                {
+                    output[i] = mapper(input[i]);
+                }
+                return new HLSLRegister<U>(output);
             }
             else
             {
@@ -85,7 +90,12 @@ namespace HLSL
             if (IsVarying)
             {
                 T[] input = VaryingValues;
-                return new HLSLRegister<U>(input.Select(mapper).ToArray());
+                U[] output = new U[input.Length];
+                for (int i = 0; i < input.Length; i++)
+                {
+                    output[i] = mapper(input[i], i);
+                }
+                return new HLSLRegister<U>(output);
             }
             else
             {
@@ -120,7 +130,15 @@ namespace HLSL
             if (IsVarying)
                 return new HLSLRegister<T>(VaryingValues.ToArray());
             else
-                return new HLSLRegister<T>(Enumerable.Repeat(UniformValue, threadCount).ToArray());
+            {
+                T[] arr = new T[threadCount];
+                T v = UniformValue;
+                for (int i = 0; i < threadCount; i++)
+                {
+                    arr[i] = v;
+                }
+                return new HLSLRegister<T>(arr);
+            }
         }
 
         public HLSLRegister<T> Scalarize(int threadIndex)
