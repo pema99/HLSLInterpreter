@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -9,12 +9,12 @@ namespace HLSL
 {
     public static class HLSLTypeUtils
     {
-        public static object GetZeroValue(ScalarType type)
+        public static RawValue GetZeroValue(ScalarType type)
         {
             switch (type)
             {
                 case ScalarType.Void:
-                    return null;
+                    return default;
                 case ScalarType.Bool:
                     return default(bool);
                 case ScalarType.Int:
@@ -34,8 +34,6 @@ namespace HLSL
                     return default(float);
                 case ScalarType.Double:
                     return default(double);
-                case ScalarType.String:
-                    return string.Empty;
                 case ScalarType.Char:
                     return default(char);
                 default:
@@ -43,12 +41,12 @@ namespace HLSL
             }
         }
 
-        public static object GetOneValue(ScalarType type)
+        public static RawValue GetOneValue(ScalarType type)
         {
             switch (type)
             {
                 case ScalarType.Void:
-                    return null;
+                    return default;
                 case ScalarType.Bool:
                     return true;
                 case ScalarType.Int:
@@ -68,8 +66,6 @@ namespace HLSL
                     return 1.0f;
                 case ScalarType.Double:
                     return 1.0;
-                case ScalarType.String:
-                    return string.Empty;
                 case ScalarType.Char:
                     return (char)1;
                 default:
@@ -79,18 +75,14 @@ namespace HLSL
 
         public static NumericValue GetZeroValue(NumericValue val)
         {
-            return val.Map(x =>
-            {
-                return GetZeroValue(val.Type);
-            });
+            RawValue zero = GetZeroValue(val.Type);
+            return val.Map(x => zero);
         }
 
         public static NumericValue GetOneValue(NumericValue val)
         {
-            return val.Map(x =>
-            {
-                return GetOneValue(val.Type);
-            });
+            RawValue one = GetOneValue(val.Type);
+            return val.Map(x => one);
         }
 
         public static bool IsFloat(ScalarType type)
@@ -99,6 +91,7 @@ namespace HLSL
             {
                 case ScalarType.Float:
                 case ScalarType.Double:
+                case ScalarType.Half:
                 case ScalarType.Min16Float:
                 case ScalarType.Min10Float:
                 case ScalarType.UNormFloat:
@@ -181,41 +174,186 @@ namespace HLSL
             return ScalarType.Uint;
         }
 
-        public static object CastNumeric(ScalarType type, object value)
+        public static RawValue CastNumeric(ScalarType targetType, ScalarType sourceType, RawValue value)
         {
-            switch (type)
+            if (targetType == sourceType)
+                return value;
+
+            switch (targetType)
             {
                 case ScalarType.Void:
-                    return null;
+                    return default;
                 case ScalarType.Bool:
-                    return Convert.ToBoolean(value);
+                    switch (sourceType)
+                    {
+                        case ScalarType.Bool:
+                            return value;
+                        case ScalarType.Int:
+                        case ScalarType.Min16Int:
+                        case ScalarType.Min12Int:
+                            return value.Int != 0;
+                        case ScalarType.Uint:
+                        case ScalarType.Min16Uint:
+                        case ScalarType.Min12Uint:
+                            return value.Uint != 0u;
+                        case ScalarType.Half:
+                        case ScalarType.Float:
+                        case ScalarType.Min16Float:
+                        case ScalarType.Min10Float:
+                        case ScalarType.UNormFloat:
+                        case ScalarType.SNormFloat:
+                            return value.Float != 0f;
+                        case ScalarType.Double:
+                            return value.Double != 0.0;
+                        case ScalarType.Char:
+                            return value.Char != '\0';
+                        default:
+                            throw new InvalidOperationException();
+                    }
                 case ScalarType.Int:
                 case ScalarType.Min16Int:
                 case ScalarType.Min12Int:
-                    if (value is float fi) return (int)fi;
-                    else if (value is double di) return (int)di;
-                    else if (value is uint ui) return (int)ui;
-                    else return Convert.ToInt32(value);
+                    switch (sourceType)
+                    {
+                        case ScalarType.Bool:
+                            return value.Bool ? 1 : 0;
+                        case ScalarType.Int:
+                        case ScalarType.Min16Int:
+                        case ScalarType.Min12Int:
+                            return value;
+                        case ScalarType.Uint:
+                        case ScalarType.Min16Uint:
+                        case ScalarType.Min12Uint:
+                            return (int)value.Uint;
+                        case ScalarType.Half:
+                        case ScalarType.Float:
+                        case ScalarType.Min16Float:
+                        case ScalarType.Min10Float:
+                        case ScalarType.UNormFloat:
+                        case ScalarType.SNormFloat:
+                            return (int)value.Float;
+                        case ScalarType.Double:
+                            return (int)value.Double;
+                        case ScalarType.Char:
+                            return (int)value.Char;
+                        default:
+                            throw new InvalidOperationException();
+                    }
                 case ScalarType.Uint:
                 case ScalarType.Min16Uint:
                 case ScalarType.Min12Uint:
-                    if (value is float fu) return (uint)fu;
-                    else if (value is double du) return (uint)du;
-                    else if (value is int iu) return (uint)iu;
-                    else return Convert.ToUInt32(value);
-                case ScalarType.Double:
-                    return Convert.ToDouble(value);
+                    switch (sourceType)
+                    {
+                        case ScalarType.Bool:
+                            return value.Bool ? 1u : 0u;
+                        case ScalarType.Int:
+                        case ScalarType.Min16Int:
+                        case ScalarType.Min12Int:
+                            return (uint)value.Int;
+                        case ScalarType.Uint:
+                        case ScalarType.Min16Uint:
+                        case ScalarType.Min12Uint:
+                            return value;
+                        case ScalarType.Half:
+                        case ScalarType.Float:
+                        case ScalarType.Min16Float:
+                        case ScalarType.Min10Float:
+                        case ScalarType.UNormFloat:
+                        case ScalarType.SNormFloat:
+                            return (uint)value.Float;
+                        case ScalarType.Double:
+                            return (uint)value.Double;
+                        case ScalarType.Char:
+                            return (uint)value.Char;
+                        default:
+                            throw new InvalidOperationException();
+                    }
                 case ScalarType.Half:
                 case ScalarType.Float:
                 case ScalarType.Min16Float:
                 case ScalarType.Min10Float:
                 case ScalarType.UNormFloat:
                 case ScalarType.SNormFloat:
-                    return Convert.ToSingle(value);
-                case ScalarType.String:
-                    return Convert.ToString(value);
+                    switch (sourceType)
+                    {
+                        case ScalarType.Bool:
+                            return value.Bool ? 1f : 0f;
+                        case ScalarType.Int:
+                        case ScalarType.Min16Int:
+                        case ScalarType.Min12Int:
+                            return (float)value.Int;
+                        case ScalarType.Uint:
+                        case ScalarType.Min16Uint:
+                        case ScalarType.Min12Uint:
+                            return (float)value.Uint;
+                        case ScalarType.Half:
+                        case ScalarType.Float:
+                        case ScalarType.Min16Float:
+                        case ScalarType.Min10Float:
+                        case ScalarType.UNormFloat:
+                        case ScalarType.SNormFloat:
+                            return value;
+                        case ScalarType.Double:
+                            return (float)value.Double;
+                        case ScalarType.Char:
+                            return (float)value.Char;
+                        default:
+                            throw new InvalidOperationException();
+                    }
+                case ScalarType.Double:
+                    switch (sourceType)
+                    {
+                        case ScalarType.Bool:
+                            return value.Bool ? 1.0 : 0.0;
+                        case ScalarType.Int:
+                        case ScalarType.Min16Int:
+                        case ScalarType.Min12Int:
+                            return (double)value.Int;
+                        case ScalarType.Uint:
+                        case ScalarType.Min16Uint:
+                        case ScalarType.Min12Uint:
+                            return (double)value.Uint;
+                        case ScalarType.Half:
+                        case ScalarType.Float:
+                        case ScalarType.Min16Float:
+                        case ScalarType.Min10Float:
+                        case ScalarType.UNormFloat:
+                        case ScalarType.SNormFloat:
+                            return (double)value.Float;
+                        case ScalarType.Double:
+                            return value;
+                        case ScalarType.Char:
+                            return (double)value.Char;
+                        default:
+                            throw new InvalidOperationException();
+                    }
                 case ScalarType.Char:
-                    return Convert.ToChar(value);
+                    switch (sourceType)
+                    {
+                        case ScalarType.Bool:
+                            return value.Bool ? (char)1 : (char)0;
+                        case ScalarType.Int:
+                        case ScalarType.Min16Int:
+                        case ScalarType.Min12Int:
+                            return (char)value.Int;
+                        case ScalarType.Uint:
+                        case ScalarType.Min16Uint:
+                        case ScalarType.Min12Uint:
+                            return (char)value.Uint;
+                        case ScalarType.Half:
+                        case ScalarType.Float:
+                        case ScalarType.Min16Float:
+                        case ScalarType.Min10Float:
+                        case ScalarType.UNormFloat:
+                        case ScalarType.SNormFloat:
+                            return (char)value.Float;
+                        case ScalarType.Double:
+                            return (char)value.Double;
+                        case ScalarType.Char:
+                            return value;
+                        default:
+                            throw new InvalidOperationException();
+                    }
                 default:
                     throw new InvalidOperationException();
             }
@@ -333,7 +471,7 @@ namespace HLSL
             {
                 if (rank.Dimension == null)
                     continue;
-                length *= Convert.ToInt32(((ScalarValue)HLSLExpressionEvaluator.EvaluateConstExpr(rank.Dimension)).Value.Get(0));
+                length *= ((ScalarValue)HLSLExpressionEvaluator.EvaluateConstExpr(rank.Dimension)).AsInt();
             }
             return length;
         }

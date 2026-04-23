@@ -85,7 +85,7 @@ namespace HLSL
                 return () =>
                 {
                     var res = expressionEvaluator.CallMethod(mockStruct, methodName, Array.Empty<HLSLValue>());
-                    return res is ScalarValue sv ? Convert.ToInt32(sv.GetThreadValue(0)) : defaultValue;
+                    return res is ScalarValue sv ? sv.AsInt() : defaultValue;
                 };
             }
 
@@ -180,7 +180,7 @@ namespace HLSL
             type = context.ResolveType(type);
             bool isArray = decl.ArrayRanks.Count > 0;
             bool hasImplicitSize = isArray && decl.ArrayRanks[0].Dimension == null;
-            int arrayLength = (isArray && !hasImplicitSize) ? Convert.ToInt32(EvaluateNumeric(decl.ArrayRanks[0].Dimension).GetThreadValue(0)) : 0;
+            int arrayLength = (isArray && !hasImplicitSize) ? ((ScalarValue)EvaluateNumeric(decl.ArrayRanks[0].Dimension)).AsInt() : 0;
             
             if (decl.Initializer is ValueInitializerNode initializer)
             {
@@ -209,12 +209,12 @@ namespace HLSL
                                 .BroadcastToMatrix(matrixType.FirstDimension, matrixType.SecondDimension);
                             break;
                         case GenericVectorTypeNode genVectorType:
-                            int dims = Convert.ToInt32(EvaluateScalar(genVectorType.Dimension).Cast(ScalarType.Int).GetThreadValue(0));
+                            int dims = EvaluateScalar(genVectorType.Dimension).AsInt();
                             initializerValue = numericInitializerValue.Cast(genVectorType.Kind).BroadcastToVector(dims);
                             break;
                         case GenericMatrixTypeNode genMatrixType:
-                            int rows = Convert.ToInt32(EvaluateScalar(genMatrixType.FirstDimension).Cast(ScalarType.Int).GetThreadValue(0));
-                            int cols = Convert.ToInt32(EvaluateScalar(genMatrixType.SecondDimension).Cast(ScalarType.Int).GetThreadValue(0));
+                            int rows = EvaluateScalar(genMatrixType.FirstDimension).AsInt();
+                            int cols = EvaluateScalar(genMatrixType.SecondDimension).AsInt();
                             initializerValue = numericInitializerValue.Cast(genMatrixType.Kind).BroadcastToMatrix(rows, cols);
                             break;
                         default:
@@ -267,15 +267,15 @@ namespace HLSL
                 switch (type)
                 {
                     case ScalarTypeNode scalarType:
-                        defaultValue = new ScalarValue(scalarType.Kind, new HLSLRegister<object>(HLSLTypeUtils.GetZeroValue(scalarType.Kind)));
+                        defaultValue = new ScalarValue(scalarType.Kind, new HLSLRegister<RawValue>(HLSLTypeUtils.GetZeroValue(scalarType.Kind)));
                         break;
                     case VectorTypeNode vectorType:
                         defaultValue = new VectorValue(vectorType.Kind,
-                            new HLSLRegister<object[]>(Enumerable.Repeat(HLSLTypeUtils.GetZeroValue(vectorType.Kind), vectorType.Dimension).ToArray()));
+                            new HLSLRegister<RawValue[]>(Enumerable.Repeat(HLSLTypeUtils.GetZeroValue(vectorType.Kind), vectorType.Dimension).ToArray()));
                         break;
                     case MatrixTypeNode matrixType:
                         defaultValue = new MatrixValue(matrixType.Kind, matrixType.FirstDimension, matrixType.SecondDimension,
-                            new HLSLRegister<object[]>(Enumerable.Repeat(HLSLTypeUtils.GetZeroValue(matrixType.Kind), matrixType.FirstDimension * matrixType.SecondDimension).ToArray()));
+                            new HLSLRegister<RawValue[]>(Enumerable.Repeat(HLSLTypeUtils.GetZeroValue(matrixType.Kind), matrixType.FirstDimension * matrixType.SecondDimension).ToArray()));
                         break;
                     case QualifiedNamedTypeNode qualifiedNamedTypeNodeType:
                         string fullName = qualifiedNamedTypeNodeType.GetName();
@@ -298,15 +298,15 @@ namespace HLSL
                         defaultValue = CreateStructValue(namedStruct);
                         break;
                     case GenericVectorTypeNode genVectorType:
-                        int dims = Convert.ToInt32(EvaluateScalar(genVectorType.Dimension).Cast(ScalarType.Int).GetThreadValue(0));
+                        int dims = EvaluateScalar(genVectorType.Dimension).AsInt();
                         defaultValue = new VectorValue(genVectorType.Kind,
-                            new HLSLRegister<object[]>(Enumerable.Repeat(HLSLTypeUtils.GetZeroValue(genVectorType.Kind), dims).ToArray()));
+                            new HLSLRegister<RawValue[]>(Enumerable.Repeat(HLSLTypeUtils.GetZeroValue(genVectorType.Kind), dims).ToArray()));
                         break;
                     case GenericMatrixTypeNode genMatrixType:
-                        int rows = Convert.ToInt32(EvaluateScalar(genMatrixType.FirstDimension).Cast(ScalarType.Int).GetThreadValue(0));
-                        int cols = Convert.ToInt32(EvaluateScalar(genMatrixType.SecondDimension).Cast(ScalarType.Int).GetThreadValue(0));
+                        int rows = EvaluateScalar(genMatrixType.FirstDimension).AsInt();
+                        int cols = EvaluateScalar(genMatrixType.SecondDimension).AsInt();
                         defaultValue = new MatrixValue(genMatrixType.Kind, rows, cols,
-                           new HLSLRegister<object[]>(Enumerable.Repeat(HLSLTypeUtils.GetZeroValue(genMatrixType.Kind), rows * cols).ToArray()));
+                           new HLSLRegister<RawValue[]>(Enumerable.Repeat(HLSLTypeUtils.GetZeroValue(genMatrixType.Kind), rows * cols).ToArray()));
                         break;
                     case PredefinedObjectTypeNode predefinedObjectType:
                         switch (predefinedObjectType.Kind)
@@ -426,7 +426,7 @@ namespace HLSL
 
         public override void VisitIfStatementNode(IfStatementNode node)
         {
-            ScalarValue boolCondValue = EvaluateScalar(node.Condition);
+            ScalarValue boolCondValue = (ScalarValue)EvaluateScalar(node.Condition).Cast(ScalarType.Bool);
 
             bool[] perThreadCond = new bool[executionState.GetThreadCount()];
 
@@ -434,7 +434,7 @@ namespace HLSL
             executionState.PushExecutionMask(ExecutionScope.Conditional);
             for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
             {
-                perThreadCond[threadIndex] = Convert.ToBoolean(boolCondValue.Value.Get(threadIndex));
+                perThreadCond[threadIndex] = boolCondValue.Value.Get(threadIndex).Bool;
                 if (perThreadCond[threadIndex] == false)
                     executionState.DisableThread(threadIndex);
             }
@@ -490,11 +490,12 @@ namespace HLSL
                         
                         for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
                         {
-                            var boolCondValue = cond.GetThreadValue(threadIndex);
                             if (cond is ScalarValue sv)
-                                pass[threadIndex] |= Convert.ToBoolean(boolCondValue);
-                            else
-                                pass[threadIndex] |= boolCondValue is object[] components && components.All(x => Convert.ToBoolean(x));
+                                pass[threadIndex] |= sv.Value.Get(threadIndex).Bool;
+                            else if (cond is VectorValue vv)
+                                pass[threadIndex] |= vv.Values.Get(threadIndex).All(x => x.Bool);
+                            else if (cond is MatrixValue mv)
+                                pass[threadIndex] |= mv.Values.Get(threadIndex).All(x => x.Bool);
                         }
                     }
                 }
@@ -537,14 +538,14 @@ namespace HLSL
             {
                 anyRunning = false;
 
-                ScalarValue boolCondValue = EvaluateScalar(node.Condition);
+                ScalarValue boolCondValue = (ScalarValue)EvaluateScalar(node.Condition).Cast(ScalarType.Bool);
 
                 for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
                 {
                     if (!executionState.IsThreadActive(threadIndex))
                         continue;
 
-                    bool threadCond = Convert.ToBoolean(boolCondValue.Value.Get(threadIndex));
+                    bool threadCond = boolCondValue.Value.Get(threadIndex).Bool;
                     if (!threadCond)
                         executionState.DisableThread(threadIndex);
                     anyRunning |= threadCond;
@@ -571,14 +572,14 @@ namespace HLSL
                     Visit(node.Body);
                 executionState.ResumeSuspendedThreadsInLoop();
 
-                ScalarValue boolCondValue = EvaluateScalar(node.Condition);
+                ScalarValue boolCondValue = (ScalarValue)EvaluateScalar(node.Condition).Cast(ScalarType.Bool);
 
                 for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
                 {
                     if (!executionState.IsThreadActive(threadIndex))
                         continue;
 
-                    bool threadCond = Convert.ToBoolean(boolCondValue.Value.Get(threadIndex));
+                    bool threadCond = boolCondValue.Value.Get(threadIndex).Bool;
                     if (!threadCond)
                         executionState.DisableThread(threadIndex);
                     anyRunning |= threadCond;
@@ -603,14 +604,14 @@ namespace HLSL
             {
                 anyRunning = false;
 
-                ScalarValue boolCondValue = EvaluateScalar(node.Condition);
+                ScalarValue boolCondValue = (ScalarValue)EvaluateScalar(node.Condition).Cast(ScalarType.Bool);
 
                 for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
                 {
                     if (!executionState.IsThreadActive(threadIndex))
                         continue;
 
-                    bool threadCond = Convert.ToBoolean(boolCondValue.Value.Get(threadIndex));
+                    bool threadCond = boolCondValue.Value.Get(threadIndex).Bool;
                     if (!threadCond)
                         executionState.DisableThread(threadIndex);
                     anyRunning |= threadCond;

@@ -76,23 +76,23 @@ namespace HLSL
                 if (val is ScalarValue sv)
                 {
                     for (int i = 0; i < sv.ThreadCount; i++)
-                        if (state.IsThreadActive(i) && !Convert.ToBoolean(sv.Value.Get(i)))
+                        if (state.IsThreadActive(i) && !sv.AsBool(i))
                             throw new TestFailException(failMsg);
                 }
                 else if (val is VectorValue vv)
                 {
                     for (int i = 0; i < vv.ThreadCount; i++)
                         if (state.IsThreadActive(i))
-                            foreach (var b in vv.Values.Get(i))
-                                if (!Convert.ToBoolean(b))
+                            for (int c = 0; c < vv.Size; c++)
+                                if (!vv[c].AsBool(i))
                                     throw new TestFailException(failMsg);
                 }
                 else if (val is MatrixValue mv)
                 {
                     for (int i = 0; i < mv.ThreadCount; i++)
                         if (state.IsThreadActive(i))
-                            foreach (var b in mv.Values.Get(i))
-                                if (!Convert.ToBoolean(b))
+                            for (int c = 0; c < mv.Rows * mv.Columns; c++)
+                                if (!mv[c].AsBool(i))
                                     throw new TestFailException(failMsg);
                 }
                 else
@@ -107,7 +107,7 @@ namespace HLSL
                 {
                     string message = null;
                     if (args.Length > 1)
-                        message = (interpreter.EvaluateExpression(args[1]) as ScalarValue).Value.Get(0) as string;
+                        message = (interpreter.EvaluateExpression(args[1]) as StringValue)?.Value;
 
                     HLSLValue val = interpreter.EvaluateExpression(args[0]);
                     CheckAllTrue(state, val, message ?? $"Assertion failed: {args[0].GetPrettyPrintedCode()}");
@@ -270,7 +270,7 @@ namespace HLSL
 
             interpreter.AddCallback("TEST_NAME", (state, args) =>
             {
-                return new ScalarValue(ScalarType.String, HLSLValueUtils.MakeScalarSGPR(currentTest.TestName));
+                return new StringValue(currentTest.TestName);
             });
 
             interpreter.AddCallback("TEST_CASE", (state, args) =>
@@ -323,7 +323,7 @@ namespace HLSL
                         continue;
 
                     string mockStructName = (attr.Arguments[0] as IdentifierExpressionNode)?.GetName()
-                        ?? (interpreter.EvaluateExpression(attr.Arguments[0]) as ScalarValue)?.Value.Get(0) as string;
+                        ?? (interpreter.EvaluateExpression(attr.Arguments[0]) as StringValue)?.Value;
                     if (mockStructName == null)
                         continue;
 
@@ -460,13 +460,13 @@ namespace HLSL
                             if (attribute.Arguments.Count > 1)
                             {
                                 testRun.UsesCustomWarpSize = true;
-                                testRun.WarpSizeX = Convert.ToInt32((interpreter.EvaluateExpression(attribute.Arguments[0]) as ScalarValue).GetThreadValue(0));
-                                testRun.WarpSizeY = Convert.ToInt32((interpreter.EvaluateExpression(attribute.Arguments[1]) as ScalarValue).GetThreadValue(0));
+                                testRun.WarpSizeX = (interpreter.EvaluateExpression(attribute.Arguments[0]) as ScalarValue).AsInt();
+                                testRun.WarpSizeY = (interpreter.EvaluateExpression(attribute.Arguments[1]) as ScalarValue).AsInt();
                             }
                             else if (attribute.Arguments.Count > 0)
                             {
                                 testRun.UsesCustomWarpSize = true;
-                                testRun.WarpSizeX = Convert.ToInt32((interpreter.EvaluateExpression(attribute.Arguments[0]) as ScalarValue).GetThreadValue(0));
+                                testRun.WarpSizeX = (interpreter.EvaluateExpression(attribute.Arguments[0]) as ScalarValue).AsInt();
                                 testRun.WarpSizeY = 1;
                             }
                             break;
@@ -481,7 +481,7 @@ namespace HLSL
                             if (attribute.Arguments.Count == 1)
                             {
                                 string generatorName = (attribute.Arguments[0] as IdentifierExpressionNode)?.GetName()
-                                    ?? (interpreter.EvaluateExpression(attribute.Arguments[0]) as ScalarValue)?.Value.Get(0) as string;
+                                    ?? (interpreter.EvaluateExpression(attribute.Arguments[0]) as StringValue)?.Value;
                                 if (generatorName != null)
                                 {
                                     var cases = RunTestCaseGenerator(generatorName);
@@ -494,11 +494,11 @@ namespace HLSL
                             break;
                         case "description":
                             if (attribute.Arguments.Count > 0)
-                                testRun.Description = (interpreter.EvaluateExpression(attribute.Arguments[0]) as ScalarValue)?.Value.Get(0) as string ?? "";
+                                testRun.Description = (interpreter.EvaluateExpression(attribute.Arguments[0]) as StringValue)?.Value ?? "";
                             break;
                         case "category":
                             if (attribute.Arguments.Count > 0)
-                                testRun.Category = (interpreter.EvaluateExpression(attribute.Arguments[0]) as ScalarValue)?.Value.Get(0) as string ?? "";
+                                testRun.Category = (interpreter.EvaluateExpression(attribute.Arguments[0]) as StringValue)?.Value ?? "";
                             break;
                         default: break;
                     }
@@ -516,7 +516,7 @@ namespace HLSL
                         if (attrLexeme == "valuesource" && attr.Arguments.Count == 1)
                         {
                             string genName = (attr.Arguments[0] as IdentifierExpressionNode)?.GetName()
-                                ?? (interpreter.EvaluateExpression(attr.Arguments[0]) as ScalarValue)?.Value.Get(0) as string;
+                                ?? (interpreter.EvaluateExpression(attr.Arguments[0]) as StringValue)?.Value;
                             if (genName != null)
                                 paramValues = RunValueGenerator(genName);
                         }

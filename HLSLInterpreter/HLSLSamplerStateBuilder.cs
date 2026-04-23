@@ -50,10 +50,10 @@ namespace HLSL
                     case "BORDERCOLOR":
                         if (eval != null && eval.Visit(prop.Value) is VectorValue vec && vec.Size >= 4)
                             sampler.BorderColor = (
-                                Convert.ToSingle(vec[0].Cast(ScalarType.Float).GetThreadValue(0)),
-                                Convert.ToSingle(vec[1].Cast(ScalarType.Float).GetThreadValue(0)),
-                                Convert.ToSingle(vec[2].Cast(ScalarType.Float).GetThreadValue(0)),
-                                Convert.ToSingle(vec[3].Cast(ScalarType.Float).GetThreadValue(0)));
+                                vec[0].AsFloat(),
+                                vec[1].AsFloat(),
+                                vec[2].AsFloat(),
+                                vec[3].AsFloat());
                         break;
                     // Legacy D3D9 per-stage filter settings
                     case "MINFILTER": legacyMin = id; break;
@@ -115,8 +115,8 @@ namespace HLSL
 
         private static float ParseFloat(ExpressionNode expr, HLSLExpressionEvaluator eval)
         {
-            if (eval.Visit(expr) is NumericValue num)
-                return Convert.ToSingle(num.Cast(ScalarType.Float).GetThreadValue(0));
+            if (eval.Visit(expr) is ScalarValue num)
+                return num.AsFloat();
             return 0f;
         }
 

@@ -795,8 +795,8 @@ float4 main(float4 position : SV_Position) : SV_Target
             runner.DebugHook = null;
             runner.Reset();
             runner.SetWarpSize(wx, wy);
-            runner.SetVariable("WARP_SIZE_X", new ScalarValue(ScalarType.Uint, new HLSLRegister<object>((uint)wx)));
-            runner.SetVariable("WARP_SIZE_Y", new ScalarValue(ScalarType.Uint, new HLSLRegister<object>((uint)wy)));
+            runner.SetVariable("WARP_SIZE_X", new ScalarValue(ScalarType.Uint, new HLSLRegister<RawValue>((uint)wx)));
+            runner.SetVariable("WARP_SIZE_Y", new ScalarValue(ScalarType.Uint, new HLSLRegister<RawValue>((uint)wy)));
             runner.ProcessCode(code, MakeParserConfig());
 
             var threadArg = BuildThreadArg(wx, wy, threadCount, groupOffsetX, groupOffsetY);
@@ -850,8 +850,8 @@ float4 main(float4 position : SV_Position) : SV_Target
 
             runner.Reset();
             runner.SetWarpSize(wx, wy);
-            runner.SetVariable("WARP_SIZE_X", new ScalarValue(ScalarType.Uint, new HLSLRegister<object>((uint)wx)));
-            runner.SetVariable("WARP_SIZE_Y", new ScalarValue(ScalarType.Uint, new HLSLRegister<object>((uint)wy)));
+            runner.SetVariable("WARP_SIZE_X", new ScalarValue(ScalarType.Uint, new HLSLRegister<RawValue>((uint)wx)));
+            runner.SetVariable("WARP_SIZE_Y", new ScalarValue(ScalarType.Uint, new HLSLRegister<RawValue>((uint)wy)));
 
             runner.DebugHook = node =>
             {
@@ -1134,14 +1134,14 @@ float4 main(float4 position : SV_Position) : SV_Target
                 if (mv.Values.IsVarying)
                 {
                     var perThread = mv.Values.VaryingValues
-                        .Select(elems => elems.Skip(r * cols).Take(cols).ToArray() as object[])
+                        .Select(elems => elems.Skip(r * cols).Take(cols).ToArray())
                         .ToArray();
-                    rowVec = new VectorValue(mv.Type, new HLSLRegister<object[]>(perThread));
+                    rowVec = new VectorValue(mv.Type, new HLSLRegister<RawValue[]>(perThread));
                 }
                 else
                 {
                     var rowElems = mv.Values.UniformValue.Skip(r * cols).Take(cols).ToArray();
-                    rowVec = new VectorValue(mv.Type, new HLSLRegister<object[]>(rowElems));
+                    rowVec = new VectorValue(mv.Type, new HLSLRegister<RawValue[]>(rowElems));
                 }
                 BuildVarRows(rows, $"[{r}]", rowVec, depth + 1, $"{path}[{r}]");
             }
@@ -1170,8 +1170,7 @@ float4 main(float4 position : SV_Position) : SV_Target
         try
         {
             int idx = Math.Min(threadIndex, sv.ThreadCount - 1);
-            object v = sv.Value.Get(idx);
-            return FormatObject(v);
+            return FormatRawValue(sv.Value.Get(idx), sv.Type);
         }
         catch { return "?"; }
     }
@@ -1181,9 +1180,9 @@ float4 main(float4 position : SV_Position) : SV_Target
         try
         {
             int idx = Math.Min(threadIndex, vv.ThreadCount - 1);
-            object[] comps = vv.Values.Get(idx);
+            RawValue[] comps = vv.Values.Get(idx);
             if (comps == null) return "(null)";
-            return $"({string.Join(", ", comps.Select(c => FormatObject(c)))})";
+            return $"({string.Join(", ", comps.Select(c => FormatRawValue(c, vv.Type)))})";
         }
         catch { return "?"; }
     }
@@ -1205,11 +1204,15 @@ float4 main(float4 position : SV_Position) : SV_Target
         catch { return "{struct}"; }
     }
 
-    private static string FormatObject(object? v)
+    private static string FormatRawValue(RawValue rv, ScalarType type)
     {
-        if (v is float f) return f.ToString("G6", CultureInfo.InvariantCulture);
-        if (v is double d) return d.ToString("G6", CultureInfo.InvariantCulture);
-        return Convert.ToString(v, CultureInfo.InvariantCulture) ?? "null";
+        if (HLSLTypeUtils.IsInt(type)) return rv.Int.ToString(CultureInfo.InvariantCulture);
+        if (HLSLTypeUtils.IsUint(type)) return rv.Uint.ToString(CultureInfo.InvariantCulture);
+        if (type == ScalarType.Double) return rv.Double.ToString("G6", CultureInfo.InvariantCulture);
+        if (HLSLTypeUtils.IsFloat(type)) return rv.Float.ToString("G6", CultureInfo.InvariantCulture);
+        if (type == ScalarType.Bool) return rv.Bool.ToString(CultureInfo.InvariantCulture);
+        if (type == ScalarType.Char) return rv.Char.ToString(CultureInfo.InvariantCulture);
+        return rv.Int.ToString(CultureInfo.InvariantCulture);
     }
 
     [JSInvokable]
@@ -1241,15 +1244,15 @@ float4 main(float4 position : SV_Position) : SV_Target
 
     private static VectorValue BuildThreadArg(int wx, int wy, int threadCount, int groupOffsetX = 0, int groupOffsetY = 0)
     {
-        var threadIds = new object[threadCount][];
+        var threadIds = new RawValue[threadCount][];
         for (int i = 0; i < threadCount; i++)
-            threadIds[i] = new object[] {
+            threadIds[i] = new RawValue[] {
                 (float)(i % wx + groupOffsetX * wx) + 0.5f,
                 (float)(i / wx + groupOffsetY * wy) + 0.5f,
                 0.0f,
                 1.0f
             };
-        return new VectorValue(ScalarType.Float, new HLSLRegister<object[]>(threadIds).Converge());
+        return new VectorValue(ScalarType.Float, new HLSLRegister<RawValue[]>(threadIds).Converge());
     }
 
     private HLSLValue CallMain(VectorValue threadArg)
@@ -1297,8 +1300,8 @@ float4 main(float4 position : SV_Position) : SV_Target
         try
         {
             var evalRunner = new HLSLRunner(wx, wy);
-            evalRunner.SetVariable("WARP_SIZE_X", new ScalarValue(ScalarType.Uint, new HLSLRegister<object>((uint)wx)));
-            evalRunner.SetVariable("WARP_SIZE_Y", new ScalarValue(ScalarType.Uint, new HLSLRegister<object>((uint)wy)));
+            evalRunner.SetVariable("WARP_SIZE_X", new ScalarValue(ScalarType.Uint, new HLSLRegister<RawValue>((uint)wx)));
+            evalRunner.SetVariable("WARP_SIZE_Y", new ScalarValue(ScalarType.Uint, new HLSLRegister<RawValue>((uint)wy)));
 
             HLSLValue evalResult = null;
             Exception evalError = null;
@@ -1359,13 +1362,14 @@ float4 main(float4 position : SV_Position) : SV_Target
             imageWidth = wx;
             imageHeight = wy;
             imagePixels = new byte[threadCount * 4];
+            var asFloat = (VectorValue)vv.Cast(ScalarType.Float);
             for (int i = 0; i < threadCount; i++)
             {
-                var c = vv.Values.Get(i);
-                imagePixels[i * 4 + 0] = FloatToByte(components > 0 ? Convert.ToSingle(c[0]) : 0f);
-                imagePixels[i * 4 + 1] = FloatToByte(components > 1 ? Convert.ToSingle(c[1]) : 0f);
-                imagePixels[i * 4 + 2] = FloatToByte(components > 2 ? Convert.ToSingle(c[2]) : 0f);
-                imagePixels[i * 4 + 3] = FloatToByte(components > 3 ? Convert.ToSingle(c[3]) : 1f);
+                var c = asFloat.Values.Get(i);
+                imagePixels[i * 4 + 0] = FloatToByte(components > 0 ? c[0].Float : 0f);
+                imagePixels[i * 4 + 1] = FloatToByte(components > 1 ? c[1].Float : 0f);
+                imagePixels[i * 4 + 2] = FloatToByte(components > 2 ? c[2].Float : 0f);
+                imagePixels[i * 4 + 3] = FloatToByte(components > 3 ? c[3].Float : 1f);
             }
             hasImage = true;
         }
@@ -1376,7 +1380,7 @@ float4 main(float4 position : SV_Position) : SV_Target
             imagePixels = new byte[threadCount * 4];
             for (int i = 0; i < threadCount; i++)
             {
-                byte gray = FloatToByte(Convert.ToSingle(sv.Value.Get(i)));
+                byte gray = FloatToByte(sv.AsFloat(i));
                 imagePixels[i * 4 + 0] = gray;
                 imagePixels[i * 4 + 1] = gray;
                 imagePixels[i * 4 + 2] = gray;

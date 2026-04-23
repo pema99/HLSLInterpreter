@@ -353,12 +353,12 @@ namespace HLSL
             var results = new HLSLValue[threadCount];
             for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
             {
-                int x = dim >= 1 ? Convert.ToInt32(scalarCoord[0].GetThreadValue(threadIndex)) : 0;
-                int y = dim >= 2 ? Convert.ToInt32(scalarCoord[1].GetThreadValue(threadIndex)) : 0;
-                int z = dim >= 3 ? Convert.ToInt32(scalarCoord[2].GetThreadValue(threadIndex)) : 0;
+                int x = dim >= 1 ? scalarCoord[0].AsInt(threadIndex) : 0;
+                int y = dim >= 2 ? scalarCoord[1].AsInt(threadIndex) : 0;
+                int z = dim >= 3 ? scalarCoord[2].AsInt(threadIndex) : 0;
                 if (rv.IsArray)
                 {
-                    int slice = Convert.ToInt32(scalarCoord[dim].GetThreadValue(threadIndex));
+                    int slice = scalarCoord[dim].AsInt(threadIndex);
                     if (dim == 1) y = slice; else z = slice;
                 }
                 results[threadIndex] = HLSLValueUtils.Scalarize(rv.Get(x, y, z, 0, 0), threadIndex);
@@ -376,12 +376,12 @@ namespace HLSL
             for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
             {
                 if (!executionState.IsThreadActive(threadIndex)) continue;
-                int x = dim >= 1 ? Convert.ToInt32(scalarCoord[0].GetThreadValue(threadIndex)) : 0;
-                int y = dim >= 2 ? Convert.ToInt32(scalarCoord[1].GetThreadValue(threadIndex)) : 0;
-                int z = dim >= 3 ? Convert.ToInt32(scalarCoord[2].GetThreadValue(threadIndex)) : 0;
+                int x = dim >= 1 ? scalarCoord[0].AsInt(threadIndex) : 0;
+                int y = dim >= 2 ? scalarCoord[1].AsInt(threadIndex) : 0;
+                int z = dim >= 3 ? scalarCoord[2].AsInt(threadIndex) : 0;
                 if (rv.IsArray)
                 {
-                    int slice = Convert.ToInt32(scalarCoord[dim].GetThreadValue(threadIndex));
+                    int slice = scalarCoord[dim].AsInt(threadIndex);
                     if (dim == 1) y = slice; else z = slice;
                 }
                 rv.Set(x, y, z, 0, 0, HLSLValueUtils.Scalarize(value, threadIndex));
@@ -402,7 +402,7 @@ namespace HLSL
 
             for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
             {
-                int baseOff = Convert.ToInt32(scalarOff.GetThreadValue(threadIndex));
+                int baseOff = scalarOff.AsInt(threadIndex);
                 var components = new ScalarValue[count];
                 for (int i = 0; i < count; i++)
                 {
@@ -425,10 +425,10 @@ namespace HLSL
             for (int thread = 0; thread < threadCount; thread++)
             {
                 if (!state.IsThreadActive(thread)) continue;
-                int baseOff = Convert.ToInt32(scalarOff.GetThreadValue(thread));
+                int baseOff = scalarOff.AsInt(thread);
                 for (int i = 0; i < count; i++)
                 {
-                    var raw = vec[i].GetThreadValue(thread);
+                    var raw = vec[i].Value.Get(thread);
                     rv.Set(baseOff + i * 4, 0, 0, 0, 0, new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR(raw)));
                 }
             }
@@ -437,7 +437,7 @@ namespace HLSL
         private static uint ReadUint32(ResourceValue rv, int byteOffset)
         {
             var v = (NumericValue)rv.Get(byteOffset, 0, 0, 0, 0);
-            return Convert.ToUInt32(CastToScalar(v.Cast(ScalarType.Uint)).GetThreadValue(0));
+            return CastToScalar(v).AsUint();
         }
 
         private static void WriteUint32(ResourceValue rv, int byteOffset, uint value)
@@ -467,9 +467,9 @@ namespace HLSL
             var originals = hasOut ? new HLSLValue[threadCount] : null;
             for (int thread = 0; thread < threadCount; thread++)
             {
-                int off = Convert.ToInt32(scalarOff.GetThreadValue(thread));
+                int off = scalarOff.AsInt(thread);
                 uint old = ReadUint32(rv, off);
-                uint val = Convert.ToUInt32(scalarVal.GetThreadValue(thread));
+                uint val = scalarVal.AsUint(thread);
                 if (originals is not null) originals[thread] = new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR(old));
                 if (state.IsThreadActive(thread))
                     WriteUint32(rv, off, op(old, val));
@@ -487,10 +487,10 @@ namespace HLSL
             var originals = hasOut ? new HLSLValue[threadCount] : null;
             for (int thread = 0; thread < threadCount; thread++)
             {
-                int off = Convert.ToInt32(scalarOff.GetThreadValue(thread));
+                int off = scalarOff.AsInt(thread);
                 ulong old = ReadUint64(rv, off);
-                ulong val = Convert.ToUInt32(valVec[0].GetThreadValue(thread)) |
-                             ((ulong)Convert.ToUInt32(valVec[1].GetThreadValue(thread)) << 32);
+                ulong val = valVec[0].AsUint(thread) |
+                             ((ulong)valVec[1].AsUint(thread) << 32);
                 if (originals is not null)
                     originals[thread] = VectorValue.FromScalars(
                         new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR((uint)(old & 0xFFFFFFFF))),
@@ -510,9 +510,9 @@ namespace HLSL
             var originals = new HLSLValue[threadCount];
             for (int thread = 0; thread < threadCount; thread++)
             {
-                int off = Convert.ToInt32(scalarOff.GetThreadValue(thread));
+                int off = scalarOff.AsInt(thread);
                 float old = BitConverter.ToSingle(BitConverter.GetBytes(ReadUint32(rv, off)), 0);
-                float val = Convert.ToSingle(scalarVal.GetThreadValue(thread));
+                float val = scalarVal.AsFloat(thread);
                 originals[thread] = new ScalarValue(ScalarType.Float, HLSLValueUtils.MakeScalarSGPR(old));
                 if (state.IsThreadActive(thread))
                     WriteUint32(rv, off, BitConverter.ToUInt32(BitConverter.GetBytes(val), 0));
@@ -531,10 +531,10 @@ namespace HLSL
             var originals = hasOut ? new HLSLValue[threadCount] : null;
             for (int thread = 0; thread < threadCount; thread++)
             {
-                int off = Convert.ToInt32(scalarOff.GetThreadValue(thread));
+                int off = scalarOff.AsInt(thread);
                 uint old = ReadUint32(rv, off);
-                uint cmp = Convert.ToUInt32(scalarCmp.GetThreadValue(thread));
-                uint val = Convert.ToUInt32(scalarVal.GetThreadValue(thread));
+                uint cmp = scalarCmp.AsUint(thread);
+                uint val = scalarVal.AsUint(thread);
                 if (originals is not null) originals[thread] = new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR(old));
                 if (state.IsThreadActive(thread) && old == cmp) WriteUint32(rv, off, val);
             }
@@ -552,10 +552,10 @@ namespace HLSL
             var originals = hasOut ? new HLSLValue[threadCount] : null;
             for (int thread = 0; thread < threadCount; thread++)
             {
-                int off = Convert.ToInt32(scalarOff.GetThreadValue(thread));
+                int off = scalarOff.AsInt(thread);
                 ulong old = ReadUint64(rv, off);
-                ulong cmp = Convert.ToUInt32(cmpVec[0].GetThreadValue(thread)) | ((ulong)Convert.ToUInt32(cmpVec[1].GetThreadValue(thread)) << 32);
-                ulong val = Convert.ToUInt32(valVec[0].GetThreadValue(thread)) | ((ulong)Convert.ToUInt32(valVec[1].GetThreadValue(thread)) << 32);
+                ulong cmp = cmpVec[0].AsUint(thread) | ((ulong)cmpVec[1].AsUint(thread) << 32);
+                ulong val = valVec[0].AsUint(thread) | ((ulong)valVec[1].AsUint(thread) << 32);
                 if (originals is not null)
                     originals[thread] = VectorValue.FromScalars(
                         new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR((uint)(old & 0xFFFFFFFF))),
@@ -576,10 +576,10 @@ namespace HLSL
             var originals = hasOut ? new HLSLValue[threadCount] : null;
             for (int thread = 0; thread < threadCount; thread++)
             {
-                int off = Convert.ToInt32(scalarOff.GetThreadValue(thread));
+                int off = scalarOff.AsInt(thread);
                 uint oldBits = ReadUint32(rv, off);
-                uint cmpBits = BitConverter.ToUInt32(BitConverter.GetBytes(Convert.ToSingle(scalarCmp.GetThreadValue(thread))), 0);
-                uint valBits = BitConverter.ToUInt32(BitConverter.GetBytes(Convert.ToSingle(scalarVal.GetThreadValue(thread))), 0);
+                uint cmpBits = BitConverter.ToUInt32(BitConverter.GetBytes(scalarCmp.AsFloat(thread)), 0);
+                uint valBits = BitConverter.ToUInt32(BitConverter.GetBytes(scalarVal.AsFloat(thread)), 0);
                 if (originals is not null)
                     originals[thread] = new ScalarValue(ScalarType.Float, HLSLValueUtils.MakeScalarSGPR(BitConverter.ToSingle(BitConverter.GetBytes(oldBits), 0)));
                 if (state.IsThreadActive(thread) && oldBits == cmpBits) WriteUint32(rv, off, valBits);
@@ -611,12 +611,12 @@ namespace HLSL
             {
                 int CoordWithOffset(int i)
                 {
-                    int v = Convert.ToInt32(scalarLoc[i].GetThreadValue(threadIndex));
+                    int v = scalarLoc[i].AsInt(threadIndex);
                     if (scalarOff != null)
-                        v += Convert.ToInt32(scalarOff[i].GetThreadValue(threadIndex));
+                        v += scalarOff[i].AsInt(threadIndex);
                     return v;
                 }
-                int RawCoord(int i) => Convert.ToInt32(scalarLoc[i].GetThreadValue(threadIndex));
+                int RawCoord(int i) => scalarLoc[i].AsInt(threadIndex);
 
                 int x = rv.Dimension >= 1 ? CoordWithOffset(0) : 0;
                 int y = rv.Dimension >= 2 ? CoordWithOffset(1) : 0;
@@ -813,16 +813,16 @@ namespace HLSL
             for (int thread = 0; thread < threadCount; thread++)
             {
                 ProjectCubeDirection(
-                    Convert.ToSingle(dir.x.GetThreadValue(thread)),
-                    Convert.ToSingle(dir.y.GetThreadValue(thread)),
-                    Convert.ToSingle(dir.z.GetThreadValue(thread)),
+                    dir.x.AsFloat(thread),
+                    dir.y.AsFloat(thread),
+                    dir.z.AsFloat(thread),
                     out int face, out float u, out float v);
 
-                float lodClamped = MathF.Max(0f, Convert.ToSingle(scalarLod.GetThreadValue(thread)));
+                float lodClamped = MathF.Max(0f, scalarLod.AsFloat(thread));
                 float faceSize = MathF.Max(1f, rv.SizeX / MathF.Pow(2f, lodClamped));
                 int mip = (int)lodClamped;
                 int maxC = (int)faceSize - 1;
-                int arraySlice = rv.IsArray ? Convert.ToInt32(dir[3].GetThreadValue(thread)) : 0;
+                int arraySlice = rv.IsArray ? dir[3].AsInt(thread) : 0;
 
                 float texelU = u * faceSize - 0.5f;
                 float texelV = v * faceSize - 0.5f;
@@ -882,9 +882,9 @@ namespace HLSL
             for (int thread = 0; thread < threadCount; thread++)
             {
                 ProjectCubeDirection(
-                    Convert.ToSingle(dir.x.GetThreadValue(thread)),
-                    Convert.ToSingle(dir.y.GetThreadValue(thread)),
-                    Convert.ToSingle(dir.z.GetThreadValue(thread)),
+                    dir.x.AsFloat(thread),
+                    dir.y.AsFloat(thread),
+                    dir.z.AsFloat(thread),
                     out _, out float u, out float v);
                 results[thread] = VectorValue.FromScalars(u, v);
             }
@@ -961,7 +961,7 @@ namespace HLSL
             var depth = ToFloatLike(CastToScalar(sampledValue));
             var cmp = ToFloatLike(CastToScalar(cmpVal));
             (depth, cmp) = HLSLTypeUtils.Promote(depth, cmp, false);
-            return HLSLValueUtils.Map2(depth, cmp, (a, b) => CompareScalars(sampler, Convert.ToSingle(a), Convert.ToSingle(b)));
+            return HLSLValueUtils.Map2(depth, cmp, (a, b) => CompareScalars(sampler, a.Float, b.Float));
         }
 
         private static NumericValue WrapTexelCoord(NumericValue coord, NumericValue mipSize, SamplerStateValue.TextureAddressMode mode)
@@ -1026,9 +1026,9 @@ namespace HLSL
 
             for (int thread = 0; thread < threadCount; thread++)
             {
-                float u = Convert.ToSingle(loc[0].GetThreadValue(thread));
-                float v = spatialDim >= 2 ? Convert.ToSingle(loc[1].GetThreadValue(thread)) : 0f;
-                int arraySlice = rv.IsArray ? Convert.ToInt32(loc[spatialDim].GetThreadValue(thread)) : 0;
+                float u = loc[0].AsFloat(thread);
+                float v = spatialDim >= 2 ? loc[1].AsFloat(thread) : 0f;
+                int arraySlice = rv.IsArray ? loc[spatialDim].AsInt(thread) : 0;
 
                 int baseX = (int)MathF.Floor(u * rv.SizeX - 0.5f);
                 int baseY = (int)MathF.Floor(v * rv.SizeY - 0.5f);
@@ -1037,7 +1037,7 @@ namespace HLSL
                 int[] cornerX = { baseX, baseX + 1, baseX + 1, baseX };
                 int[] cornerY = { baseY + 1, baseY + 1, baseY, baseY };
 
-                float cmpV = scalarCmp is not null ? Convert.ToSingle(scalarCmp.GetThreadValue(thread)) : 0f;
+                float cmpV = scalarCmp is not null ? scalarCmp.AsFloat(thread) : 0f;
 
                 float[] components = new float[4];
                 for (int i = 0; i < 4; i++)
@@ -1049,12 +1049,12 @@ namespace HLSL
                         if (spatialDim >= 2)
                         {
                             var ov = CastToVector(offSrc.Cast(ScalarType.Int), 2);
-                            ox = Convert.ToInt32(ov.x.GetThreadValue(thread));
-                            oy = Convert.ToInt32(ov.y.GetThreadValue(thread));
+                            ox = ov.x.AsInt(thread);
+                            oy = ov.y.AsInt(thread);
                         }
                         else
                         {
-                            ox = Convert.ToInt32(CastToScalar(offSrc.Cast(ScalarType.Int)).GetThreadValue(thread));
+                            ox = CastToScalar(offSrc).AsInt(thread);
                         }
                     }
 
@@ -1071,8 +1071,8 @@ namespace HLSL
 
                     var texel = rv.Get(x, y, z, 0, 0);
                     float texelCh = texel is VectorValue vv
-                        ? Convert.ToSingle(vv[Math.Min(channelIndex, vv.Size - 1)].GetThreadValue(thread))
-                        : Convert.ToSingle(CastToScalar((NumericValue)texel).GetThreadValue(thread));
+                        ? vv[Math.Min(channelIndex, vv.Size - 1)].AsFloat(thread)
+                        : CastToScalar((NumericValue)texel).AsFloat(thread);
 
                     if (comparisonValue is not null)
                         texelCh = CompareScalars(sampler, texelCh, cmpV);
@@ -1116,7 +1116,7 @@ namespace HLSL
 
             for (int thread = 0; thread < threadCount; thread++)
             {
-                int mipLevel = hasMipInput ? Convert.ToInt32(scalarMip.GetThreadValue(thread)) : 0;
+                int mipLevel = hasMipInput ? scalarMip.AsInt(thread) : 0;
                 float scale = MathF.Pow(2, mipLevel);
                 uint w = (uint)Math.Max(1, (int)(rv.SizeX / scale));
                 uint h = (uint)Math.Max(1, (int)(rv.SizeY / scale));

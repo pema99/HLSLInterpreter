@@ -1018,7 +1018,7 @@ void Intrinsic_Tanh()
     // Small values
     ASSERT(abs(tanh(0.1) - 0.0996679) < 0.001);
     
-    // Large values (should approach ±1)
+    // Large values (should approach ï¿½1)
     ASSERT(abs(tanh(5.0) - 0.9999092) < 0.001);
     ASSERT(abs(tanh(-5.0) - (-0.9999092)) < 0.001);
 }
@@ -1030,6 +1030,42 @@ void Intrinsic_Transpose()
     float2x2 m = float2x2(1.0, 2.0, 3.0, 4.0);
     float2x2 t = transpose(m);
     ASSERT(t == float2x2(1.0, 3.0, 2.0, 4.0));
+    ASSERT(transpose(t) == m);
+}
+
+[Test]
+void Intrinsic_Select_NonBoolCondition()
+{
+    // The ternary operator goes through Select. HLSL allows non-bool conditions:
+    // nonzero numerics are truthy, zero is falsy.
+
+    // Float scalar condition
+    float fc = 0.5f;
+    ASSERT((fc ? 10 : 20) == 10);
+    float fz = 0.0f;
+    ASSERT((fz ? 10 : 20) == 20);
+
+    // Int scalar condition
+    int ic = 3;
+    ASSERT((ic ? 10 : 20) == 10);
+    int iz = 0;
+    ASSERT((iz ? 10 : 20) == 20);
+}
+
+[Test]
+void Intrinsic_Transpose_NonSquare()
+{
+    // 2x3 -> 3x2
+    float2x3 m = float2x3(
+        1.0, 2.0, 3.0,
+        4.0, 5.0, 6.0
+    );
+    float3x2 t = transpose(m);
+    ASSERT(t[0][0] == 1.0 && t[0][1] == 4.0);
+    ASSERT(t[1][0] == 2.0 && t[1][1] == 5.0);
+    ASSERT(t[2][0] == 3.0 && t[2][1] == 6.0);
+
+    // Round-trip back to original
     ASSERT(transpose(t) == m);
 }
 
@@ -1562,39 +1598,39 @@ void Intrinsic_Reversebits()
 [Test]
 void Intrinsic_Lit()
 {
-    // Standard case: positive n·l and n·h
+    // Standard case: positive nï¿½l and nï¿½h
     float4 result = lit(0.5, 0.8, 32.0);
     ASSERT(result.x == 1.0); // ambient is always 1
-    ASSERT(result.y == 0.5); // diffuse = n·l
-    ASSERT(result.z > 0.0);  // specular = (n·h)^m when n·l > 0
+    ASSERT(result.y == 0.5); // diffuse = nï¿½l
+    ASSERT(result.z > 0.0);  // specular = (nï¿½h)^m when nï¿½l > 0
     ASSERT(result.w == 1.0); // w is always 1
     
-    // n·l is zero
+    // nï¿½l is zero
     result = lit(0.0, 0.8, 32.0);
     ASSERT(result.x == 1.0);
     ASSERT(result.y == 0.0);
-    ASSERT(result.z == 0.0); // specular is 0 when n·l <= 0
+    ASSERT(result.z == 0.0); // specular is 0 when nï¿½l <= 0
     ASSERT(result.w == 1.0);
     
-    // n·l is negative (backfacing)
+    // nï¿½l is negative (backfacing)
     result = lit(-0.5, 0.8, 32.0);
     ASSERT(result.x == 1.0);
     ASSERT(result.y == 0.0); // diffuse clamped to 0
-    ASSERT(result.z == 0.0); // specular is 0 when n·l <= 0
+    ASSERT(result.z == 0.0); // specular is 0 when nï¿½l <= 0
     ASSERT(result.w == 1.0);
     
-    // n·h is zero (no specular highlight)
+    // nï¿½h is zero (no specular highlight)
     result = lit(0.5, 0.0, 32.0);
     ASSERT(result.x == 1.0);
     ASSERT(result.y == 0.5);
-    ASSERT(result.z == 0.0); // (n·h)^m = 0^32 = 0
+    ASSERT(result.z == 0.0); // (nï¿½h)^m = 0^32 = 0
     ASSERT(result.w == 1.0);
     
-    // n·h is negative
+    // nï¿½h is negative
     result = lit(0.5, -0.5, 32.0);
     ASSERT(result.x == 1.0);
     ASSERT(result.y == 0.5);
-    ASSERT(result.z == 0.0); // negative n·h clamped
+    ASSERT(result.z == 0.0); // negative nï¿½h clamped
     ASSERT(result.w == 1.0);
     
     // Maximum values
@@ -1777,6 +1813,49 @@ void Intrinsic_F32tof16()
 }
 
 [Test]
+void Intrinsic_F32tof16_Vector()
+{
+    // float2/3/4 overloads â€” operate component-wise.
+    uint2 r2 = f32tof16(float2(0.0, 1.0));
+    ASSERT(r2.x == 0x0000 && r2.y == 0x3C00);
+
+    uint3 r3 = f32tof16(float3(-1.0, 0.5, 2.0));
+    ASSERT(r3.x == 0xBC00 && r3.y == 0x3800 && r3.z == 0x4000);
+
+    uint4 r4 = f32tof16(float4(0.0, 1.0, -2.0, 0.25));
+    ASSERT(r4.x == 0x0000 && r4.y == 0x3C00 && r4.z == 0xC000 && r4.w == 0x3400);
+}
+
+[Test]
+void Intrinsic_F16tof32_Vector()
+{
+    // uint2/3/4 overloads â€” operate component-wise.
+    float2 r2 = f16tof32(uint2(0x0000, 0x3C00));
+    ASSERT(abs(r2.x - 0.0) < 0.001 && abs(r2.y - 1.0) < 0.001);
+
+    float3 r3 = f16tof32(uint3(0xBC00, 0x3800, 0x4000));
+    ASSERT(abs(r3.x - (-1.0)) < 0.001 && abs(r3.y - 0.5) < 0.001 && abs(r3.z - 2.0) < 0.001);
+
+    float4 r4 = f16tof32(uint4(0x0000, 0x3C00, 0xC000, 0x3400));
+    ASSERT(abs(r4.x - 0.0) < 0.001);
+    ASSERT(abs(r4.y - 1.0) < 0.001);
+    ASSERT(abs(r4.z - (-2.0)) < 0.001);
+    ASSERT(abs(r4.w - 0.25) < 0.001);
+}
+
+[Test]
+void Intrinsic_F32tof16_Vector_RoundTrip()
+{
+    float4 original = float4(1.5, -3.75, 0.125, -7.0);
+    uint4 halves = f32tof16(original);
+    float4 restored = f16tof32(halves);
+    ASSERT(abs(restored.x - original.x) < 0.001);
+    ASSERT(abs(restored.y - original.y) < 0.001);
+    ASSERT(abs(restored.z - original.z) < 0.001);
+    ASSERT(abs(restored.w - original.w) < 0.001);
+}
+
+[Test]
 void Intrinsic_Firstbithigh()
 {
     // Zero has no bits set - typically returns -1
@@ -1854,6 +1933,136 @@ void Intrinsic_Firstbitlow()
     ASSERT(firstbitlow(0x00000002u) == 1);
     ASSERT(firstbitlow(0x00000004u) == 2);
     ASSERT(firstbitlow(0x00000008u) == 3);
+}
+
+[Test]
+void Intrinsic_Firstbithigh_SignedInt()
+{
+    // Positive signed: same as unsigned (highest set bit, scanning MSB->LSB).
+    int p1 = 0x00000001;
+    int p2 = 0x40000000;       // bit 30
+    int p3 = 0x12345678;       // highest bit is 28
+    int pMax = 0x7FFFFFFF;     // INT_MAX, highest bit is 30
+    ASSERT(firstbithigh(p1) == 0);
+    ASSERT(firstbithigh(p2) == 30);
+    ASSERT(firstbithigh(p3) == 28);
+    ASSERT(firstbithigh(pMax) == 30);
+
+    // Zero: no bits set, returns -1 (= 0xFFFFFFFFu).
+    int z = 0;
+    ASSERT(firstbithigh(z) == -1);
+
+    // Negative signed: scan MSB->LSB, return position of first 0 bit.
+    int n1 = -1;               // 0xFFFFFFFF: all bits 1, no zero bits -> -1.
+    int n2 = -2;               // 0xFFFFFFFE: only bit 0 is zero -> 0.
+    int n16 = 0xFFFFFFF0;      // -16: bits 0..3 are zero, scan from MSB finds bit 3 first -> 3.
+    int nMin = 0x80000000;     // INT_MIN: bit 31 is 1, bit 30 is 0 -> 30.
+    ASSERT(firstbithigh(n1) == -1);
+    ASSERT(firstbithigh(n2) == 0);
+    ASSERT(firstbithigh(n16) == 3);
+    ASSERT(firstbithigh(nMin) == 30);
+}
+
+[Test]
+void Intrinsic_Firstbithigh_Vector()
+{
+    // Per DXC: uint<> firstbithigh(in any_int<> x) â€” vector overload exists.
+
+    // uint vector
+    uint4 ru = firstbithigh(uint4(0u, 1u, 0x80000000u, 0x12345678u));
+    ASSERT(ru.x == 0xFFFFFFFFu); // 0u -> -1
+    ASSERT(ru.y == 0);
+    ASSERT(ru.z == 31);
+    ASSERT(ru.w == 28);
+
+    // int vector with mixed sign
+    uint3 ri = firstbithigh(int3(1, -2, 0));
+    ASSERT(ri.x == 0);
+    ASSERT(ri.y == 0);            // -2 -> highest zero bit at position 0
+    ASSERT(ri.z == 0xFFFFFFFFu);  // 0 -> -1
+}
+
+[Test]
+void Intrinsic_Firstbithigh_Matrix()
+{
+    // uint matrix
+    uint2x2 ru = firstbithigh(uint2x2(0u, 1u, 0x80000000u, 0x12345678u));
+    ASSERT(ru[0][0] == 0xFFFFFFFFu);
+    ASSERT(ru[0][1] == 0);
+    ASSERT(ru[1][0] == 31);
+    ASSERT(ru[1][1] == 28);
+
+    // int matrix â€” signed branch including negative values
+    int2x2 mi = int2x2(1, -2, 0x80000000, 0);
+    uint2x2 ri = firstbithigh(mi);
+    ASSERT(ri[0][0] == 0);             // 1 -> bit 0
+    ASSERT(ri[0][1] == 0);             // -2 (0xFFFFFFFE) -> first 0 bit at pos 0
+    ASSERT(ri[1][0] == 30);            // INT_MIN -> bit 31 is 1, bit 30 is 0
+    ASSERT(ri[1][1] == 0xFFFFFFFFu);   // 0 -> not found
+}
+
+[Test]
+void Intrinsic_Firstbitlow_SignedInt()
+{
+    // firstbitlow on signed input â€” bit pattern interpretation matches unsigned.
+    int p = 0x00000008;
+    int z = 0;
+    int n1 = -1;             // 0xFFFFFFFF, lowest set bit is 0
+    int n2 = -2;             // 0xFFFFFFFE, lowest set bit is 1
+    int nMin = 0x80000000;
+    ASSERT(firstbitlow(p) == 3);
+    ASSERT(firstbitlow(z) == -1);
+    ASSERT(firstbitlow(n1) == 0);
+    ASSERT(firstbitlow(n2) == 1);
+    ASSERT(firstbitlow(nMin) == 31);
+}
+
+[Test]
+void Intrinsic_Firstbitlow_Vector()
+{
+    uint4 ru = firstbitlow(uint4(0u, 1u, 0x80000000u, 0x12345678u));
+    ASSERT(ru.x == 0xFFFFFFFFu);
+    ASSERT(ru.y == 0);
+    ASSERT(ru.z == 31);
+    ASSERT(ru.w == 3);
+
+    uint3 ri = firstbitlow(int3(8, -2, 0));
+    ASSERT(ri.x == 3);
+    ASSERT(ri.y == 1);
+    ASSERT(ri.z == 0xFFFFFFFFu);
+}
+
+[Test]
+void Intrinsic_Firstbitlow_Matrix()
+{
+    // uint matrix
+    uint2x2 ru = firstbitlow(uint2x2(0u, 1u, 0x80000000u, 0x12345678u));
+    ASSERT(ru[0][0] == 0xFFFFFFFFu);
+    ASSERT(ru[0][1] == 0);
+    ASSERT(ru[1][0] == 31);
+    ASSERT(ru[1][1] == 3);
+
+    // int matrix â€” bit pattern preserved across int -> uint cast
+    int2x2 mi = int2x2(8, -2, 0x80000000, 0);
+    uint2x2 ri = firstbitlow(mi);
+    ASSERT(ri[0][0] == 3);             // 8 -> bit 3
+    ASSERT(ri[0][1] == 1);             // -2 (0xFFFFFFFE) -> lowest set bit is 1
+    ASSERT(ri[1][0] == 31);            // INT_MIN -> bit 31
+    ASSERT(ri[1][1] == 0xFFFFFFFFu);   // 0 -> not found
+}
+
+[Test]
+void Intrinsic_Firstbithigh_ReturnsUint()
+{
+    // Per DXC: return type is always uint<>, regardless of input signedness.
+    // -1 from no-bit-set case == 0xFFFFFFFFu. Either reading is valid since HLSL
+    // allows int<->uint implicit conversion, but the underlying tag is uint.
+    int z = 0;
+    uint u = firstbithigh(z);
+    ASSERT(u == 0xFFFFFFFFu);
+
+    uint u2 = firstbitlow(z);
+    ASSERT(u2 == 0xFFFFFFFFu);
 }
 
 [Test]

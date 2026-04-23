@@ -62,38 +62,34 @@ namespace HLSL
             else
                 return v.BroadcastToMatrix(rows, cols);
         }
-        
+
         private static NumericValue ToFloatLike(NumericValue value)
         {
             if (HLSLTypeUtils.IsFloat(value.Type))
                 return value;
             return value.Cast(ScalarType.Float);
         }
-        
-        private static object Min(object left, object right)
+
+        private static RawValue Min(ScalarType type, RawValue left, RawValue right)
         {
-            switch (left)
-            {
-                case int x: return Math.Min(x, (int)right);
-                case uint x: return Math.Min(x, (uint)right);
-                case float x: return Math.Min(x, (float)right);
-                case double x: return Math.Min(x, (double)right);
-                case bool x: return Math.Min((x ? 1 : 0), ((bool)right ? 1 : 0)) != 0;
-                default: throw new InvalidOperationException();
-            }
+            if (type == ScalarType.Float) return Math.Min(left.Float, right.Float);
+            if (HLSLTypeUtils.IsInt(type)) return Math.Min(left.Int, right.Int);
+            if (HLSLTypeUtils.IsUint(type)) return Math.Min(left.Uint, right.Uint);
+            if (type == ScalarType.Double) return Math.Min(left.Double, right.Double);
+            if (HLSLTypeUtils.IsFloat(type)) return Math.Min(left.Float, right.Float);
+            if (type == ScalarType.Bool) return Math.Min(left.Bool ? 1 : 0, right.Bool ? 1 : 0) != 0;
+            throw new InvalidOperationException();
         }
 
-        private static object Max(object left, object right)
+        private static RawValue Max(ScalarType type, RawValue left, RawValue right)
         {
-            switch (left)
-            {
-                case int x: return Math.Max(x, (int)right);
-                case uint x: return Math.Max(x, (uint)right);
-                case float x: return Math.Max(x, (float)right);
-                case double x: return Math.Max(x, (double)right);
-                case bool x: return Math.Max((x ? 1 : 0), ((bool)right ? 1 : 0)) != 0;
-                default: throw new InvalidOperationException();
-            }
+            if (type == ScalarType.Float) return Math.Max(left.Float, right.Float);
+            if (HLSLTypeUtils.IsInt(type)) return Math.Max(left.Int, right.Int);
+            if (HLSLTypeUtils.IsUint(type)) return Math.Max(left.Uint, right.Uint);
+            if (type == ScalarType.Double) return Math.Max(left.Double, right.Double);
+            if (HLSLTypeUtils.IsFloat(type)) return Math.Max(left.Float, right.Float);
+            if (type == ScalarType.Bool) return Math.Max(left.Bool ? 1 : 0, right.Bool ? 1 : 0) != 0;
+            throw new InvalidOperationException();
         }
         #endregion
 
@@ -279,33 +275,33 @@ namespace HLSL
         {
             return x * (1 - s) + y * s;
         }
-        
+
         public static NumericValue Exp(NumericValue x)
         {
-            return ToFloatLike(x).Map(val => MathF.Exp(Convert.ToSingle(val)));
+            return ToFloatLike(x).Map(val => MathF.Exp(val.Float));
         }
-        
+
         public static NumericValue Exp2(NumericValue x)
         {
-            return ToFloatLike(x).Map(val => MathF.Pow(2.0f, Convert.ToSingle(val)));
+            return ToFloatLike(x).Map(val => MathF.Pow(2.0f, val.Float));
         }
 
         public static NumericValue Abs(NumericValue x)
         {
             if (HLSLTypeUtils.IsInt(x.Type))
-                return x.Map(val => Math.Abs(Convert.ToInt32(val)));
+                return x.Map(val => Math.Abs(val.Int));
 
             if (HLSLTypeUtils.IsUint(x.Type))
                 return x;
 
-            return x.Map(val => Math.Abs(Convert.ToSingle(val)));
+            return x.Map(val => Math.Abs(val.Float));
         }
-        
+
         public static NumericValue Acos(NumericValue x)
         {
-            return ToFloatLike(x).Map(val => MathF.Acos(Convert.ToSingle(val)));
+            return ToFloatLike(x).Map(val => MathF.Acos(val.Float));
         }
-        
+
         public static NumericValue All(NumericValue x)
         {
             var scalars = x.ToScalars();
@@ -337,76 +333,70 @@ namespace HLSL
             ScalarValue lowbitsScalar = (ScalarValue)lowbits.Cast(ScalarType.Uint);
             ScalarValue highbitsScalar = (ScalarValue)highbits.Cast(ScalarType.Uint);
 
-            NumericValue result = 0.0;
+            ScalarValue result = (ScalarValue)0.0;
             return result.MapThreads((_, threadIndex) =>
             {
-                var low = (uint)lowbitsScalar.GetThreadValue(threadIndex);
-                var high = (uint)highbitsScalar.GetThreadValue(threadIndex);
+                var low = lowbitsScalar.AsUint(threadIndex);
+                var high = highbitsScalar.AsUint(threadIndex);
                 return BitConverter.ToDouble(BitConverter.GetBytes(low).Concat(BitConverter.GetBytes(high)).ToArray());
             });
         }
 
         public static NumericValue Asfloat(NumericValue x)
         {
-            return x.Map(y =>
+            if (HLSLTypeUtils.IsInt(x.Type) || HLSLTypeUtils.IsUint(x.Type))
             {
-                byte[] bytes;
-                if (HLSLTypeUtils.IsUint(x.Type))
-                    bytes = BitConverter.GetBytes(Convert.ToUInt32(y));
-                else if (HLSLTypeUtils.IsInt(x.Type))
-                    bytes = BitConverter.GetBytes(Convert.ToInt32(y));
-                else
-                    return y;
-                return BitConverter.ToSingle(bytes);
-            }).Cast(ScalarType.Float);
+                // Bit-reinterpret int/uint bits as float by re-tagging the register.
+                if (x is ScalarValue sv) return new ScalarValue(ScalarType.Float, sv.Value);
+                if (x is VectorValue vv) return new VectorValue(ScalarType.Float, vv.Values);
+                if (x is MatrixValue mv) return new MatrixValue(ScalarType.Float, mv.Rows, mv.Columns, mv.Values);
+                throw new InvalidOperationException();
+            }
+            return x.Cast(ScalarType.Float);
         }
 
         public static NumericValue Asint(NumericValue x)
         {
-            return x.Map(y =>
+            if (HLSLTypeUtils.IsUint(x.Type) || x.Type == ScalarType.Float || x.Type == ScalarType.Half)
             {
-                byte[] bytes;
-                if (HLSLTypeUtils.IsFloat(x.Type))
-                    bytes = BitConverter.GetBytes(Convert.ToSingle(y));
-                else if (HLSLTypeUtils.IsUint(x.Type))
-                    bytes = BitConverter.GetBytes(Convert.ToUInt32(y));
-                else
-                    return y;
-                return BitConverter.ToInt32(bytes);
-            }).Cast(ScalarType.Int);
+                // Bit-reinterpret uint/float bits as int by re-tagging the register.
+                if (x is ScalarValue sv) return new ScalarValue(ScalarType.Int, sv.Value);
+                if (x is VectorValue vv) return new VectorValue(ScalarType.Int, vv.Values);
+                if (x is MatrixValue mv) return new MatrixValue(ScalarType.Int, mv.Rows, mv.Columns, mv.Values);
+                throw new InvalidOperationException();
+            }
+            return x.Cast(ScalarType.Int);
         }
 
         public static NumericValue Asuint(NumericValue x)
         {
-            return x.Map(y =>
+            if (HLSLTypeUtils.IsInt(x.Type) || x.Type == ScalarType.Float || x.Type == ScalarType.Half)
             {
-                byte[] bytes;
-                if (HLSLTypeUtils.IsFloat(x.Type))
-                    bytes = BitConverter.GetBytes(Convert.ToSingle(y));
-                else if (HLSLTypeUtils.IsInt(x.Type))
-                    bytes = BitConverter.GetBytes(Convert.ToInt32(y));
-                else
-                    return y;
-                return BitConverter.ToUInt32(bytes);
-            }).Cast(ScalarType.Uint);
+                // Bit-reinterpret int/float bits as uint by re-tagging the register.
+                if (x is ScalarValue sv) return new ScalarValue(ScalarType.Uint, sv.Value);
+                if (x is VectorValue vv) return new VectorValue(ScalarType.Uint, vv.Values);
+                if (x is MatrixValue mv) return new MatrixValue(ScalarType.Uint, mv.Rows, mv.Columns, mv.Values);
+                throw new InvalidOperationException();
+            }
+            return x.Cast(ScalarType.Uint);
         }
 
         public static NumericValue Asin(NumericValue x)
         {
-            return ToFloatLike(x).Map(val => MathF.Asin(Convert.ToSingle(val)));
+            return ToFloatLike(x).Map(val => MathF.Asin(val.Float));
         }
 
         public static NumericValue Atan(NumericValue x)
         {
-            return ToFloatLike(x).Map(val => MathF.Atan(Convert.ToSingle(val)));
+            return ToFloatLike(x).Map(val => MathF.Atan(val.Float));
         }
-        
+
         public static NumericValue Atan2(NumericValue y, NumericValue x)
         {
             x = ToFloatLike(x);
             y = ToFloatLike(y);
 
-            return 
+            return
             Select(x > 0, Atan(y / x),
             Select(HLSLOperators.BoolAnd(x < 0, y >= 0), Atan(y / x) + MathF.PI,
             Select(HLSLOperators.BoolAnd(x < 0, y < 0), Atan(y / x) - MathF.PI,
@@ -414,9 +404,12 @@ namespace HLSL
             Select(HLSLOperators.BoolAnd(x == 0, y < 0), -MathF.PI / 2.0f,
             0)))));
         }
-        
+
         public static NumericValue Select(NumericValue cond, NumericValue a, NumericValue b)
         {
+            // HLSL allows non-bool cond (e.g. (0.5f ? a : b)); coerce so .Bool reads are safe.
+            cond = cond.Cast(ScalarType.Bool);
+
             // Match thread count all args
             (cond, a) = HLSLTypeUtils.PromoteThreadCount(cond, a);
             (cond, b) = HLSLTypeUtils.PromoteThreadCount(cond, b);
@@ -459,41 +452,57 @@ namespace HLSL
             // Match types of branches
             (a, b) = HLSLTypeUtils.PromoteType(a, b, false);
 
-            return cond.MapThreads((condVal, threadIndex) =>
+            ScalarType resultType = a.Type;
+            if (cond is ScalarValue condS)
             {
-                if (condVal is object[] arr)
+                var aS = (ScalarValue)a;
+                var bS = (ScalarValue)b;
+                return new ScalarValue(resultType, condS.Value.MapThreads((c, i) => c.Bool ? aS.GetThreadValue(i) : bS.GetThreadValue(i)));
+            }
+            if (cond is VectorValue condV)
+            {
+                var aV = (VectorValue)a;
+                var bV = (VectorValue)b;
+                return new VectorValue(resultType, condV.Values.MapThreads((c, i) =>
                 {
-                    object[] result = new object[arr.Length];
-                    for (int i = 0; i < arr.Length; i++)
-                    {
-                        if (Convert.ToBoolean(arr[i]))
-                            result[i] = ((object[])a.GetThreadValue(threadIndex))[i];
-                        else
-                            result[i] = ((object[])b.GetThreadValue(threadIndex))[i];
-                    }
-                    return result;
-                }
-                
-                if (Convert.ToBoolean(cond.GetThreadValue(threadIndex)))
-                    return a.GetThreadValue(threadIndex);
-                else
-                    return b.GetThreadValue(threadIndex);
-            }).Cast(a.Type);
+                    var aArr = aV.GetThreadValue(i);
+                    var bArr = bV.GetThreadValue(i);
+                    var r = new RawValue[c.Length];
+                    for (int j = 0; j < c.Length; j++)
+                        r[j] = c[j].Bool ? aArr[j] : bArr[j];
+                    return r;
+                }));
+            }
+            if (cond is MatrixValue condM)
+            {
+                var aM = (MatrixValue)a;
+                var bM = (MatrixValue)b;
+                return new MatrixValue(resultType, condM.Rows, condM.Columns, condM.Values.MapThreads((c, i) =>
+                {
+                    var aArr = aM.GetThreadValue(i);
+                    var bArr = bM.GetThreadValue(i);
+                    var r = new RawValue[c.Length];
+                    for (int j = 0; j < c.Length; j++)
+                        r[j] = c[j].Bool ? aArr[j] : bArr[j];
+                    return r;
+                }));
+            }
+            throw new InvalidOperationException();
         }
-        
+
         public static NumericValue Sqrt(NumericValue x)
         {
-            return ToFloatLike(x).Map(val => MathF.Sqrt(Convert.ToSingle(val)));
+            return ToFloatLike(x).Map(val => MathF.Sqrt(val.Float));
         }
 
         public static NumericValue Step(NumericValue y, NumericValue x)
         {
             return Select(x >= y, 1, 0);
         }
-        
+
         public static NumericValue Ceil(NumericValue x)
         {
-            return ToFloatLike(x).Map(val => MathF.Ceiling(Convert.ToSingle(val)));
+            return ToFloatLike(x).Map(val => MathF.Ceiling(val.Float));
         }
 
         public static NumericValue CheckAccessFullyMapped(NumericValue x)
@@ -504,12 +513,12 @@ namespace HLSL
 
         public static NumericValue Cos(NumericValue x)
         {
-            return ToFloatLike(x).Map(val => MathF.Cos(Convert.ToSingle(val)));
+            return ToFloatLike(x).Map(val => MathF.Cos(val.Float));
         }
-        
+
         public static NumericValue Cosh(NumericValue x)
         {
-            return ToFloatLike(x).Map(val => MathF.Cosh(Convert.ToSingle(val)));
+            return ToFloatLike(x).Map(val => MathF.Cosh(val.Float));
         }
 
         public static NumericValue Countbits(NumericValue x)
@@ -517,7 +526,7 @@ namespace HLSL
             var u = x.Cast(ScalarType.Uint);
             return u.Map(y =>
             {
-                uint bits = Convert.ToUInt32(y);
+                uint bits = y.Uint;
                 uint count = 0;
                 for (int i = 0; i < 32; i++)
                 {
@@ -601,127 +610,120 @@ namespace HLSL
                     );
             }
         }
-        
+
         public static NumericValue Distance(NumericValue x, NumericValue y)
         {
             return Length(y - x);
         }
-        
+
         public static NumericValue Sign(NumericValue x)
         {
             var zero = HLSLTypeUtils.GetZeroValue(x);
             return Select(x == zero, zero, Select(x > zero, 1, -1)).Cast(ScalarType.Int);
         }
 
-        public static NumericValue F32tof16(NumericValue x)
+        private static uint F32tof16Bits(uint f)
         {
-            x = x.Cast(ScalarType.Float);
-            object[] perThreadValue = new object[x.ThreadCount];
-            for (int threadIndex = 0; threadIndex < x.ThreadCount; threadIndex++)
-            {
-                uint f = BitConverter.ToUInt32(BitConverter.GetBytes(Convert.ToSingle(x.GetThreadValue(threadIndex))));
+            // Extract sign, exponent, and mantissa from float32
+            uint sign = (f >> 31) & 0x1;
+            uint exponent = (f >> 23) & 0xFF;
+            uint mantissa = f & 0x7FFFFF;
 
-                // Extract sign, exponent, and mantissa from float32
-                uint sign = (f >> 31) & 0x1;
-                uint exponent = (f >> 23) & 0xFF;
-                uint mantissa = f & 0x7FFFFF;
+            if (exponent == 0xFF) // Inf or NaN
+                return (sign << 15) | 0x7C00 | (mantissa != 0 ? 0x200u : 0);
+            if (exponent == 0) // Zero or denormalized
+                return sign << 15; // Just preserve sign, flush denorms to zero
 
-                uint half;
+            // Rebias exponent from float32 (bias 127) to float16 (bias 15)
+            int newExp = (int)(exponent) - 127 + 15;
+            if (newExp >= 31) // Overflow to infinity
+                return (sign << 15) | 0x7C00;
+            if (newExp <= 0) // Underflow to zero
+                return sign << 15;
 
-                if (exponent == 0xFF) // Inf or NaN
-                {
-                    half = (sign << 15) | 0x7C00 | (mantissa != 0 ? 0x200u : 0);
-                }
-                else if (exponent == 0) // Zero or denormalized
-                {
-                    half = sign << 15; // Just preserve sign, flush denorms to zero
-                }
-                else
-                {
-                    // Rebias exponent from float32 (bias 127) to float16 (bias 15)
-                    int newExp = (int)(exponent) - 127 + 15;
-
-                    if (newExp >= 31) // Overflow to infinity
-                    {
-                        half = (sign << 15) | 0x7C00;
-                    }
-                    else if (newExp <= 0) // Underflow to zero
-                    {
-                        half = sign << 15;
-                    }
-                    else
-                    {
-                        // Normal case: construct half float
-                        half = (sign << 15) | ((uint)(newExp) << 10) | (mantissa >> 13);
-                    }
-                }
-
-                perThreadValue[threadIndex] = half;
-            }
-
-            if (x.ThreadCount == 1)
-                return new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR(perThreadValue[0]));
-            else
-                return new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarVGPR(perThreadValue));
+            // Normal case: construct half float
+            return (sign << 15) | ((uint)(newExp) << 10) | (mantissa >> 13);
         }
 
+        private static uint F16tof32Bits(uint half)
+        {
+            // Extract sign, exponent, and mantissa from float16
+            uint sign = (half >> 15) & 0x1;
+            uint exponent = (half >> 10) & 0x1F;
+            uint mantissa = half & 0x3FF;
+
+            if (exponent == 0x1F) // Inf or NaN
+            {
+                // Preserve inf/nan, expand mantissa
+                return (sign << 31) | 0x7F800000 | (mantissa << 13);
+            }
+            if (exponent == 0) // Zero or denormalized
+            {
+                if (mantissa == 0) // Zero
+                    return sign << 31;
+
+                // Denormalized - convert to normalized float32
+                // Find the leading 1 bit
+                exponent = 1;
+                while ((mantissa & 0x400) == 0)
+                {
+                    mantissa <<= 1;
+                    exponent--;
+                }
+                mantissa &= 0x3FF; // Remove leading 1
+            }
+
+            // Rebias exponent from float16 (bias 15) to float32 (bias 127)
+            uint newExp = exponent + 127 - 15;
+            return (sign << 31) | (newExp << 23) | (mantissa << 13);
+        }
+
+        public static NumericValue F32tof16(NumericValue x)
+        {
+            var floatVal = x.Cast(ScalarType.Float);
+            if (floatVal is ScalarValue sv)
+                return new ScalarValue(ScalarType.Uint, sv.Value.Map(rv => (RawValue)F32tof16Bits(rv.Uint)));
+            if (floatVal is VectorValue vv)
+                return new VectorValue(ScalarType.Uint, vv.Values.Map(arr =>
+                {
+                    var res = new RawValue[arr.Length];
+                    for (int i = 0; i < arr.Length; i++)
+                        res[i] = F32tof16Bits(arr[i].Uint);
+                    return res;
+                }));
+            if (floatVal is MatrixValue mv)
+                return new MatrixValue(ScalarType.Uint, mv.Rows, mv.Columns, mv.Values.Map(arr =>
+                {
+                    var res = new RawValue[arr.Length];
+                    for (int i = 0; i < arr.Length; i++)
+                        res[i] = F32tof16Bits(arr[i].Uint);
+                    return res;
+                }));
+            throw new InvalidOperationException();
+        }
 
         public static NumericValue F16tof32(NumericValue x)
         {
-            x = x.Cast(ScalarType.Uint);
-            object[] perThreadValue = new object[x.ThreadCount];
-            for (int threadIndex = 0; threadIndex < x.ThreadCount; threadIndex++)
-            {
-                uint half = Convert.ToUInt32(x.GetThreadValue(threadIndex));
-
-                // Extract sign, exponent, and mantissa from float16
-                uint sign = (half >> 15) & 0x1;
-                uint exponent = (half >> 10) & 0x1F;
-                uint mantissa = half & 0x3FF;
-
-                uint f;
-
-                if (exponent == 0x1F) // Inf or NaN
+            var uintVal = x.Cast(ScalarType.Uint);
+            if (uintVal is ScalarValue sv)
+                return new ScalarValue(ScalarType.Float, sv.Value.Map(rv => (RawValue)F16tof32Bits(rv.Uint)));
+            if (uintVal is VectorValue vv)
+                return new VectorValue(ScalarType.Float, vv.Values.Map(arr =>
                 {
-                    // Preserve inf/nan, expand mantissa
-                    f = (sign << 31) | 0x7F800000 | (mantissa << 13);
-                }
-                else if (exponent == 0) // Zero or denormalized
+                    var res = new RawValue[arr.Length];
+                    for (int i = 0; i < arr.Length; i++)
+                        res[i] = F16tof32Bits(arr[i].Uint);
+                    return res;
+                }));
+            if (uintVal is MatrixValue mv)
+                return new MatrixValue(ScalarType.Float, mv.Rows, mv.Columns, mv.Values.Map(arr =>
                 {
-                    if (mantissa == 0) // Zero
-                    {
-                        f = sign << 31;
-                    }
-                    else // Denormalized - convert to normalized float32
-                    {
-                        // Find the leading 1 bit
-                        exponent = 1;
-                        while ((mantissa & 0x400) == 0)
-                        {
-                            mantissa <<= 1;
-                            exponent--;
-                        }
-                        mantissa &= 0x3FF; // Remove leading 1
-
-                        // Rebias exponent from float16 (bias 15) to float32 (bias 127)
-                        uint newExp = exponent + 127 - 15;
-                        f = (sign << 31) | (newExp << 23) | (mantissa << 13);
-                    }
-                }
-                else // Normal case
-                {
-                    // Rebias exponent from float16 (bias 15) to float32 (bias 127)
-                    uint newExp = exponent + 127 - 15;
-                    f = (sign << 31) | (newExp << 23) | (mantissa << 13);
-                }
-
-                perThreadValue[threadIndex] = BitConverter.ToSingle(BitConverter.GetBytes(f));
-            }
-
-            if (x.ThreadCount == 1)
-                return new ScalarValue(ScalarType.Float, HLSLValueUtils.MakeScalarSGPR(perThreadValue[0]));
-            else
-                return new ScalarValue(ScalarType.Float, HLSLValueUtils.MakeScalarVGPR(perThreadValue));
+                    var res = new RawValue[arr.Length];
+                    for (int i = 0; i < arr.Length; i++)
+                        res[i] = F16tof32Bits(arr[i].Uint);
+                    return res;
+                }));
+            throw new InvalidOperationException();
         }
 
         public static NumericValue Faceforward(NumericValue n, NumericValue i, NumericValue ng)
@@ -731,14 +733,16 @@ namespace HLSL
 
         public static NumericValue Firstbithigh(NumericValue x)
         {
-            if (x.Type != ScalarType.Int && x.Type != ScalarType.Uint)
-                x = x.Cast(ScalarType.Uint);
-
-            return x.Map(y =>
+            // Per DXC: uint<> firstbithigh(in any_int<> x) — returns uint regardless of signed/unsigned input.
+            // Gets the location of the first set bit starting from the highest order bit and working downward, per component.
+            NumericValue result;
+            if (HLSLTypeUtils.IsInt(x.Type))
             {
-                // Gets the location of the first set bit starting from the highest order bit and working downward, per component.
-                if (y is int signed)
+                if (x.Type != ScalarType.Int)
+                    x = x.Cast(ScalarType.Int);
+                result = x.Map(y =>
                 {
+                    int signed = y.Int;
                     for (int i = 0; i < 32; i++)
                     {
                         int bitPos = 1 << (31 - i);
@@ -752,19 +756,29 @@ namespace HLSL
                             return (31 - i);
                     }
                     return -1;
-                }
-                else
+                });
+            }
+            else
+            {
+                if (x.Type != ScalarType.Uint)
+                    x = x.Cast(ScalarType.Uint);
+                result = x.Map(y =>
                 {
-                    uint unsigned = (uint)y;
+                    uint unsigned = y.Uint;
                     for (int i = 0; i < 32; i++)
                     {
                         uint bitPos = 1u << (31 - i);
                         if ((unsigned & bitPos) != 0)
                             return (31 - i);
                     }
-                    return 0xFFFFFFFFu;
-                }
-            });
+                    return -1;
+                });
+            }
+            // Re-tag result as uint (bit patterns are equivalent: -1 == 0xFFFFFFFFu).
+            if (result is ScalarValue sv) return new ScalarValue(ScalarType.Uint, sv.Value);
+            if (result is VectorValue vv) return new VectorValue(ScalarType.Uint, vv.Values);
+            if (result is MatrixValue mv) return new MatrixValue(ScalarType.Uint, mv.Rows, mv.Columns, mv.Values);
+            throw new InvalidOperationException();
         }
 
         public static NumericValue Firstbitlow(NumericValue x)
@@ -774,12 +788,12 @@ namespace HLSL
             return x.Map(y =>
             {
                 // Returns the location of the first set bit starting from the lowest order bit and working upward, per component.
-                uint unsigned = (uint)y;
+                uint unsigned = y.Uint;
                 for (int i = 0; i < 32; i++)
                 {
                     uint bitPos = 1u << i;
                     if ((unsigned & bitPos) != 0)
-                        return i;
+                        return (uint)i;
                 }
                 return 0xFFFFFFFFu;
             });
@@ -787,14 +801,14 @@ namespace HLSL
 
         public static NumericValue Floor(NumericValue x)
         {
-            return ToFloatLike(x).Map(val => MathF.Floor(Convert.ToSingle(val)));
+            return ToFloatLike(x).Map(val => MathF.Floor(val.Float));
         }
 
         public static NumericValue Fma(NumericValue a, NumericValue b, NumericValue c)
         {
             return a * b + c;
         }
-        
+
         public static NumericValue Fmod(NumericValue a, NumericValue b)
         {
             a = ToFloatLike(a);
@@ -805,27 +819,27 @@ namespace HLSL
 
         public static NumericValue Frac(NumericValue x)
         {
-            return Abs(ToFloatLike(x).Map(val => Convert.ToSingle(val) % 1.0f));
+            return Abs(ToFloatLike(x).Map(val => val.Float % 1.0f));
         }
-        
+
         public static NumericValue Isnan(NumericValue x)
         {
-            return ToFloatLike(x).Map(val => float.IsNaN(Convert.ToSingle(val))).Cast(ScalarType.Bool);
+            return x.Cast(ScalarType.Float).Map(val => float.IsNaN(val.Float)).Cast(ScalarType.Bool);
         }
-        
+
         public static NumericValue Isfinite(NumericValue x)
         {
-            return ToFloatLike(x).Map(val => float.IsFinite(Convert.ToSingle(val))).Cast(ScalarType.Bool);
+            return x.Cast(ScalarType.Float).Map(val => float.IsFinite(val.Float)).Cast(ScalarType.Bool);
         }
-        
+
         public static NumericValue Isinf(NumericValue x)
         {
-            return ToFloatLike(x).Map(val => float.IsInfinity(Convert.ToSingle(val))).Cast(ScalarType.Bool);
+            return x.Cast(ScalarType.Float).Map(val => float.IsInfinity(val.Float)).Cast(ScalarType.Bool);
         }
 
         public static NumericValue Isnormal(NumericValue x)
         {
-            return ToFloatLike(x).Map(val => float.IsNormal(Convert.ToSingle(val))).Cast(ScalarType.Bool);
+            return x.Cast(ScalarType.Float).Map(val => float.IsNormal(val.Float)).Cast(ScalarType.Bool);
         }
 
         public static NumericValue Ldexp(NumericValue x, NumericValue exp)
@@ -848,17 +862,17 @@ namespace HLSL
 
         public static NumericValue Log(NumericValue x)
         {
-            return ToFloatLike(x).Map(val => MathF.Log(Convert.ToSingle(val)));
+            return ToFloatLike(x).Map(val => MathF.Log(val.Float));
         }
 
         public static NumericValue Log10(NumericValue x)
         {
-            return ToFloatLike(x).Map(val => MathF.Log(Convert.ToSingle(val)) / MathF.Log(10));
+            return ToFloatLike(x).Map(val => MathF.Log(val.Float) / MathF.Log(10));
         }
 
         public static NumericValue Log2(NumericValue x)
         {
-            return ToFloatLike(x).Map(val => MathF.Log(Convert.ToSingle(val)) / MathF.Log(2));
+            return ToFloatLike(x).Map(val => MathF.Log(val.Float) / MathF.Log(2));
         }
 
         public static NumericValue Mad(NumericValue m, NumericValue a, NumericValue b)
@@ -870,25 +884,25 @@ namespace HLSL
         {
             return 1; // Not supported since SM2.0
         }
-        
+
         public static NumericValue Pow(NumericValue x, NumericValue y)
         {
             x = ToFloatLike(x);
             y = ToFloatLike(y);
             (x, y) = HLSLTypeUtils.Promote(x, y, false);
-            return HLSLValueUtils.Map2(x, y, (fx, fy) => MathF.Exp(Convert.ToSingle(fy) * MathF.Log(Convert.ToSingle(fx))));
+            return HLSLValueUtils.Map2(x, y, (fx, fy) => MathF.Exp(fy.Float * MathF.Log(fx.Float)));
         }
 
         public static NumericValue Radians(NumericValue x)
         {
             return x / (180f / MathF.PI);
         }
-        
+
         public static NumericValue Rcp(NumericValue x)
         {
             return 1.0f / x;
         }
-        
+
         public static NumericValue Reflect(NumericValue i, NumericValue n)
         {
             return i - 2.0f * n * Dot(n,i);
@@ -906,7 +920,7 @@ namespace HLSL
         {
             return x.Cast(ScalarType.Uint).Map(v =>
             {
-                uint a = Convert.ToUInt32(v);
+                uint a = v.Uint;
                 uint r = 0;
                 for (int i = 0; i < 32; i++)
                 {
@@ -920,64 +934,66 @@ namespace HLSL
 
         public static NumericValue Round(NumericValue x)
         {
-            return ToFloatLike(x).Map(val => MathF.Round(Convert.ToSingle(val), MidpointRounding.ToEven));
+            return ToFloatLike(x).Map(val => MathF.Round(val.Float, MidpointRounding.ToEven));
         }
-        
+
         public static NumericValue Rsqrt(NumericValue x)
         {
             return 1.0f / Sqrt(x);
         }
-        
+
         public static NumericValue Sin(NumericValue x)
         {
-            return ToFloatLike(x).Map(val => MathF.Sin(Convert.ToSingle(val)));
+            return ToFloatLike(x).Map(val => MathF.Sin(val.Float));
         }
-        
+
         public static NumericValue Sinh(NumericValue x)
         {
-            return ToFloatLike(x).Map(val => MathF.Sinh(Convert.ToSingle(val)));
+            return ToFloatLike(x).Map(val => MathF.Sinh(val.Float));
         }
-        
+
         // https://developer.download.nvidia.com/cg/smoothstep.html
         public static NumericValue Smoothstep(NumericValue a, NumericValue b, NumericValue x)
         {
             var t = Saturate((x - a)/(b - a));
             return t*t*(3.0f - (2.0f*t));
         }
-        
+
         public static NumericValue Tan(NumericValue x)
         {
-            return ToFloatLike(x).Map(val => MathF.Tan(Convert.ToSingle(val)));
+            return ToFloatLike(x).Map(val => MathF.Tan(val.Float));
         }
-        
+
         public static NumericValue Tanh(NumericValue x)
         {
-            return ToFloatLike(x).Map(val => MathF.Tanh(Convert.ToSingle(val)));
+            return ToFloatLike(x).Map(val => MathF.Tanh(val.Float));
         }
 
         public static NumericValue Transpose(NumericValue m)
         {
             var mat = CastToMatrix(m);
+            int rows = mat.Rows;
+            int cols = mat.Columns;
             var reg = mat.Values.Map(x =>
             {
-                object[] values = new object[x.Length];
-                for (int col = 0; col < mat.Columns; col++)
+                RawValue[] values = new RawValue[x.Length];
+                for (int col = 0; col < cols; col++)
                 {
-                    for (int row = 0; row < mat.Rows; row++)
+                    for (int row = 0; row < rows; row++)
                     {
-                        values[row * mat.Columns + col] = x[col * mat.Rows + row];
+                        values[col * rows + row] = x[row * cols + col];
                     }
                 }
                 return values;
             });
             return new MatrixValue(mat.Type, mat.Columns, mat.Rows, reg);
         }
-        
+
         public static NumericValue Trunc(NumericValue x)
         {
-            return ToFloatLike(x).Map(val => MathF.Truncate(Convert.ToSingle(val)));
+            return ToFloatLike(x).Map(val => MathF.Truncate(val.Float));
         }
-        
+
         public static NumericValue Dot(NumericValue x, NumericValue y)
         {
             (x, y) = HLSLTypeUtils.Promote(x, y, false);
@@ -1015,7 +1031,8 @@ namespace HLSL
         public static NumericValue Min(NumericValue x, NumericValue y)
         {
             (x, y) = HLSLTypeUtils.Promote(x, y, false);
-            return HLSLValueUtils.Map2(x, y, Min);
+            ScalarType t = x.Type;
+            return HLSLValueUtils.Map2(x, y, (l, r) => Min(t, l, r));
         }
 
         public static NumericValue Msad4(NumericValue reference, NumericValue source, NumericValue accum)
@@ -1073,7 +1090,7 @@ namespace HLSL
             bool yIsScalar = y is ScalarValue;
 
             // Covers case 1, 2, 3, 4, 7 - scalar mul
-            if (xIsScalar || yIsScalar) 
+            if (xIsScalar || yIsScalar)
                 return x * y;
 
             bool xIsVector = x is VectorValue;
@@ -1150,7 +1167,8 @@ namespace HLSL
         public static NumericValue Max(NumericValue x, NumericValue y)
         {
             (x, y) = HLSLTypeUtils.Promote(x, y, false);
-            return HLSLValueUtils.Map2(x, y, Max);
+            ScalarType t = x.Type;
+            return HLSLValueUtils.Map2(x, y, (l, r) => Max(t, l, r));
         }
 
         public static NumericValue Clamp(NumericValue x, NumericValue min, NumericValue max)
@@ -1191,9 +1209,9 @@ namespace HLSL
             var d = (ScalarValue)value.Cast(ScalarType.Double);
             if (d.IsUniform)
             {
-                var bytes = BitConverter.GetBytes(Convert.ToDouble(d.Value.UniformValue));
-                lowbits.Set((ScalarValue)BitConverter.ToUInt32(bytes, 0));
-                highbits.Set((ScalarValue)BitConverter.ToUInt32(bytes, 4));
+                long bits = d.Value.UniformValue.Long;
+                lowbits.Set((ScalarValue)(uint)(bits & 0xFFFFFFFFu));
+                highbits.Set((ScalarValue)(uint)((bits >> 32) & 0xFFFFFFFFu));
                 return;
             }
 
@@ -1203,9 +1221,9 @@ namespace HLSL
             retHigh = (ScalarValue)retHigh.Vectorize(d.ThreadCount);
             for (int threadIndex = 0; threadIndex < d.ThreadCount; threadIndex++)
             {
-                var bytes = BitConverter.GetBytes(Convert.ToDouble(d.Value.Get(threadIndex)));
-                uint low = BitConverter.ToUInt32(bytes, 0);
-                uint high = BitConverter.ToUInt32(bytes, 4);
+                long bits = d.Value.Get(threadIndex).Long;
+                uint low = (uint)(bits & 0xFFFFFFFFu);
+                uint high = (uint)((bits >> 32) & 0xFFFFFFFFu);
                 retLow = (ScalarValue)retLow.SetThreadValue(threadIndex, low);
                 retHigh = (ScalarValue)retHigh.SetThreadValue(threadIndex, high);
             }
@@ -1502,7 +1520,7 @@ namespace HLSL
             var value = (NumericValue)args[2];
             InterlockedOp(state, args, 3, (cur, t) =>
             {
-                return Convert.ToBoolean((cur == compare.Scalarize(t)).GetThreadValue(0)) ? value.Scalarize(t) : null;
+                return ((ScalarValue)(cur == compare.Scalarize(t))).AsBool() ? value.Scalarize(t) : null;
             });
         }
 
@@ -1551,7 +1569,7 @@ namespace HLSL
 
         public static ScalarValue WaveGetLaneIndex(HLSLExecutionState executionState)
         {
-            return new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarVGPR(Enumerable.Range(0, executionState.GetThreadCount())));
+            return new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarVGPR(Enumerable.Range(0, executionState.GetThreadCount()).Select(i => (RawValue)(uint)i)));
         }
 
         public static ScalarValue WaveGetLaneCount(HLSLExecutionState executionState)
@@ -1561,7 +1579,7 @@ namespace HLSL
 
         public static ScalarValue WaveIsFirstLane(HLSLExecutionState executionState)
         {
-            var perLaneIsFirst = new bool[executionState.GetThreadCount()];
+            var perLaneIsFirst = new RawValue[executionState.GetThreadCount()];
             for (int threadIdx = 0; threadIdx < executionState.GetThreadCount(); threadIdx++)
             {
                 if (executionState.IsThreadActive(threadIdx))
@@ -1576,25 +1594,36 @@ namespace HLSL
         public static NumericValue WaveReadLaneAt(HLSLExecutionState executionState, NumericValue expr, ScalarValue laneIndex)
         {
             if (laneIndex.IsUniform)
-                return expr.Scalarize(Convert.ToInt32(laneIndex.Value.UniformValue));
+                return expr.Scalarize(laneIndex.AsInt());
 
-            object[] perLaneValue = new object[laneIndex.ThreadCount];
-            for (int threadIndex = 0; threadIndex < perLaneValue.Length; threadIndex++)
+            int threadCount = laneIndex.ThreadCount;
+            if (expr is ScalarValue scalarExpr)
             {
-                perLaneValue[threadIndex] = expr.Scalarize(Convert.ToInt32(laneIndex.GetThreadValue(threadIndex))).GetThreadValue(0);
-            }
-            if (expr is ScalarValue)
+                RawValue[] perLaneValue = new RawValue[threadCount];
+                for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
+                    perLaneValue[threadIndex] = scalarExpr.Value.Get(laneIndex.AsInt(threadIndex));
                 return new ScalarValue(expr.Type, HLSLValueUtils.MakeScalarVGPR(perLaneValue));
-            if (expr is VectorValue)
-                return new VectorValue(expr.Type, HLSLValueUtils.MakeVectorVGPR(perLaneValue.Select(x => (object[])x)));
-            if (expr is MatrixValue mat)
-                return new MatrixValue(expr.Type, mat.Rows, mat.Columns, HLSLValueUtils.MakeVectorVGPR(perLaneValue.Select(x => (object[])x)));
+            }
+            if (expr is VectorValue vectorExpr)
+            {
+                RawValue[][] perLaneValue = new RawValue[threadCount][];
+                for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
+                    perLaneValue[threadIndex] = vectorExpr.Values.Get(laneIndex.AsInt(threadIndex));
+                return new VectorValue(expr.Type, HLSLValueUtils.MakeVectorVGPR(perLaneValue));
+            }
+            if (expr is MatrixValue matrixExpr)
+            {
+                RawValue[][] perLaneValue = new RawValue[threadCount][];
+                for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
+                    perLaneValue[threadIndex] = matrixExpr.Values.Get(laneIndex.AsInt(threadIndex));
+                return new MatrixValue(expr.Type, matrixExpr.Rows, matrixExpr.Columns, HLSLValueUtils.MakeVectorVGPR(perLaneValue));
+            }
             throw new InvalidOperationException();
         }
 
         public static NumericValue QuadReadAcrossDiagonal(HLSLExecutionState executionState, NumericValue expr)
         {
-            var laneIndex = HLSLValueUtils.MakeScalarVGPR(new uint[] { 3, 2, 1, 0 });
+            var laneIndex = HLSLValueUtils.MakeScalarVGPR(new RawValue[] { 3u, 2u, 1u, 0u });
             return WaveReadLaneAt(executionState, expr, new ScalarValue(ScalarType.Uint, laneIndex));
         }
 
@@ -1605,13 +1634,13 @@ namespace HLSL
 
         public static NumericValue QuadReadAcrossX(HLSLExecutionState executionState, NumericValue expr)
         {
-            var laneIndex = HLSLValueUtils.MakeScalarVGPR(new uint[] { 1, 0, 3, 2 });
+            var laneIndex = HLSLValueUtils.MakeScalarVGPR(new RawValue[] { 1u, 0u, 3u, 2u });
             return WaveReadLaneAt(executionState, expr, new ScalarValue(ScalarType.Uint, laneIndex));
         }
 
         public static NumericValue QuadReadAcrossY(HLSLExecutionState executionState, NumericValue expr)
         {
-            var laneIndex = HLSLValueUtils.MakeScalarVGPR(new uint[] { 2, 3, 0, 1 });
+            var laneIndex = HLSLValueUtils.MakeScalarVGPR(new RawValue[] { 2u, 3u, 0u, 1u });
             return WaveReadLaneAt(executionState, expr, new ScalarValue(ScalarType.Uint, laneIndex));
         }
 
@@ -1669,7 +1698,7 @@ namespace HLSL
 
         public static NumericValue WaveActiveCountBits(HLSLExecutionState executionState, NumericValue expr)
         {
-            expr = expr.Cast(ScalarType.Bool);
+            var exprS = (ScalarValue)expr.Cast(ScalarType.Bool);
 
             uint count = 0;
 
@@ -1678,7 +1707,7 @@ namespace HLSL
                 if (!executionState.IsThreadActive(threadIndex))
                     continue;
 
-                if (Convert.ToBoolean(expr.GetThreadValue(threadIndex)))
+                if (exprS.AsBool(threadIndex))
                     count++;
             }
 
@@ -1699,14 +1728,14 @@ namespace HLSL
 
         public static NumericValue WaveActiveAllTrue(HLSLExecutionState executionState, NumericValue expr)
         {
-            expr = expr.Cast(ScalarType.Bool);
+            var exprS = (ScalarValue)expr.Cast(ScalarType.Bool);
 
             for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
             {
                 if (!executionState.IsThreadActive(threadIndex))
                     continue;
 
-                if (!Convert.ToBoolean(expr.GetThreadValue(threadIndex)))
+                if (!exprS.AsBool(threadIndex))
                     return false;
             }
 
@@ -1715,14 +1744,14 @@ namespace HLSL
 
         public static NumericValue WaveActiveAnyTrue(HLSLExecutionState executionState, NumericValue expr)
         {
-            expr = expr.Cast(ScalarType.Bool);
+            var exprS = (ScalarValue)expr.Cast(ScalarType.Bool);
 
             for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
             {
                 if (!executionState.IsThreadActive(threadIndex))
                     continue;
 
-                if (Convert.ToBoolean(expr.GetThreadValue(threadIndex)))
+                if (exprS.AsBool(threadIndex))
                     return true;
             }
 
@@ -1731,7 +1760,7 @@ namespace HLSL
 
         public static NumericValue WaveActiveBallot(HLSLExecutionState executionState, NumericValue expr)
         {
-            expr = expr.Cast(ScalarType.Bool);
+            var exprS = (ScalarValue)expr.Cast(ScalarType.Bool);
             bool[] perLane = new bool[executionState.GetThreadCount()];
 
             for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
@@ -1739,7 +1768,7 @@ namespace HLSL
                 if (!executionState.IsThreadActive(threadIndex))
                     continue;
 
-                if (Convert.ToBoolean(expr.GetThreadValue(threadIndex)))
+                if (exprS.AsBool(threadIndex))
                     perLane[threadIndex] = true;
             }
 
@@ -1833,15 +1862,20 @@ namespace HLSL
             if (val.IsUniform)
                 return val - val;
 
-            return val.MapThreads((_, threadIndex) =>
+            NumericValue Compute(int threadIndex)
             {
                 (int x, int y) = executionState.GetThreadPosition(threadIndex);
                 int offset = (x % 2 == 0) ? 1 : -1;
 
                 var me = val.Scalarize(threadIndex);
                 var other = val.Scalarize(executionState.GetThreadIndex(x + offset, y));
-                return ((other - me) * offset).GetThreadValue(0);
-            });
+                return (other - me) * offset;
+            }
+
+            if (val is ScalarValue sv) return sv.MapThreads((_, threadIndex) => ((ScalarValue)Compute(threadIndex)).GetThreadValue(0));
+            if (val is VectorValue vv) return vv.MapThreads((_, threadIndex) => ((VectorValue)Compute(threadIndex)).GetThreadValue(0));
+            if (val is MatrixValue mv) return mv.MapThreads((_, threadIndex) => ((MatrixValue)Compute(threadIndex)).GetThreadValue(0));
+            throw new InvalidOperationException();
         }
 
         public static NumericValue DdyFine(HLSLExecutionState executionState, NumericValue val)
@@ -1849,15 +1883,20 @@ namespace HLSL
             if (val.IsUniform)
                 return val - val;
 
-            return val.MapThreads((_, threadIndex) =>
+            NumericValue Compute(int threadIndex)
             {
                 (int x, int y) = executionState.GetThreadPosition(threadIndex);
                 int offset = (y % 2 == 0) ? 1 : -1;
 
                 var me = val.Scalarize(threadIndex);
                 var other = val.Scalarize(executionState.GetThreadIndex(x, y + offset));
-                return ((other - me) * offset).GetThreadValue(0);
-            });
+                return (other - me) * offset;
+            }
+
+            if (val is ScalarValue sv) return sv.MapThreads((_, threadIndex) => ((ScalarValue)Compute(threadIndex)).GetThreadValue(0));
+            if (val is VectorValue vv) return vv.MapThreads((_, threadIndex) => ((VectorValue)Compute(threadIndex)).GetThreadValue(0));
+            if (val is MatrixValue mv) return mv.MapThreads((_, threadIndex) => ((MatrixValue)Compute(threadIndex)).GetThreadValue(0));
+            throw new InvalidOperationException();
         }
 
         public static NumericValue Ddx(HLSLExecutionState executionState, NumericValue val)
@@ -1865,7 +1904,7 @@ namespace HLSL
             if (val.IsUniform)
                 return val - val;
 
-            return val.MapThreads((_, threadIndex) =>
+            NumericValue Compute(int threadIndex)
             {
                 (int x, int y) = executionState.GetThreadPosition(threadIndex);
                 y -= (y & 1);
@@ -1874,8 +1913,13 @@ namespace HLSL
 
                 var me = val.Scalarize(threadIndex);
                 var other = val.Scalarize(executionState.GetThreadIndex(x + offset, y));
-                return ((other - me) * offset).GetThreadValue(0);
-            });
+                return (other - me) * offset;
+            }
+
+            if (val is ScalarValue sv) return sv.MapThreads((_, threadIndex) => ((ScalarValue)Compute(threadIndex)).GetThreadValue(0));
+            if (val is VectorValue vv) return vv.MapThreads((_, threadIndex) => ((VectorValue)Compute(threadIndex)).GetThreadValue(0));
+            if (val is MatrixValue mv) return mv.MapThreads((_, threadIndex) => ((MatrixValue)Compute(threadIndex)).GetThreadValue(0));
+            throw new InvalidOperationException();
         }
 
         public static NumericValue Ddy(HLSLExecutionState executionState, NumericValue val)
@@ -1883,7 +1927,7 @@ namespace HLSL
             if (val.IsUniform)
                 return val - val;
 
-            return val.MapThreads((_, threadIndex) =>
+            NumericValue Compute(int threadIndex)
             {
                 (int x, int y) = executionState.GetThreadPosition(threadIndex);
                 x -= (x & 1);
@@ -1892,8 +1936,13 @@ namespace HLSL
 
                 var me = val.Scalarize(threadIndex);
                 var other = val.Scalarize(executionState.GetThreadIndex(x, y + offset));
-                return ((other - me) * offset).GetThreadValue(0);
-            });
+                return (other - me) * offset;
+            }
+
+            if (val is ScalarValue sv) return sv.MapThreads((_, threadIndex) => ((ScalarValue)Compute(threadIndex)).GetThreadValue(0));
+            if (val is VectorValue vv) return vv.MapThreads((_, threadIndex) => ((VectorValue)Compute(threadIndex)).GetThreadValue(0));
+            if (val is MatrixValue mv) return mv.MapThreads((_, threadIndex) => ((MatrixValue)Compute(threadIndex)).GetThreadValue(0));
+            throw new InvalidOperationException();
         }
 
         public static NumericValue Fwidth(HLSLExecutionState executionState, NumericValue val) =>
@@ -1901,12 +1950,12 @@ namespace HLSL
 
         public static void Clip(HLSLExecutionState executionState, NumericValue x)
         {
-            var cond = x < 0;
+            var cond = (ScalarValue)(x < 0);
             for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
             {
                 if (executionState.IsThreadActive(threadIndex))
                 {
-                    if (Convert.ToBoolean(cond.GetThreadValue(threadIndex)))
+                    if (cond.AsBool(threadIndex))
                         executionState.KillThreadGlobally(threadIndex);
                 }
             }

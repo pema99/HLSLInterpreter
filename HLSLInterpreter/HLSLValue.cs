@@ -3,12 +3,36 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using UnityShaderParser.Common;
 using UnityShaderParser.HLSL;
 
 namespace HLSL
 {
+    [StructLayout(LayoutKind.Explicit, Size = 8)]
+    public struct RawValue : IEquatable<RawValue>
+    {
+        [FieldOffset(0)] public int Int;
+        [FieldOffset(0)] public uint Uint;
+        [FieldOffset(0)] public float Float;
+        [FieldOffset(0)] public double Double;
+        [FieldOffset(0)] public bool Bool;
+        [FieldOffset(0)] public char Char;
+        [FieldOffset(0)] public long Long;
+
+        public static implicit operator RawValue(int v) { var r = default(RawValue); r.Int = v; return r; }
+        public static implicit operator RawValue(uint v) { var r = default(RawValue); r.Uint = v; return r; }
+        public static implicit operator RawValue(float v) { var r = default(RawValue); r.Float = v; return r; }
+        public static implicit operator RawValue(double v) { var r = default(RawValue); r.Double = v; return r; }
+        public static implicit operator RawValue(bool v) { var r = default(RawValue); r.Bool = v; return r; }
+        public static implicit operator RawValue(char v) { var r = default(RawValue); r.Char = v; return r; }
+
+        public bool Equals(RawValue other) => Long == other.Long;
+        public override bool Equals(object obj) => obj is RawValue other && Long == other.Long;
+        public override int GetHashCode() => Long.GetHashCode();
+    }
+
     public readonly struct HLSLRegister<T>
     {
         public readonly T UniformValue;
@@ -114,7 +138,7 @@ namespace HLSL
             bool allSame = true;
             foreach (T value in VaryingValues)
             {
-                if (!StructuralComparisons.StructuralEqualityComparer.Equals(first, value))
+                if (!EqualityComparer<T>.Default.Equals(first, value))
                 {
                     allSame = false;
                     break;
@@ -162,6 +186,20 @@ namespace HLSL
         public override string ToString() => $"Ref({Get()})";
     }
 
+    public sealed class StringValue : HLSLValue
+    {
+        public readonly string Value;
+
+        public StringValue(string value) { Value = value; }
+
+        public override int ThreadCount => 1;
+        public override bool IsUniform => true;
+
+        public override HLSLValue Copy() => new StringValue(Value);
+
+        public override string ToString() => Value;
+    }
+
     public abstract class NumericValue : HLSLValue
     {
         public readonly ScalarType Type;
@@ -176,10 +214,7 @@ namespace HLSL
         public abstract VectorValue BroadcastToVector(int size);
         public abstract MatrixValue BroadcastToMatrix(int rows, int columns);
         public abstract NumericValue Cast(ScalarType type);
-        public abstract object GetThreadValue(int threadIndex);
-        public abstract NumericValue SetThreadValue(int threadIndex, object set);
-        public abstract NumericValue Map(Func<object, object> mapper);
-        public abstract NumericValue MapThreads(Func<object, int, object> mapper);
+        public abstract NumericValue Map(Func<RawValue, RawValue> mapper);
         public abstract ScalarValue[] ToScalars();
 
         public abstract NumericValue Vectorize(int threadCount);
@@ -256,9 +291,9 @@ namespace HLSL
 
     public sealed class ScalarValue : NumericValue
     {
-        public readonly HLSLRegister<object> Value;
+        public readonly HLSLRegister<RawValue> Value;
 
-        public ScalarValue(ScalarType type, HLSLRegister<object> value)
+        public ScalarValue(ScalarType type, HLSLRegister<RawValue> value)
             : base(type)
         {
             Value = value;
@@ -282,7 +317,7 @@ namespace HLSL
         {
             return new MatrixValue(Type, rows, columns, Value.Map(x =>
             {
-                object[] res = new object[rows * columns];
+                RawValue[] res = new RawValue[rows * columns];
                 Array.Fill(res, x);
                 return res;
             }));
@@ -292,7 +327,7 @@ namespace HLSL
         {
             return new VectorValue(Type, Value.Map(x =>
             {
-                object[] res = new object[size];
+                RawValue[] res = new RawValue[size];
                 Array.Fill(res, x);
                 return res;
             }));
@@ -300,20 +335,24 @@ namespace HLSL
 
         public override NumericValue Cast(ScalarType type)
         {
-            return new ScalarValue(type, Value.Map(x => HLSLTypeUtils.CastNumeric(type, x)));
+            return new ScalarValue(type, Value.Map(x => HLSLTypeUtils.CastNumeric(type, Type, x)));
         }
 
-        public override object GetThreadValue(int threadIndex)
-        {
-            return Value.Get(threadIndex);
-        }
+        public int AsInt(int threadIndex = 0) => HLSLTypeUtils.CastNumeric(ScalarType.Int, Type, Value.Get(threadIndex)).Int;
+        public uint AsUint(int threadIndex = 0) => HLSLTypeUtils.CastNumeric(ScalarType.Uint, Type, Value.Get(threadIndex)).Uint;
+        public float AsFloat(int threadIndex = 0) => HLSLTypeUtils.CastNumeric(ScalarType.Float, Type, Value.Get(threadIndex)).Float;
+        public double AsDouble(int threadIndex = 0) => HLSLTypeUtils.CastNumeric(ScalarType.Double, Type, Value.Get(threadIndex)).Double;
+        public bool AsBool(int threadIndex = 0) => HLSLTypeUtils.CastNumeric(ScalarType.Bool, Type, Value.Get(threadIndex)).Bool;
+        public char AsChar(int threadIndex = 0) => HLSLTypeUtils.CastNumeric(ScalarType.Char, Type, Value.Get(threadIndex)).Char;
 
-        public override NumericValue Map(Func<object, object> mapper)
+        public RawValue GetThreadValue(int threadIndex) => Value.Get(threadIndex);
+
+        public override NumericValue Map(Func<RawValue, RawValue> mapper)
         {
             return new ScalarValue(Type, Value.Map(mapper));
         }
 
-        public override NumericValue MapThreads(Func<object, int, object> mapper)
+        public ScalarValue MapThreads(Func<RawValue, int, RawValue> mapper)
         {
             return new ScalarValue(Type, Value.MapThreads(mapper));
         }
@@ -328,7 +367,7 @@ namespace HLSL
             return new ScalarValue(Type, Value.Vectorize(threadCount));
         }
 
-        public override NumericValue SetThreadValue(int threadIndex, object set)
+        public ScalarValue SetThreadValue(int threadIndex, RawValue set)
         {
             return new ScalarValue(Type, Value.Set(threadIndex, set));
         }
@@ -347,7 +386,7 @@ namespace HLSL
                 return ToString(0);
             }
         }
-        public string ToString(int threadIndex) => Convert.ToString(Value.Get(threadIndex), CultureInfo.InvariantCulture);
+        public string ToString(int threadIndex) => HLSLValueUtils.FormatRawValue(Value.Get(threadIndex), Type);
 
         public static ScalarValue operator +(ScalarValue left, ScalarValue right) => (ScalarValue)((NumericValue)left + (NumericValue)right);
         public static ScalarValue operator -(ScalarValue left, ScalarValue right) => (ScalarValue)((NumericValue)left - (NumericValue)right);
@@ -367,21 +406,21 @@ namespace HLSL
         public static ScalarValue operator !(ScalarValue left) => (ScalarValue)(!(NumericValue)left);
         public static ScalarValue operator -(ScalarValue left) => (ScalarValue)(-(NumericValue)left);
 
-        public static implicit operator ScalarValue(int v) => new ScalarValue(ScalarType.Int, new HLSLRegister<object>(v));
-        public static implicit operator ScalarValue(uint v) => new ScalarValue(ScalarType.Uint, new HLSLRegister<object>(v));
-        public static implicit operator ScalarValue(float v) => new ScalarValue(ScalarType.Float, new HLSLRegister<object>(v));
-        public static implicit operator ScalarValue(double v) => new ScalarValue(ScalarType.Double, new HLSLRegister<object>(v));
-        public static implicit operator ScalarValue(bool v) => new ScalarValue(ScalarType.Bool, new HLSLRegister<object>(v));
-        public static implicit operator ScalarValue(char v) => new ScalarValue(ScalarType.Char, new HLSLRegister<object>(v));
+        public static implicit operator ScalarValue(int v) => new ScalarValue(ScalarType.Int, new HLSLRegister<RawValue>(v));
+        public static implicit operator ScalarValue(uint v) => new ScalarValue(ScalarType.Uint, new HLSLRegister<RawValue>(v));
+        public static implicit operator ScalarValue(float v) => new ScalarValue(ScalarType.Float, new HLSLRegister<RawValue>(v));
+        public static implicit operator ScalarValue(double v) => new ScalarValue(ScalarType.Double, new HLSLRegister<RawValue>(v));
+        public static implicit operator ScalarValue(bool v) => new ScalarValue(ScalarType.Bool, new HLSLRegister<RawValue>(v));
+        public static implicit operator ScalarValue(char v) => new ScalarValue(ScalarType.Char, new HLSLRegister<RawValue>(v));
 
-        public static ScalarValue Null => new ScalarValue(ScalarType.Void, new HLSLRegister<object>(0));
+        public static ScalarValue Null => new ScalarValue(ScalarType.Void, new HLSLRegister<RawValue>(0));
     }
 
     public sealed class VectorValue : NumericValue
     {
-        public readonly HLSLRegister<object[]> Values;
+        public readonly HLSLRegister<RawValue[]> Values;
 
-        public VectorValue(ScalarType type, HLSLRegister<object[]> values)
+        public VectorValue(ScalarType type, HLSLRegister<RawValue[]> values)
             : base(type)
         {
             Values = values;
@@ -398,7 +437,7 @@ namespace HLSL
             {
                 if (IsVarying)
                 {
-                    object[] perThreadValue = new object[ThreadCount];
+                    RawValue[] perThreadValue = new RawValue[ThreadCount];
                     for (int threadIndex = 0; threadIndex < ThreadCount; threadIndex++)
                         perThreadValue[threadIndex] = Values.Get(threadIndex)[channel];
                     return new ScalarValue(Type, HLSLValueUtils.MakeScalarVGPR(perThreadValue));
@@ -416,10 +455,10 @@ namespace HLSL
 
         public NumericValue Swizzle(string swizzle)
         {
-            object[][] perThreadSwizzle = new object[ThreadCount][];
+            RawValue[][] perThreadSwizzle = new RawValue[ThreadCount][];
             for (int threadIndex = 0; threadIndex < perThreadSwizzle.Length; threadIndex++)
             {
-                perThreadSwizzle[threadIndex] = new object[swizzle.Length];
+                perThreadSwizzle[threadIndex] = new RawValue[swizzle.Length];
                 for (int component = 0; component < swizzle.Length; component++)
                 {
                     perThreadSwizzle[threadIndex][component] = Values.Get(threadIndex)[HLSLValueUtils.VectorSwizzleCharToIndex(swizzle[component])];
@@ -443,19 +482,12 @@ namespace HLSL
 
         public VectorValue SwizzleAssign(string swizzle, NumericValue value)
         {
-            object GetComponent(object arrayOrSingle, int index)
-            {
-                if (arrayOrSingle is object[] array)
-                    return array[index];
-                return arrayOrSingle;
-            }
-
             int maxThreadCount = Math.Max(ThreadCount, value.ThreadCount);
-            object[][] perThreadSwizzle = new object[maxThreadCount][];
+            RawValue[][] perThreadSwizzle = new RawValue[maxThreadCount][];
             for (int threadIndex = 0; threadIndex < perThreadSwizzle.Length; threadIndex++)
             {
                 // Write current values
-                perThreadSwizzle[threadIndex] = new object[Size];
+                perThreadSwizzle[threadIndex] = new RawValue[Size];
                 for (int component = 0; component < Size; component++)
                 {
                     perThreadSwizzle[threadIndex][component] = Values.Get(threadIndex)[component];
@@ -464,7 +496,7 @@ namespace HLSL
                 // Splat swizzle assign
                 for (int component = 0; component < swizzle.Length; component++)
                 {
-                    perThreadSwizzle[threadIndex][HLSLValueUtils.VectorSwizzleCharToIndex(swizzle[component])] = GetComponent(value.GetThreadValue(threadIndex), component);
+                    perThreadSwizzle[threadIndex][HLSLValueUtils.VectorSwizzleCharToIndex(swizzle[component])] = HLSLValueUtils.GetScalarComponent(value, threadIndex, component);
                 }
             }
             if (maxThreadCount == 1)
@@ -484,7 +516,8 @@ namespace HLSL
 
         public static VectorValue FromScalars(params ScalarValue[] scalars)
         {
-            return new VectorValue(scalars[0].Type, HLSLValueUtils.RegisterFromScalars(scalars));
+            var reg = HLSLValueUtils.RegisterFromScalars(scalars, out var promotedType);
+            return new VectorValue(promotedType, reg);
         }
 
         public override ScalarValue[] ToScalars()
@@ -509,7 +542,7 @@ namespace HLSL
                 int sizeDiff = size - x.Length;
                 if (sizeDiff > 0) // Expansion
                 {
-                    object[] res = new object[size];
+                    RawValue[] res = new RawValue[size];
                     Array.Copy(x, res, x.Length);
                     for (int i = 0; i < sizeDiff; i++)
                         res[x.Length + i] = HLSLTypeUtils.GetZeroValue(Type);
@@ -517,7 +550,7 @@ namespace HLSL
                 }
                 else if (size < x.Length) // Truncation
                 {
-                    object[] res = new object[size];
+                    RawValue[] res = new RawValue[size];
                     Array.Copy(x, res, size);
                     return res;
                 }
@@ -530,32 +563,27 @@ namespace HLSL
         {
             return new VectorValue(type, Values.Map(x =>
             {
-                object[] res = new object[x.Length];
+                RawValue[] res = new RawValue[x.Length];
                 for (int i = 0; i < res.Length; i++)
-                    res[i] = HLSLTypeUtils.CastNumeric(type, x[i]);
+                    res[i] = HLSLTypeUtils.CastNumeric(type, Type, x[i]);
                 return res;
             }));
         }
 
-        public override object GetThreadValue(int threadIndex)
-        {
-            return Values.Get(threadIndex);
-        }
-
-        public override NumericValue Map(Func<object, object> mapper)
+        public override NumericValue Map(Func<RawValue, RawValue> mapper)
         {
             return new VectorValue(Type, Values.Map(x =>
             {
-                object[] res = new object[x.Length];
+                RawValue[] res = new RawValue[x.Length];
                 for (int i = 0; i < res.Length; i++)
                     res[i] = mapper(x[i]);
                 return res;
             }));
         }
 
-        public override NumericValue MapThreads(Func<object, int, object> mapper)
+        public VectorValue MapThreads(Func<RawValue[], int, RawValue[]> mapper)
         {
-            return new VectorValue(Type, Values.MapThreads((a, b) => (object[])mapper(a, b)));
+            return new VectorValue(Type, Values.MapThreads(mapper));
         }
 
         public override NumericValue Scalarize(int threadIndex)
@@ -568,9 +596,11 @@ namespace HLSL
             return new VectorValue(Type, Values.Vectorize(threadCount));
         }
 
-        public override NumericValue SetThreadValue(int threadIndex, object set)
+        public RawValue[] GetThreadValue(int threadIndex) => Values.Get(threadIndex);
+
+        public VectorValue SetThreadValue(int threadIndex, RawValue[] set)
         {
-            return new VectorValue(Type, Values.Set(threadIndex, (object[])set));
+            return new VectorValue(Type, Values.Set(threadIndex, set));
         }
 
         public override string ToString()
@@ -590,7 +620,7 @@ namespace HLSL
         public string ToString(int threadIndex)
         {
             string type = PrintingUtil.GetEnumName(Type);
-            return $"{type}{Size}({string.Join(", ", Values.Get(threadIndex).Select(x => Convert.ToString(x, CultureInfo.InvariantCulture)))})";
+            return $"{type}{Size}({HLSLValueUtils.FormatRawValues(Values.Get(threadIndex), Type)})";
         }
 
         public static VectorValue operator +(VectorValue left, VectorValue right) => (VectorValue)((NumericValue)left + (NumericValue)right);
@@ -616,9 +646,9 @@ namespace HLSL
     {
         public readonly int Rows;
         public readonly int Columns;
-        public readonly HLSLRegister<object[]> Values;
+        public readonly HLSLRegister<RawValue[]> Values;
 
-        public MatrixValue(ScalarType type, int rows, int columns, HLSLRegister<object[]> values)
+        public MatrixValue(ScalarType type, int rows, int columns, HLSLRegister<RawValue[]> values)
             : base(type)
         {
             Rows = rows;
@@ -636,7 +666,7 @@ namespace HLSL
             {
                 if (IsVarying)
                 {
-                    object[] perThreadValue = new object[ThreadCount];
+                    RawValue[] perThreadValue = new RawValue[ThreadCount];
                     for (int threadIndex = 0; threadIndex < ThreadCount; threadIndex++)
                         perThreadValue[threadIndex] = Values.Get(threadIndex)[channel];
                     return new ScalarValue(Type, HLSLValueUtils.MakeScalarVGPR(perThreadValue));
@@ -652,16 +682,17 @@ namespace HLSL
 
         public static MatrixValue FromScalars(int rows, int columns, params ScalarValue[] scalars)
         {
-            return new MatrixValue(scalars[0].Type, rows, columns, HLSLValueUtils.RegisterFromScalars(scalars));
+            var reg = HLSLValueUtils.RegisterFromScalars(scalars, out var promotedType);
+            return new MatrixValue(promotedType, rows, columns, reg);
         }
 
         public NumericValue Swizzle(string swizzle)
         {
             int[] indices = HLSLValueUtils.MatrixSwizzleStringToIndices(swizzle, Columns);
-            object[][] perThreadSwizzle = new object[ThreadCount][];
+            RawValue[][] perThreadSwizzle = new RawValue[ThreadCount][];
             for (int threadIndex = 0; threadIndex < perThreadSwizzle.Length; threadIndex++)
             {
-                perThreadSwizzle[threadIndex] = new object[indices.Length];
+                perThreadSwizzle[threadIndex] = new RawValue[indices.Length];
                 for (int component = 0; component < indices.Length; component++)
                     perThreadSwizzle[threadIndex][component] = Values.Get(threadIndex)[indices[component]];
             }
@@ -683,27 +714,20 @@ namespace HLSL
 
         public MatrixValue SwizzleAssign(string swizzle, NumericValue value)
         {
-            object GetComponent(object arrayOrSingle, int index)
-            {
-                if (arrayOrSingle is object[] array)
-                    return array[index];
-                return arrayOrSingle;
-            }
-
             int[] indices = HLSLValueUtils.MatrixSwizzleStringToIndices(swizzle, Columns);
             int size = Rows * Columns;
             int maxThreadCount = Math.Max(ThreadCount, value.ThreadCount);
-            object[][] perThreadSwizzle = new object[maxThreadCount][];
+            RawValue[][] perThreadSwizzle = new RawValue[maxThreadCount][];
             for (int threadIndex = 0; threadIndex < perThreadSwizzle.Length; threadIndex++)
             {
                 // Write current values
-                perThreadSwizzle[threadIndex] = new object[size];
+                perThreadSwizzle[threadIndex] = new RawValue[size];
                 for (int component = 0; component < size; component++)
                     perThreadSwizzle[threadIndex][component] = Values.Get(threadIndex)[component];
 
                 // Splat swizzle assign
                 for (int component = 0; component < indices.Length; component++)
-                    perThreadSwizzle[threadIndex][indices[component]] = GetComponent(value.GetThreadValue(threadIndex), component);
+                    perThreadSwizzle[threadIndex][indices[component]] = HLSLValueUtils.GetScalarComponent(value, threadIndex, component);
             }
             if (maxThreadCount == 1)
                 return new MatrixValue(Type, Rows, Columns, HLSLValueUtils.MakeVectorSGPR(perThreadSwizzle[0]));
@@ -751,32 +775,27 @@ namespace HLSL
         {
             return new MatrixValue(type, Rows, Columns, Values.Map(x =>
             {
-                object[] res = new object[x.Length];
+                RawValue[] res = new RawValue[x.Length];
                 for (int i = 0; i < res.Length; i++)
-                    res[i] = HLSLTypeUtils.CastNumeric(type, x[i]);
+                    res[i] = HLSLTypeUtils.CastNumeric(type, Type, x[i]);
                 return res;
             }));
         }
 
-        public override object GetThreadValue(int threadIndex)
-        {
-            return Values.Get(threadIndex);
-        }
-
-        public override NumericValue Map(Func<object, object> mapper)
+        public override NumericValue Map(Func<RawValue, RawValue> mapper)
         {
             return new MatrixValue(Type, Rows, Columns, Values.Map(x =>
             {
-                object[] res = new object[x.Length];
+                RawValue[] res = new RawValue[x.Length];
                 for (int i = 0; i < res.Length; i++)
                     res[i] = mapper(x[i]);
                 return res;
             }));
         }
 
-        public override NumericValue MapThreads(Func<object, int, object> mapper)
+        public MatrixValue MapThreads(Func<RawValue[], int, RawValue[]> mapper)
         {
-            return new MatrixValue(Type, Rows, Columns, Values.MapThreads((a, b) => (object[])mapper(a, b)));
+            return new MatrixValue(Type, Rows, Columns, Values.MapThreads(mapper));
         }
 
         public override NumericValue Scalarize(int threadIndex)
@@ -789,9 +808,11 @@ namespace HLSL
             return new MatrixValue(Type, Rows, Columns, Values.Vectorize(threadCount));
         }
 
-        public override NumericValue SetThreadValue(int threadIndex, object set)
+        public RawValue[] GetThreadValue(int threadIndex) => Values.Get(threadIndex);
+
+        public MatrixValue SetThreadValue(int threadIndex, RawValue[] set)
         {
-            return new MatrixValue(Type, Rows, Columns, Values.Set(threadIndex, (object[])set));
+            return new MatrixValue(Type, Rows, Columns, Values.Set(threadIndex, set));
         }
 
         public override string ToString()
@@ -811,7 +832,7 @@ namespace HLSL
         public string ToString(int threadIndex)
         {
             string type = PrintingUtil.GetEnumName(Type);
-            return $"{type}{Rows}x{Columns}({string.Join(", ", Values.Get(threadIndex).Select(x => Convert.ToString(x, CultureInfo.InvariantCulture)))})";
+            return $"{type}{Rows}x{Columns}({HLSLValueUtils.FormatRawValues(Values.Get(threadIndex), Type)})";
         }
 
         public static MatrixValue operator +(MatrixValue left, MatrixValue right) => (MatrixValue)((NumericValue)left + (NumericValue)right);
@@ -1002,7 +1023,7 @@ namespace HLSL
         {
             return new ArrayValue(Values.Select(x => x.Copy()).ToArray());
         }
-        
+
         public ArrayValue(HLSLValue[] values)
         {
             Values = values;

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using UnityShaderParser.HLSL;
 
 namespace HLSL
@@ -6,247 +6,195 @@ namespace HLSL
     public static class HLSLOperators
     {
         #region Helpers for binary and unary operators
-        private static object Add(object left, object right)
+        private static RawValue Add(ScalarType type, RawValue left, RawValue right)
         {
-            switch (left)
-            {
-                case int x: return x + (int)right;
-                case uint x: return x + (uint)right;
-                case float x: return x + (float)right;
-                case double x: return x + (double)right;
-                case bool x: return ((x ? 1 : 0) + ((bool)right ? 1 : 0)) != 0;
-                default: throw new InvalidOperationException();
-            }
+            if (type == ScalarType.Float) return left.Float + right.Float;
+            if (HLSLTypeUtils.IsInt(type)) return left.Int + right.Int;
+            if (HLSLTypeUtils.IsUint(type)) return left.Uint + right.Uint;
+            if (type == ScalarType.Double) return left.Double + right.Double;
+            if (HLSLTypeUtils.IsFloat(type)) return left.Float + right.Float;
+            if (type == ScalarType.Bool) return ((left.Bool ? 1 : 0) + (right.Bool ? 1 : 0)) != 0;
+            throw new InvalidOperationException();
         }
 
-        private static object Mul(object left, object right)
+        private static RawValue Mul(ScalarType type, RawValue left, RawValue right)
         {
-            switch (left)
-            {
-                case int x: return x * (int)right;
-                case uint x: return x * (uint)right;
-                case float x: return x * (float)right;
-                case double x: return x * (double)right;
-                case bool x: return ((x ? 1 : 0) * ((bool)right ? 1 : 0)) != 0;
-                default: throw new InvalidOperationException();
-            }
+            if (type == ScalarType.Float) return left.Float * right.Float;
+            if (HLSLTypeUtils.IsInt(type)) return left.Int * right.Int;
+            if (HLSLTypeUtils.IsUint(type)) return left.Uint * right.Uint;
+            if (type == ScalarType.Double) return left.Double * right.Double;
+            if (HLSLTypeUtils.IsFloat(type)) return left.Float * right.Float;
+            if (type == ScalarType.Bool) return ((left.Bool ? 1 : 0) * (right.Bool ? 1 : 0)) != 0;
+            throw new InvalidOperationException();
         }
 
-        private static object Sub(object left, object right)
+        private static RawValue Sub(ScalarType type, RawValue left, RawValue right)
         {
-            switch (left)
-            {
-                case int x: return x - (int)right;
-                case uint x: return x - (uint)right;
-                case float x: return x - (float)right;
-                case double x: return x - (double)right;
-                case bool x: return ((x ? 1 : 0) - ((bool)right ? 1 : 0)) != 0;
-                default: throw new InvalidOperationException();
-            }
+            if (type == ScalarType.Float) return left.Float - right.Float;
+            if (HLSLTypeUtils.IsInt(type)) return left.Int - right.Int;
+            if (HLSLTypeUtils.IsUint(type)) return left.Uint - right.Uint;
+            if (type == ScalarType.Double) return left.Double - right.Double;
+            if (HLSLTypeUtils.IsFloat(type)) return left.Float - right.Float;
+            if (type == ScalarType.Bool) return ((left.Bool ? 1 : 0) - (right.Bool ? 1 : 0)) != 0;
+            throw new InvalidOperationException();
         }
 
-        private static object Div(object left, object right)
+        private static RawValue Div(ScalarType type, RawValue left, RawValue right)
         {
-            switch (left)
-            {
-                case int x: return x / (int)right;
-                case uint x: return x / (uint)right;
-                case float x: return x / (float)right;
-                case double x: return x / (double)right;
-                case bool x: return ((x ? 1 : 0) / ((bool)right ? 1 : 0)) != 0;
-                default: throw new InvalidOperationException();
-            }
+            if (type == ScalarType.Float) return left.Float / right.Float;
+            if (HLSLTypeUtils.IsInt(type)) return left.Int / right.Int;
+            if (HLSLTypeUtils.IsUint(type)) return left.Uint / right.Uint;
+            if (type == ScalarType.Double) return left.Double / right.Double;
+            if (HLSLTypeUtils.IsFloat(type)) return left.Float / right.Float;
+            if (type == ScalarType.Bool) return ((left.Bool ? 1 : 0) / (right.Bool ? 1 : 0)) != 0;
+            throw new InvalidOperationException();
         }
 
-        private static object Mod(object left, object right)
+        private static RawValue Mod(ScalarType type, RawValue left, RawValue right)
         {
-            switch (left)
-            {
-                case int x: return x % (int)right;
-                case uint x: return x % (uint)right;
-                case float x: return x % (float)right;
-                case double x: return x % (double)right;
-                case bool x: return ((x ? 1 : 0) % ((bool)right ? 1 : 0)) != 0;
-                default: throw new InvalidOperationException();
-            }
+            if (type == ScalarType.Float) return left.Float % right.Float;
+            if (HLSLTypeUtils.IsInt(type)) return left.Int % right.Int;
+            if (HLSLTypeUtils.IsUint(type)) return left.Uint % right.Uint;
+            if (type == ScalarType.Double) return left.Double % right.Double;
+            if (HLSLTypeUtils.IsFloat(type)) return left.Float % right.Float;
+            if (type == ScalarType.Bool) return ((left.Bool ? 1 : 0) % (right.Bool ? 1 : 0)) != 0;
+            throw new InvalidOperationException();
         }
 
-        private static object BitSHL(object left, object right)
+        private static RawValue BitSHL(ScalarType type, RawValue left, RawValue right)
         {
-            switch (left)
-            {
-                case int x: return x << (int)right;
-                case uint x: return x << (int)(uint)right;
-                default: throw new InvalidOperationException();
-            }
+            if (HLSLTypeUtils.IsInt(type)) return left.Int << right.Int;
+            if (HLSLTypeUtils.IsUint(type)) return left.Uint << (int)right.Uint;
+            throw new InvalidOperationException();
         }
 
-        private static object BitSHR(object left, object right)
+        private static RawValue BitSHR(ScalarType type, RawValue left, RawValue right)
         {
-            switch (left)
-            {
-                case int x: return x >> (int)right;
-                case uint x: return x >> (int)(uint)right;
-                default: throw new InvalidOperationException();
-            }
+            if (HLSLTypeUtils.IsInt(type)) return left.Int >> right.Int;
+            if (HLSLTypeUtils.IsUint(type)) return left.Uint >> (int)right.Uint;
+            throw new InvalidOperationException();
         }
 
-        private static object BitAnd(object left, object right)
+        private static RawValue BitAnd(ScalarType type, RawValue left, RawValue right)
         {
-            switch (left)
-            {
-                case int x: return x & (int)right;
-                case uint x: return x & (uint)right;
-                default: throw new InvalidOperationException();
-            }
+            if (HLSLTypeUtils.IsInt(type)) return left.Int & right.Int;
+            if (HLSLTypeUtils.IsUint(type)) return left.Uint & right.Uint;
+            throw new InvalidOperationException();
         }
 
-        private static object BitOr(object left, object right)
+        private static RawValue BitOr(ScalarType type, RawValue left, RawValue right)
         {
-            switch (left)
-            {
-                case int x: return x | (int)right;
-                case uint x: return x | (uint)right;
-                default: throw new InvalidOperationException();
-            }
+            if (HLSLTypeUtils.IsInt(type)) return left.Int | right.Int;
+            if (HLSLTypeUtils.IsUint(type)) return left.Uint | right.Uint;
+            throw new InvalidOperationException();
         }
 
-        private static object BitXor(object left, object right)
+        private static RawValue BitXor(ScalarType type, RawValue left, RawValue right)
         {
-            switch (left)
-            {
-                case int x: return x ^ (int)right;
-                case uint x: return x ^ (uint)right;
-                default: throw new InvalidOperationException();
-            }
+            if (HLSLTypeUtils.IsInt(type)) return left.Int ^ right.Int;
+            if (HLSLTypeUtils.IsUint(type)) return left.Uint ^ right.Uint;
+            throw new InvalidOperationException();
         }
 
-        private static object BoolAnd(object left, object right)
+        private static RawValue BoolAnd(RawValue left, RawValue right)
         {
-            switch (left)
-            {
-                case bool x: return x && (bool)right;
-                default: throw new InvalidOperationException();
-            }
+            return left.Bool && right.Bool;
         }
 
-        private static object BoolOr(object left, object right)
+        private static RawValue BoolOr(RawValue left, RawValue right)
         {
-            switch (left)
-            {
-                case bool x: return x || (bool)right;
-                default: throw new InvalidOperationException();
-            }
+            return left.Bool || right.Bool;
         }
 
-        private static object BitNot(object left)
+        private static RawValue BitNot(ScalarType type, RawValue left)
         {
-            switch (left)
-            {
-                case int x: return ~x;
-                case uint x: return ~x;
-                default: throw new InvalidOperationException();
-            }
+            if (HLSLTypeUtils.IsInt(type)) return ~left.Int;
+            if (HLSLTypeUtils.IsUint(type)) return ~left.Uint;
+            throw new InvalidOperationException();
         }
 
-        private static object Negate(object left)
+        private static RawValue Negate(ScalarType type, RawValue left)
         {
-            switch (left)
-            {
-                case int x: return -x;
-                case uint x: return (int)-x;
-                case float x: return -x;
-                case double x: return -x;
-                case bool x: return (-(x ? 1 : 0)) != 0;
-                default: throw new InvalidOperationException();
-            }
+            if (type == ScalarType.Float) return -left.Float;
+            if (HLSLTypeUtils.IsInt(type)) return -left.Int;
+            if (HLSLTypeUtils.IsUint(type)) return (int)-left.Uint;
+            if (type == ScalarType.Double) return -left.Double;
+            if (HLSLTypeUtils.IsFloat(type)) return -left.Float;
+            if (type == ScalarType.Bool) return (-(left.Bool ? 1 : 0)) != 0;
+            throw new InvalidOperationException();
         }
 
-        private static object BoolNegate(object left)
+        private static RawValue BoolNegate(RawValue left)
         {
-            switch (left)
-            {
-                case bool x: return !x;
-                default: throw new InvalidOperationException();
-            }
+            return !left.Bool;
         }
 
-        private static object Less(object left, object right)
+        private static RawValue Less(ScalarType type, RawValue left, RawValue right)
         {
-            switch (left)
-            {
-                case int x: return x < (int)right;
-                case uint x: return x < (uint)right;
-                case float x: return x < (float)right;
-                case double x: return x < (double)right;
-                case bool x: return ((x ? 1 : 0) < ((bool)right ? 1 : 0));
-                default: throw new InvalidOperationException();
-            }
+            if (type == ScalarType.Float) return left.Float < right.Float;
+            if (HLSLTypeUtils.IsInt(type)) return left.Int < right.Int;
+            if (HLSLTypeUtils.IsUint(type)) return left.Uint < right.Uint;
+            if (type == ScalarType.Double) return left.Double < right.Double;
+            if (HLSLTypeUtils.IsFloat(type)) return left.Float < right.Float;
+            if (type == ScalarType.Bool) return (left.Bool ? 1 : 0) < (right.Bool ? 1 : 0);
+            throw new InvalidOperationException();
         }
 
-        private static object Greater(object left, object right)
+        private static RawValue Greater(ScalarType type, RawValue left, RawValue right)
         {
-            switch (left)
-            {
-                case int x: return x > (int)right;
-                case uint x: return x > (uint)right;
-                case float x: return x > (float)right;
-                case double x: return x > (double)right;
-                case bool x: return ((x ? 1 : 0) > ((bool)right ? 1 : 0));
-                default: throw new InvalidOperationException();
-            }
+            if (type == ScalarType.Float) return left.Float > right.Float;
+            if (HLSLTypeUtils.IsInt(type)) return left.Int > right.Int;
+            if (HLSLTypeUtils.IsUint(type)) return left.Uint > right.Uint;
+            if (type == ScalarType.Double) return left.Double > right.Double;
+            if (HLSLTypeUtils.IsFloat(type)) return left.Float > right.Float;
+            if (type == ScalarType.Bool) return (left.Bool ? 1 : 0) > (right.Bool ? 1 : 0);
+            throw new InvalidOperationException();
         }
 
-        private static object LessEqual(object left, object right)
+        private static RawValue LessEqual(ScalarType type, RawValue left, RawValue right)
         {
-            switch (left)
-            {
-                case int x: return x <= (int)right;
-                case uint x: return x <= (uint)right;
-                case float x: return x <= (float)right;
-                case double x: return x <= (double)right;
-                case bool x: return ((x ? 1 : 0) <= ((bool)right ? 1 : 0));
-                default: throw new InvalidOperationException();
-            }
+            if (type == ScalarType.Float) return left.Float <= right.Float;
+            if (HLSLTypeUtils.IsInt(type)) return left.Int <= right.Int;
+            if (HLSLTypeUtils.IsUint(type)) return left.Uint <= right.Uint;
+            if (type == ScalarType.Double) return left.Double <= right.Double;
+            if (HLSLTypeUtils.IsFloat(type)) return left.Float <= right.Float;
+            if (type == ScalarType.Bool) return (left.Bool ? 1 : 0) <= (right.Bool ? 1 : 0);
+            throw new InvalidOperationException();
         }
 
-        private static object GreaterEqual(object left, object right)
+        private static RawValue GreaterEqual(ScalarType type, RawValue left, RawValue right)
         {
-            switch (left)
-            {
-                case int x: return x >= (int)right;
-                case uint x: return x >= (uint)right;
-                case float x: return x >= (float)right;
-                case double x: return x >= (double)right;
-                case bool x: return ((x ? 1 : 0) >= ((bool)right ? 1 : 0));
-                default: throw new InvalidOperationException();
-            }
+            if (type == ScalarType.Float) return left.Float >= right.Float;
+            if (HLSLTypeUtils.IsInt(type)) return left.Int >= right.Int;
+            if (HLSLTypeUtils.IsUint(type)) return left.Uint >= right.Uint;
+            if (type == ScalarType.Double) return left.Double >= right.Double;
+            if (HLSLTypeUtils.IsFloat(type)) return left.Float >= right.Float;
+            if (type == ScalarType.Bool) return (left.Bool ? 1 : 0) >= (right.Bool ? 1 : 0);
+            throw new InvalidOperationException();
         }
 
-        private static object Equal(object left, object right)
+        private static RawValue Equal(ScalarType type, RawValue left, RawValue right)
         {
-            switch (left)
-            {
-                case int x: return x == (int)right;
-                case uint x: return x == (uint)right;
-                case float x: return x == (float)right;
-                case double x: return x == (double)right;
-                case bool x: return x == (bool)right;
-                default: return left.Equals(right);
-            }
+            if (type == ScalarType.Float) return left.Float == right.Float;
+            if (HLSLTypeUtils.IsInt(type)) return left.Int == right.Int;
+            if (HLSLTypeUtils.IsUint(type)) return left.Uint == right.Uint;
+            if (type == ScalarType.Double) return left.Double == right.Double;
+            if (HLSLTypeUtils.IsFloat(type)) return left.Float == right.Float;
+            if (type == ScalarType.Bool) return left.Bool == right.Bool;
+            if (type == ScalarType.Char) return left.Char == right.Char;
+            return left.Long == right.Long;
         }
 
-        private static object NotEqual(object left, object right)
+        private static RawValue NotEqual(ScalarType type, RawValue left, RawValue right)
         {
-            switch (left)
-            {
-                case int x: return x != (int)right;
-                case uint x: return x != (uint)right;
-                case float x: return x != (float)right;
-                case double x: return x != (double)right;
-                case bool x: return x != (bool)right;
-                default: return !left.Equals(right);
-            }
+            if (type == ScalarType.Float) return left.Float != right.Float;
+            if (HLSLTypeUtils.IsInt(type)) return left.Int != right.Int;
+            if (HLSLTypeUtils.IsUint(type)) return left.Uint != right.Uint;
+            if (type == ScalarType.Double) return left.Double != right.Double;
+            if (HLSLTypeUtils.IsFloat(type)) return left.Float != right.Float;
+            if (type == ScalarType.Bool) return left.Bool != right.Bool;
+            if (type == ScalarType.Char) return left.Char != right.Char;
+            return left.Long != right.Long;
         }
         #endregion
 
@@ -254,61 +202,71 @@ namespace HLSL
         public static NumericValue Add(NumericValue left, NumericValue right)
         {
             (left, right) = HLSLTypeUtils.Promote(left, right, false);
-            return HLSLValueUtils.Map2(left, right, Add);
+            ScalarType t = left.Type;
+            return HLSLValueUtils.Map2(left, right, (l, r) => Add(t, l, r));
         }
 
         public static NumericValue Mul(NumericValue left, NumericValue right)
         {
             (left, right) = HLSLTypeUtils.Promote(left, right, false);
-            return HLSLValueUtils.Map2(left, right, Mul);
+            ScalarType t = left.Type;
+            return HLSLValueUtils.Map2(left, right, (l, r) => Mul(t, l, r));
         }
 
         public static NumericValue Sub(NumericValue left, NumericValue right)
         {
             (left, right) = HLSLTypeUtils.Promote(left, right, false);
-            return HLSLValueUtils.Map2(left, right, Sub);
+            ScalarType t = left.Type;
+            return HLSLValueUtils.Map2(left, right, (l, r) => Sub(t, l, r));
         }
 
         public static NumericValue Div(NumericValue left, NumericValue right)
         {
             (left, right) = HLSLTypeUtils.Promote(left, right, false);
-            return HLSLValueUtils.Map2(left, right, Div);
+            ScalarType t = left.Type;
+            return HLSLValueUtils.Map2(left, right, (l, r) => Div(t, l, r));
         }
 
         public static NumericValue Mod(NumericValue left, NumericValue right)
         {
             (left, right) = HLSLTypeUtils.Promote(left, right, false);
-            return HLSLValueUtils.Map2(left, right, Mod);
+            ScalarType t = left.Type;
+            return HLSLValueUtils.Map2(left, right, (l, r) => Mod(t, l, r));
         }
 
         public static NumericValue BitSHL(NumericValue left, NumericValue right)
         {
             (left, right) = HLSLTypeUtils.Promote(left, right, true);
-            return HLSLValueUtils.Map2(left, right, BitSHL);
+            ScalarType t = left.Type;
+            return HLSLValueUtils.Map2(left, right, (l, r) => BitSHL(t, l, r));
         }
 
         public static NumericValue BitSHR(NumericValue left, NumericValue right)
         {
             (left, right) = HLSLTypeUtils.Promote(left, right, true);
-            return HLSLValueUtils.Map2(left, right, BitSHR);
+            ScalarType t = left.Type;
+            return HLSLValueUtils.Map2(left, right, (l, r) => BitSHR(t, l, r));
         }
 
         public static NumericValue BitAnd(NumericValue left, NumericValue right)
         {
             (left, right) = HLSLTypeUtils.Promote(left, right, true);
-            return HLSLValueUtils.Map2(left, right, BitAnd);
+            ScalarType t = left.Type;
+            return HLSLValueUtils.Map2(left, right, (l, r) => BitAnd(t, l, r));
         }
 
         public static NumericValue BitOr(NumericValue left, NumericValue right)
         {
             (left, right) = HLSLTypeUtils.Promote(left, right, true);
-            return HLSLValueUtils.Map2(left, right, BitOr);
+            ScalarType t = left.Type;
+            return HLSLValueUtils.Map2(left, right, (l, r) => BitOr(t, l, r));
         }
 
         public static NumericValue BitXor(NumericValue left, NumericValue right)
         {
             (left, right) = HLSLTypeUtils.Promote(left, right, true);
-            return HLSLValueUtils.Map2(left, right, BitXor);
+            ScalarType t = left.Type;
+            return HLSLValueUtils.Map2(left, right, (l, r) => BitXor(t, l, r));
         }
 
         public static NumericValue BoolAnd(NumericValue left, NumericValue right)
@@ -325,7 +283,8 @@ namespace HLSL
 
         public static NumericValue Negate(NumericValue left)
         {
-            var res = left.Map(Negate);
+            ScalarType t = left.Type;
+            var res = left.Map(x => Negate(t, x));
             if (res.Type == ScalarType.Uint)
                 return res.Cast(ScalarType.Int);
             return res;
@@ -338,43 +297,50 @@ namespace HLSL
 
         public static NumericValue BitNot(NumericValue left)
         {
-            return left.Map(BitNot);
+            ScalarType t = left.Type;
+            return left.Map(x => BitNot(t, x));
         }
 
         public static NumericValue Less(NumericValue left, NumericValue right)
         {
             (left, right) = HLSLTypeUtils.Promote(left, right, false);
-            return HLSLValueUtils.Map2(left, right, Less).Cast(ScalarType.Bool);
+            ScalarType t = left.Type;
+            return HLSLValueUtils.Map2(left, right, (l, r) => Less(t, l, r)).Cast(ScalarType.Bool);
         }
 
         public static NumericValue Greater(NumericValue left, NumericValue right)
         {
             (left, right) = HLSLTypeUtils.Promote(left, right, false);
-            return HLSLValueUtils.Map2(left, right, Greater).Cast(ScalarType.Bool);
+            ScalarType t = left.Type;
+            return HLSLValueUtils.Map2(left, right, (l, r) => Greater(t, l, r)).Cast(ScalarType.Bool);
         }
 
         public static NumericValue LessEqual(NumericValue left, NumericValue right)
         {
             (left, right) = HLSLTypeUtils.Promote(left, right, false);
-            return HLSLValueUtils.Map2(left, right, LessEqual).Cast(ScalarType.Bool);
+            ScalarType t = left.Type;
+            return HLSLValueUtils.Map2(left, right, (l, r) => LessEqual(t, l, r)).Cast(ScalarType.Bool);
         }
 
         public static NumericValue GreaterEqual(NumericValue left, NumericValue right)
         {
             (left, right) = HLSLTypeUtils.Promote(left, right, false);
-            return HLSLValueUtils.Map2(left, right, GreaterEqual).Cast(ScalarType.Bool);
+            ScalarType t = left.Type;
+            return HLSLValueUtils.Map2(left, right, (l, r) => GreaterEqual(t, l, r)).Cast(ScalarType.Bool);
         }
 
         public static NumericValue Equal(NumericValue left, NumericValue right)
         {
             (left, right) = HLSLTypeUtils.Promote(left, right, false);
-            return HLSLValueUtils.Map2(left, right, Equal).Cast(ScalarType.Bool);
+            ScalarType t = left.Type;
+            return HLSLValueUtils.Map2(left, right, (l, r) => Equal(t, l, r)).Cast(ScalarType.Bool);
         }
 
         public static NumericValue NotEqual(NumericValue left, NumericValue right)
         {
             (left, right) = HLSLTypeUtils.Promote(left, right, false);
-            return HLSLValueUtils.Map2(left, right, NotEqual).Cast(ScalarType.Bool);
+            ScalarType t = left.Type;
+            return HLSLValueUtils.Map2(left, right, (l, r) => NotEqual(t, l, r)).Cast(ScalarType.Bool);
         }
         #endregion
     }

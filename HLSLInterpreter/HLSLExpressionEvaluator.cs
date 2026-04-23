@@ -306,15 +306,15 @@ namespace HLSL
                     var array = (ArrayValue)parentRef.Get();
                     if (indexVal.Value.IsUniform)
                     {
-                        return array.Values[Convert.ToInt32(indexVal.Value.UniformValue)];
+                        return array.Values[indexVal.AsInt()];
                     }
                     else
                     {
                         int threadCount = executionState.GetThreadCount();
-                        HLSLValue result = HLSLValueUtils.Vectorize(array.Values[Convert.ToInt32(indexVal.Value.Get(0))], threadCount);
+                        HLSLValue result = HLSLValueUtils.Vectorize(array.Values[indexVal.AsInt()], threadCount);
                         for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
                         {
-                            int index = Convert.ToInt32(indexVal.Value.Get(threadIndex));
+                            int index = indexVal.AsInt(threadIndex);
                             result = HLSLValueUtils.SetThreadValue(result, threadIndex, array.Values[index]);
                         }
                         return result;
@@ -327,13 +327,13 @@ namespace HLSL
                         for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
                         {
                             if (!executionState.IsThreadActive(threadIndex)) continue;
-                            int index = Convert.ToInt32(indexVal.Value.Get(threadIndex));
+                            int index = indexVal.AsInt(threadIndex);
                             array.Values[index] = HLSLValueUtils.Scalarize(val, threadIndex);
                         }
                     }
                     else if (indexVal.Value.IsUniform)
                     {
-                        int index = Convert.ToInt32(indexVal.Value.UniformValue);
+                        int index = indexVal.AsInt();
                         array.Values[index] = val;
                     }
                     else
@@ -341,7 +341,7 @@ namespace HLSL
                         int threadCount = executionState.GetThreadCount();
                         for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
                         {
-                            int index = Convert.ToInt32(indexVal.Value.Get(threadIndex));
+                            int index = indexVal.AsInt(threadIndex);
                             var elem = HLSLValueUtils.Vectorize(array.Values[index], threadCount);
                             array.Values[index] = HLSLValueUtils.SetThreadValue(elem, threadIndex, HLSLValueUtils.Scalarize(val, threadIndex));
                         }
@@ -356,15 +356,15 @@ namespace HLSL
                     var vec = (VectorValue)parentRef.Get();
                     if (indexVal.Value.IsUniform)
                     {
-                        return vec[Convert.ToInt32(indexVal.Value.UniformValue)];
+                        return vec[indexVal.AsInt()];
                     }
                     else
                     {
                         int threadCount = executionState.GetThreadCount();
-                        HLSLValue result = HLSLValueUtils.Vectorize(vec[Convert.ToInt32(indexVal.Value.Get(0))], threadCount);
+                        HLSLValue result = HLSLValueUtils.Vectorize(vec[indexVal.AsInt()], threadCount);
                         for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
                         {
-                            int channel = Convert.ToInt32(indexVal.Value.Get(threadIndex));
+                            int channel = indexVal.AsInt(threadIndex);
                             result = HLSLValueUtils.SetThreadValue(result, threadIndex, vec[channel]);
                         }
                         return result;
@@ -377,21 +377,21 @@ namespace HLSL
                         for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
                         {
                             if (!executionState.IsThreadActive(threadIndex)) continue;
-                            int channel = Convert.ToInt32(indexVal.Value.Get(threadIndex));
+                            int channel = indexVal.AsInt(threadIndex);
                             vec = vec.ChannelAssign(channel, (NumericValue)HLSLValueUtils.Scalarize(val, threadIndex));
                         }
                         parentRef.Set(vec);
                     }
                     else if (indexVal.Value.IsUniform)
                     {
-                        parentRef.Set(vec.ChannelAssign(Convert.ToInt32(indexVal.Value.UniformValue), (NumericValue)val));
+                        parentRef.Set(vec.ChannelAssign(indexVal.AsInt(), (NumericValue)val));
                     }
                     else
                     {
                         vec = (VectorValue)vec.Vectorize(executionState.GetThreadCount());
                         for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
                         {
-                            int channel = Convert.ToInt32(indexVal.Value.Get(threadIndex));
+                            int channel = indexVal.AsInt(threadIndex);
                             vec = (VectorValue)HLSLValueUtils.SetThreadValue(vec, threadIndex, vec.ChannelAssign(channel, (NumericValue)val));
                         }
                         parentRef.Set(vec);
@@ -407,7 +407,7 @@ namespace HLSL
                     var matrix = (MatrixValue)parentRef.Get();
                     if (indexVal.Value.IsUniform)
                     {
-                        int row = Convert.ToInt32(indexVal.Value.UniformValue);
+                        int row = indexVal.AsInt();
                         return VectorValue.FromScalars(matrix.ToScalars().Skip(row * columnCount).Take(columnCount).ToArray());
                     }
                     else
@@ -416,8 +416,8 @@ namespace HLSL
                         var expanded = matrix.ThreadCount < threadCount ? (MatrixValue)matrix.Vectorize(threadCount) : matrix;
                         return new VectorValue(matrix.Type, expanded.Values.MapThreads((threadData, threadIndex) =>
                         {
-                            int row = Convert.ToInt32(indexVal.Value.Get(threadIndex));
-                            var rowElements = new object[columnCount];
+                            int row = indexVal.AsInt(threadIndex);
+                            var rowElements = new RawValue[columnCount];
                             Array.Copy(threadData, row * columnCount, rowElements, 0, columnCount);
                             return rowElements;
                         }));
@@ -425,30 +425,32 @@ namespace HLSL
                 },
                 val => {
                     var matrix = (MatrixValue)parentRef.Get();
+                    // HLSL allows scalar broadcast on row assignment (e.g. mat[row] = 1.0f).
+                    var valVec = (VectorValue)((NumericValue)val).BroadcastToVector(columnCount).Cast(matrix.Type);
                     if (isGroupshared)
                     {
                         for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
                         {
                             if (!executionState.IsThreadActive(threadIndex)) continue;
-                            int row = Convert.ToInt32(indexVal.Value.Get(threadIndex));
-                            var rowData = (object[])((NumericValue)HLSLValueUtils.Scalarize(val, threadIndex)).GetThreadValue(0);
-                            var matData = (object[])matrix.Values.Get(0).Clone();
+                            int row = indexVal.AsInt(threadIndex);
+                            var rowData = ((VectorValue)HLSLValueUtils.Scalarize(valVec, threadIndex)).Values.Get(0);
+                            var matData = (RawValue[])matrix.Values.Get(0).Clone();
                             Array.Copy(rowData, 0, matData, row * columnCount, columnCount);
-                            matrix = new MatrixValue(matrix.Type, matrix.Rows, columnCount, new HLSLRegister<object[]>(matData));
+                            matrix = new MatrixValue(matrix.Type, matrix.Rows, columnCount, new HLSLRegister<RawValue[]>(matData));
                         }
                         parentRef.Set(matrix);
                     }
                     else
                     {
-                        int threadCount = Math.Max(matrix.ThreadCount, val.ThreadCount);
+                        int threadCount = Math.Max(matrix.ThreadCount, valVec.ThreadCount);
                         var expanded = threadCount > 1 ? (MatrixValue)matrix.Vectorize(threadCount) : matrix;
                         parentRef.Set(new MatrixValue(matrix.Type, matrix.Rows, columnCount, expanded.Values.MapThreads((threadData, threadIndex) =>
                         {
-                            int row = Convert.ToInt32(indexVal.Value.Get(threadIndex));
-                            var matData = (object[])threadData.Clone();
-                            Array.Copy((object[])((NumericValue)val).GetThreadValue(threadIndex), 0, matData, row * columnCount, columnCount);
+                            int row = indexVal.AsInt(threadIndex);
+                            var matData = (RawValue[])threadData.Clone();
+                            Array.Copy(valVec.Values.Get(threadIndex), 0, matData, row * columnCount, columnCount);
                             return matData;
-                        })));            
+                        })));
                     }
                 });
         }
@@ -470,18 +472,17 @@ namespace HLSL
                 }
             }
 
-            object[][] lanes = new object[maxThreadCount][];
+            for (int i = 0; i < args.Length; i++)
+                args[i] = args[i].Cast(type.Kind);
+
+            RawValue[][] lanes = new RawValue[maxThreadCount][];
             for (int threadIdx = 0; threadIdx < maxThreadCount; threadIdx++)
             {
-                List<object> flattened = new List<object>();
+                List<RawValue> flattened = new List<RawValue>();
                 foreach (var numeric in args)
                 {
                     if (numeric is ScalarValue scalar) flattened.Add(scalar.Value.Get(threadIdx));
                     if (numeric is VectorValue vector) flattened.AddRange(vector.Values.Get(threadIdx));
-                }
-                for (int i = 0; i < flattened.Count; i++)
-                {
-                    flattened[i] = HLSLTypeUtils.CastNumeric(type.Kind, flattened[i]);
                 }
                 lanes[threadIdx] = flattened.ToArray();
             }
@@ -493,16 +494,16 @@ namespace HLSL
                     else return new ScalarValue(st.Kind, HLSLValueUtils.MakeScalarVGPR(lanes.Select(l => l[0])));
                 case VectorTypeNode _:
                 case GenericVectorTypeNode _:
-                    if (maxThreadCount == 1) return new VectorValue(type.Kind, new HLSLRegister<object[]>(lanes[0]));
-                    else return new VectorValue(type.Kind, new HLSLRegister<object[]>(lanes));
+                    if (maxThreadCount == 1) return new VectorValue(type.Kind, new HLSLRegister<RawValue[]>(lanes[0]));
+                    else return new VectorValue(type.Kind, new HLSLRegister<RawValue[]>(lanes));
                 case MatrixTypeNode matrix:
-                    if (maxThreadCount == 1) return new MatrixValue(type.Kind, matrix.FirstDimension, matrix.SecondDimension, new HLSLRegister<object[]>(lanes[0]));
-                    else return new MatrixValue(type.Kind, matrix.FirstDimension, matrix.SecondDimension, new HLSLRegister<object[]>(lanes));
+                    if (maxThreadCount == 1) return new MatrixValue(type.Kind, matrix.FirstDimension, matrix.SecondDimension, new HLSLRegister<RawValue[]>(lanes[0]));
+                    else return new MatrixValue(type.Kind, matrix.FirstDimension, matrix.SecondDimension, new HLSLRegister<RawValue[]>(lanes));
                 case GenericMatrixTypeNode genMatrix:
                     var d1 = Visit(genMatrix.FirstDimension) as ScalarValue;
                     var d2 = Visit(genMatrix.SecondDimension) as ScalarValue;
-                    if (maxThreadCount == 1) return new MatrixValue(type.Kind, Convert.ToInt32(d1.Value), Convert.ToInt32(d2.Value), new HLSLRegister<object[]>(lanes[0]));
-                    else return new MatrixValue(type.Kind, Convert.ToInt32(d1.Value), Convert.ToInt32(d2.Value), new HLSLRegister<object[]>(lanes));
+                    if (maxThreadCount == 1) return new MatrixValue(type.Kind, d1.AsInt(), d2.AsInt(), new HLSLRegister<RawValue[]>(lanes[0]));
+                    else return new MatrixValue(type.Kind, d1.AsInt(), d2.AsInt(), new HLSLRegister<RawValue[]>(lanes));
                 default:
                     throw Error($"Unknown numeric constructor type.");
             }
@@ -680,14 +681,14 @@ namespace HLSL
             switch (node.Kind)
             {
                 case LiteralKind.String:
-                    return new ScalarValue(ScalarType.String, new HLSLRegister<object>(node.Lexeme));
+                    return new StringValue(node.Lexeme);
                 case LiteralKind.Float:
                     string floatLexeme = node.Lexeme;
                     bool isHalfLiteral = floatLexeme.EndsWith('h') || floatLexeme.EndsWith('H');
                     if (floatLexeme.EndsWith('f') || floatLexeme.EndsWith('F') || isHalfLiteral)
                         floatLexeme = floatLexeme.Substring(0, floatLexeme.Length - 1);
                     if (float.TryParse(floatLexeme, NumberStyles.Any, CultureInfo.InvariantCulture, out float parsedFloat))
-                        return new ScalarValue(isHalfLiteral ? ScalarType.Half : ScalarType.Float, new HLSLRegister<object>(parsedFloat));
+                        return new ScalarValue(isHalfLiteral ? ScalarType.Half : ScalarType.Float, new HLSLRegister<RawValue>(parsedFloat));
                     else
                         throw Error(node, $"Invalid float literal '{node.Lexeme}'.");
                 case LiteralKind.Integer:
@@ -695,26 +696,26 @@ namespace HLSL
                     {
                         string lexeme = node.Lexeme.Substring(0, node.Lexeme.Length - 1);
                         if (uint.TryParse(lexeme, NumberStyles.Any, CultureInfo.InvariantCulture, out uint parsedUint))
-                            return new ScalarValue(ScalarType.Uint, new HLSLRegister<object>(parsedUint));
+                            return new ScalarValue(ScalarType.Uint, new HLSLRegister<RawValue>(parsedUint));
                         else if (lexeme.StartsWith("0x") && uint.TryParse(lexeme.Substring(2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out uint parsedHexUint))
-                            return new ScalarValue(ScalarType.Uint, new HLSLRegister<object>(parsedHexUint));
+                            return new ScalarValue(ScalarType.Uint, new HLSLRegister<RawValue>(parsedHexUint));
                     }
                     else
                     {
                         if (int.TryParse(node.Lexeme, NumberStyles.Any, CultureInfo.InvariantCulture, out int parsedInt))
-                            return new ScalarValue(ScalarType.Int, new HLSLRegister<object>(parsedInt));
+                            return new ScalarValue(ScalarType.Int, new HLSLRegister<RawValue>(parsedInt));
                         else if (node.Lexeme.StartsWith("0x") && int.TryParse(node.Lexeme.Substring(2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out int parsedHexInt))
-                            return new ScalarValue(ScalarType.Int, new HLSLRegister<object>(parsedHexInt));
+                            return new ScalarValue(ScalarType.Int, new HLSLRegister<RawValue>(parsedHexInt));
                     }
                     throw Error(node, $"Invalid integer literal '{node.Lexeme}'.");
                 case LiteralKind.Character:
                     if (char.TryParse(node.Lexeme, out char parsedChar))
-                        return new ScalarValue(ScalarType.Char, new HLSLRegister<object>(parsedChar));
+                        return new ScalarValue(ScalarType.Char, new HLSLRegister<RawValue>(parsedChar));
                     else
                         throw Error(node, $"Invalid character literal '{node.Lexeme}'.");
                 case LiteralKind.Boolean:
                     if (bool.TryParse(node.Lexeme, out bool parsedBool))
-                        return new ScalarValue(ScalarType.Bool, new HLSLRegister<object>(parsedBool));
+                        return new ScalarValue(ScalarType.Bool, new HLSLRegister<RawValue>(parsedBool));
                     else
                         throw Error(node, $"Invalid boolean literal '{node.Lexeme}'.");
                 case LiteralKind.Null:
@@ -885,9 +886,9 @@ namespace HLSL
             if (node.Operator == OperatorKind.Minus && node.Expression is LiteralExpressionNode literal && literal.Kind == LiteralKind.Integer)
             {
                 if (int.TryParse("-" + literal.Lexeme, NumberStyles.Any, CultureInfo.InvariantCulture, out int parsedInt))
-                    return new ScalarValue(ScalarType.Int, new HLSLRegister<object>(parsedInt));
+                    return new ScalarValue(ScalarType.Int, new HLSLRegister<RawValue>(parsedInt));
                 else if (literal.Lexeme.StartsWith("0x") && int.TryParse("-" + literal.Lexeme.Substring(2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out int parsedHexInt))
-                    return new ScalarValue(ScalarType.Int, new HLSLRegister<object>(parsedHexInt));
+                    return new ScalarValue(ScalarType.Int, new HLSLRegister<RawValue>(parsedHexInt));
             }
 
             var num = EvaluateNumeric(node.Expression);
@@ -1095,8 +1096,8 @@ namespace HLSL
                     HLSLValue[] values = new HLSLValue[executionState.GetThreadCount()];
                     for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
                     {
-                        var index = scalarTarget.Value.Get(threadIndex);
-                        values[threadIndex] = HLSLValueUtils.Scalarize(arrValue.Values[Convert.ToInt32(index)], threadIndex);
+                        int index = scalarTarget.AsInt(threadIndex);
+                        values[threadIndex] = HLSLValueUtils.Scalarize(arrValue.Values[index], threadIndex);
                     }
                     HLSLValue result = HLSLValueUtils.Vectorize(values[0], executionState.GetThreadCount());
                     for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
@@ -1107,7 +1108,7 @@ namespace HLSL
                 }
                 else
                 {
-                    return arrValue.Values[Convert.ToInt32(scalarTarget.Value.UniformValue)];
+                    return arrValue.Values[scalarTarget.AsInt()];
                 }
             }
             else if (arr is VectorValue vec)
@@ -1117,8 +1118,8 @@ namespace HLSL
                     HLSLValue[] values = new HLSLValue[executionState.GetThreadCount()];
                     for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
                     {
-                        var index = scalarTarget.Value.Get(threadIndex);
-                        values[threadIndex] = HLSLValueUtils.Scalarize(vec[Convert.ToInt32(index)], threadIndex);
+                        int index = scalarTarget.AsInt(threadIndex);
+                        values[threadIndex] = HLSLValueUtils.Scalarize(vec[index], threadIndex);
                     }
                     HLSLValue result = HLSLValueUtils.Vectorize(values[0], executionState.GetThreadCount());
                     for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
@@ -1129,7 +1130,7 @@ namespace HLSL
                 }
                 else
                 {
-                    return vec[Convert.ToInt32(scalarTarget.Value.UniformValue)];
+                    return vec[scalarTarget.AsInt()];
                 }
             }
             else if (arr is MatrixValue mat)
@@ -1139,10 +1140,10 @@ namespace HLSL
                     HLSLValue[] values = new HLSLValue[executionState.GetThreadCount()];
                     for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
                     {
-                        var index = scalarTarget.Value.Get(threadIndex);
+                        int index = scalarTarget.AsInt(threadIndex);
                         ScalarValue[] rowVec = new ScalarValue[mat.Columns];
                         for (int i = 0; i < mat.Columns; i++)
-                            rowVec[i] = mat[Convert.ToInt32(index), i];
+                            rowVec[i] = mat[index, i];
                         values[threadIndex] = HLSLValueUtils.Scalarize(VectorValue.FromScalars(rowVec), threadIndex);
                     }
                     HLSLValue result = HLSLValueUtils.Vectorize(values[0], executionState.GetThreadCount());
@@ -1156,7 +1157,7 @@ namespace HLSL
                 {
                     ScalarValue[] rowVec = new ScalarValue[mat.Columns];
                     for (int i = 0; i < mat.Columns; i++)
-                        rowVec[i] = mat[Convert.ToInt32(scalarTarget.Value.UniformValue), i];
+                        rowVec[i] = mat[scalarTarget.AsInt(), i];
                     return VectorValue.FromScalars(rowVec);
                 }
             }
@@ -1184,7 +1185,7 @@ namespace HLSL
 
                 if (isTargetArray)
                 {
-                    int arrayLen = Convert.ToInt32(EvaluateNumeric(node.ArrayRanks[0].Dimension).GetThreadValue(0));
+                    int arrayLen = ((ScalarValue)EvaluateNumeric(node.ArrayRanks[0].Dimension)).AsInt();
                     int components = 0;
                     switch (targetKind)
                     {
@@ -1221,11 +1222,11 @@ namespace HLSL
                 case MatrixTypeNode matrixType:
                     return numeric.BroadcastToMatrix(matrixType.FirstDimension, matrixType.SecondDimension).Cast(matrixType.Kind);
                 case GenericVectorTypeNode genVectorType:
-                    int dims = Convert.ToInt32(EvaluateScalar(genVectorType.Dimension).Cast(ScalarType.Int).GetThreadValue(0));
+                    int dims = EvaluateScalar(genVectorType.Dimension).AsInt();
                     return numeric.BroadcastToVector(dims).Cast(genVectorType.Kind);
                 case GenericMatrixTypeNode genMatrixType:
-                    int rows = Convert.ToInt32(EvaluateScalar(genMatrixType.FirstDimension).Cast(ScalarType.Int).GetThreadValue(0));
-                    int cols = Convert.ToInt32(EvaluateScalar(genMatrixType.SecondDimension).Cast(ScalarType.Int).GetThreadValue(0));
+                    int rows = EvaluateScalar(genMatrixType.FirstDimension).AsInt();
+                    int cols = EvaluateScalar(genMatrixType.SecondDimension).AsInt();
                     return numeric.BroadcastToMatrix(rows, cols).Cast(genMatrixType.Kind);
                 case UserDefinedNamedTypeNode named when numeric is ScalarValue scalar:
                     var structType = context.GetStructType(named.GetName());

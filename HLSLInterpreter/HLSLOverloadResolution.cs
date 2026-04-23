@@ -24,13 +24,13 @@ namespace HLSL
 
                 if (typeNode is GenericMatrixTypeNode matGen)
                 {
-                    int rows = Convert.ToInt32(((ScalarValue)evaluator.Visit(matGen.FirstDimension)).Cast(ScalarType.Int).GetThreadValue(0));
-                    int cols = Convert.ToInt32(((ScalarValue)evaluator.Visit(matGen.SecondDimension)).Cast(ScalarType.Int).GetThreadValue(0));
+                    int rows = ((ScalarValue)evaluator.Visit(matGen.FirstDimension)).AsInt();
+                    int cols = ((ScalarValue)evaluator.Visit(matGen.SecondDimension)).AsInt();
                     valueNum = valueNum.BroadcastToMatrix(rows, cols);
                 }
 
                 if (typeNode is GenericVectorTypeNode vecGen)
-                    valueNum = valueNum.BroadcastToVector(Convert.ToInt32(((ScalarValue)evaluator.Visit(vecGen.Dimension)).Cast(ScalarType.Int).GetThreadValue(0)));
+                    valueNum = valueNum.BroadcastToVector(((ScalarValue)evaluator.Visit(vecGen.Dimension)).AsInt());
 
                 return valueNum.Cast(typeNum.Kind);
             }
@@ -51,7 +51,7 @@ namespace HLSL
             if (to is GenericVectorTypeNode genVecType &&
                 from is VectorValue genVecValue &&
                 genVecType.Kind == genVecValue.Type &&
-                Convert.ToInt32(((ScalarValue)evaluator.Visit(genVecType.Dimension)).Cast(ScalarType.Int).GetThreadValue(0)) == genVecValue.Size)
+                ((ScalarValue)evaluator.Visit(genVecType.Dimension)).AsInt() == genVecValue.Size)
                 return true;
             if (to is MatrixTypeNode matType
                 && from is MatrixValue matValue
@@ -62,8 +62,8 @@ namespace HLSL
             if (to is GenericMatrixTypeNode genMatType
                 && from is MatrixValue genMatValue
                 && genMatType.Kind == genMatValue.Type
-                && Convert.ToInt32(((ScalarValue)evaluator.Visit(genMatType.FirstDimension)).Cast(ScalarType.Int).GetThreadValue(0)) == genMatValue.Rows
-                && Convert.ToInt32(((ScalarValue)evaluator.Visit(genMatType.SecondDimension)).Cast(ScalarType.Int).GetThreadValue(0)) == genMatValue.Columns)
+                && ((ScalarValue)evaluator.Visit(genMatType.FirstDimension)).AsInt() == genMatValue.Rows
+                && ((ScalarValue)evaluator.Visit(genMatType.SecondDimension)).AsInt() == genMatValue.Columns)
                 return true;
             if (to is StructTypeNode strType && from is StructValue strValue)
             {
@@ -131,11 +131,11 @@ namespace HLSL
                     return fromMat.Rows <= toMat.FirstDimension && fromMat.Columns <= toMat.SecondDimension;
                 // Same but for generic
                 if (fromNum is VectorValue fromVecGen && toNum is GenericVectorTypeNode toVecGen)
-                    return fromVecGen.Size <= Convert.ToInt32(((ScalarValue)evaluator.Visit(toVecGen.Dimension)).Cast(ScalarType.Int).GetThreadValue(0));
+                    return fromVecGen.Size <= ((ScalarValue)evaluator.Visit(toVecGen.Dimension)).AsInt();
                 if (fromNum is MatrixValue fromMatGen && toNum is GenericMatrixTypeNode toMatGen)
                 {
-                    int rows = Convert.ToInt32(((ScalarValue)evaluator.Visit(toMatGen.FirstDimension)).Cast(ScalarType.Int).GetThreadValue(0));
-                    int cols = Convert.ToInt32(((ScalarValue)evaluator.Visit(toMatGen.SecondDimension)).Cast(ScalarType.Int).GetThreadValue(0));
+                    int rows = ((ScalarValue)evaluator.Visit(toMatGen.FirstDimension)).AsInt();
+                    int cols = ((ScalarValue)evaluator.Visit(toMatGen.SecondDimension)).AsInt();
                     return fromMatGen.Rows <= rows && fromMatGen.Columns <= cols;
                 }
             }
@@ -156,11 +156,11 @@ namespace HLSL
                 if (fromNum is MatrixValue fromMat && toNum is MatrixTypeNode toMat)
                     return fromMat.Rows > toMat.FirstDimension && fromMat.Columns > toMat.SecondDimension;
                 if (fromNum is VectorValue fromVecGen && toNum is GenericVectorTypeNode toVecGen)
-                    return fromVecGen.Size > Convert.ToInt32(((ScalarValue)evaluator.Visit(toVecGen.Dimension)).Cast(ScalarType.Int).GetThreadValue(0));
+                    return fromVecGen.Size > ((ScalarValue)evaluator.Visit(toVecGen.Dimension)).AsInt();
                 if (fromNum is MatrixValue fromMatGen && toNum is GenericMatrixTypeNode toMatGen)
                 {
-                    int rows = Convert.ToInt32(((ScalarValue)evaluator.Visit(toMatGen.FirstDimension)).Cast(ScalarType.Int).GetThreadValue(0));
-                    int cols = Convert.ToInt32(((ScalarValue)evaluator.Visit(toMatGen.SecondDimension)).Cast(ScalarType.Int).GetThreadValue(0));
+                    int rows = ((ScalarValue)evaluator.Visit(toMatGen.FirstDimension)).AsInt();
+                    int cols = ((ScalarValue)evaluator.Visit(toMatGen.SecondDimension)).AsInt();
                     return fromMatGen.Rows > rows && fromMatGen.Columns > cols;
                 }
             }

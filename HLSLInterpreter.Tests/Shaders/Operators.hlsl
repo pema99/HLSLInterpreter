@@ -1667,6 +1667,25 @@ void Operator_MatrixSwizzleWrite_ScalarBroadcast()
 }
 
 [Test]
+void Operator_MatrixRowWrite_ScalarBroadcast()
+{
+    float2x2 m = float2x2(1, 2, 3, 4);
+
+    // Assign scalar to a row index — broadcasts to every column
+    m[0] = 7.0;
+    ASSERT(m[0][0] == 7.0 && m[0][1] == 7.0);
+    ASSERT(m[1][0] == 3.0 && m[1][1] == 4.0); // other row unchanged
+
+    // Assign vector to a row index — replaces the whole row
+    m[1] = float2(8.0, 9.0);
+    ASSERT(m[1][0] == 8.0 && m[1][1] == 9.0);
+
+    // Scalar broadcast with type conversion (int scalar into float matrix)
+    m[0] = 5;
+    ASSERT(m[0][0] == 5.0 && m[0][1] == 5.0);
+}
+
+[Test]
 void Operator_MatrixSwizzleCompoundAssign()
 {
     float2x2 m = float2x2(1, 2, 3, 4);
@@ -1859,6 +1878,100 @@ void Ternary_Matrix_ResultUsedInArithmetic()
     float2x2 r = (flag ? a : b);
     // r should be identity; r[0][0] + r[1][1] == 2
     ASSERT(r[0][0] + r[1][1] == 2.0);
+}
+
+// Vector condition: per-component selection across two vectors.
+[Test]
+void Ternary_VectorCond_VectorBranches()
+{
+    bool4 cond = bool4(true, false, true, false);
+    int4 a = int4(1, 2, 3, 4);
+    int4 b = int4(10, 20, 30, 40);
+    int4 r = cond ? a : b;
+    ASSERT(r.x == 1 && r.y == 20 && r.z == 3 && r.w == 40);
+}
+
+// Vector condition with scalar branches: scalars broadcast to match cond shape.
+[Test]
+void Ternary_VectorCond_ScalarBranches()
+{
+    bool3 cond = bool3(true, false, true);
+    int3 r = cond ? 7 : 99;
+    ASSERT(r.x == 7 && r.y == 99 && r.z == 7);
+}
+
+// Scalar condition with mixed scalar / vector branches: scalar broadcast.
+[Test]
+void Ternary_ScalarCond_MixedScalarVectorBranches()
+{
+    int3 vec = int3(1, 2, 3);
+    int3 r1 = true ? vec : 0;        // false branch broadcast to int3(0,0,0)
+    ASSERT(r1.x == 1 && r1.y == 2 && r1.z == 3);
+
+    int3 r2 = false ? vec : 0;
+    ASSERT(r2.x == 0 && r2.y == 0 && r2.z == 0);
+
+    int3 r3 = true ? 9 : vec;        // true branch broadcast to int3(9,9,9)
+    ASSERT(r3.x == 9 && r3.y == 9 && r3.z == 9);
+}
+
+// Matrix condition: per-component selection across two matrices.
+[Test]
+void Ternary_MatrixCond_MatrixBranches()
+{
+    bool2x2 cond = bool2x2(true, false, false, true);
+    float2x2 a = float2x2(1, 2, 3, 4);
+    float2x2 b = float2x2(10, 20, 30, 40);
+    float2x2 r = cond ? a : b;
+    ASSERT(r[0][0] == 1 && r[0][1] == 20);
+    ASSERT(r[1][0] == 30 && r[1][1] == 4);
+}
+
+// Matrix condition with scalar branches: scalars broadcast to matrix shape.
+[Test]
+void Ternary_MatrixCond_ScalarBranches()
+{
+    bool2x2 cond = bool2x2(true, false, true, false);
+    float2x2 r = cond ? 5.0 : -1.0;
+    ASSERT(r[0][0] == 5.0 && r[0][1] == -1.0);
+    ASSERT(r[1][0] == 5.0 && r[1][1] == -1.0);
+}
+
+// Scalar condition with matrix true branch and scalar false branch (broadcast).
+[Test]
+void Ternary_ScalarCond_MatrixAndScalarBranches()
+{
+    float2x2 m = float2x2(1, 2, 3, 4);
+    float2x2 r1 = true ? m : 0.0;    // false branch broadcast to zero matrix
+    ASSERT(r1[0][0] == 1 && r1[0][1] == 2);
+    ASSERT(r1[1][0] == 3 && r1[1][1] == 4);
+
+    float2x2 r2 = false ? m : 7.0;   // false branch broadcast: 2x2 of 7s
+    ASSERT(r2[0][0] == 7 && r2[0][1] == 7);
+    ASSERT(r2[1][0] == 7 && r2[1][1] == 7);
+}
+
+// Matrix condition with mixed matrix / scalar branches.
+[Test]
+void Ternary_MatrixCond_MatrixAndScalarBranches()
+{
+    bool2x2 cond = bool2x2(true, false, true, false);
+    float2x2 m = float2x2(1, 2, 3, 4);
+    // True branch: matrix; False branch: scalar broadcast to matrix
+    float2x2 r = cond ? m : 99.0;
+    ASSERT(r[0][0] == 1 && r[0][1] == 99);
+    ASSERT(r[1][0] == 3 && r[1][1] == 99);
+}
+
+// Non-bool condition with vector branches: cond bits get coerced to bool per-component.
+[Test]
+void Ternary_NonBoolVectorCond_VectorBranches()
+{
+    int4 cond = int4(5, 0, -2, 0);   // nonzero is truthy
+    int4 a = int4(1, 2, 3, 4);
+    int4 b = int4(10, 20, 30, 40);
+    int4 r = cond ? a : b;
+    ASSERT(r.x == 1 && r.y == 20 && r.z == 3 && r.w == 40);
 }
 
 // ============================================================================
