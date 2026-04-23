@@ -267,15 +267,15 @@ namespace HLSL
                 switch (type)
                 {
                     case ScalarTypeNode scalarType:
-                        defaultValue = new ScalarValue(scalarType.Kind, new HLSLRegister<RawValue>(HLSLTypeUtils.GetZeroValue(scalarType.Kind)));
+                        defaultValue = new ScalarValue(scalarType.Kind, new HLSLRegister<RawValue>(default(RawValue)));
                         break;
                     case VectorTypeNode vectorType:
                         defaultValue = new VectorValue(vectorType.Kind,
-                            new HLSLRegister<RawValue[]>(Enumerable.Repeat(HLSLTypeUtils.GetZeroValue(vectorType.Kind), vectorType.Dimension).ToArray()));
+                            new HLSLRegister<RawValue[]>(new RawValue[vectorType.Dimension]));
                         break;
                     case MatrixTypeNode matrixType:
                         defaultValue = new MatrixValue(matrixType.Kind, matrixType.FirstDimension, matrixType.SecondDimension,
-                            new HLSLRegister<RawValue[]>(Enumerable.Repeat(HLSLTypeUtils.GetZeroValue(matrixType.Kind), matrixType.FirstDimension * matrixType.SecondDimension).ToArray()));
+                            new HLSLRegister<RawValue[]>(new RawValue[matrixType.FirstDimension * matrixType.SecondDimension]));
                         break;
                     case QualifiedNamedTypeNode qualifiedNamedTypeNodeType:
                         string fullName = qualifiedNamedTypeNodeType.GetName();
@@ -300,13 +300,13 @@ namespace HLSL
                     case GenericVectorTypeNode genVectorType:
                         int dims = EvaluateScalar(genVectorType.Dimension).AsInt();
                         defaultValue = new VectorValue(genVectorType.Kind,
-                            new HLSLRegister<RawValue[]>(Enumerable.Repeat(HLSLTypeUtils.GetZeroValue(genVectorType.Kind), dims).ToArray()));
+                            new HLSLRegister<RawValue[]>(new RawValue[dims]));
                         break;
                     case GenericMatrixTypeNode genMatrixType:
                         int rows = EvaluateScalar(genMatrixType.FirstDimension).AsInt();
                         int cols = EvaluateScalar(genMatrixType.SecondDimension).AsInt();
                         defaultValue = new MatrixValue(genMatrixType.Kind, rows, cols,
-                           new HLSLRegister<RawValue[]>(Enumerable.Repeat(HLSLTypeUtils.GetZeroValue(genMatrixType.Kind), rows * cols).ToArray()));
+                           new HLSLRegister<RawValue[]>(new RawValue[rows * cols]));
                         break;
                     case PredefinedObjectTypeNode predefinedObjectType:
                         switch (predefinedObjectType.Kind)

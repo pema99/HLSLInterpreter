@@ -62,56 +62,6 @@ namespace HLSL
             return parts.Select(p => (p[0] - '0' - offset) * columns + (p[1] - '0' - offset)).ToArray();
         }
 
-        private static HLSLRegister<T> Map2Registers<T>(HLSLRegister<T> left, HLSLRegister<T> right, Func<T, T, T> mapper)
-        {
-            if (left.IsVarying && right.IsVarying)
-            {
-                T[] mapped = new T[left.VaryingValues.Length];
-                for (int i = 0; i < mapped.Length; i++)
-                    mapped[i] = mapper(left.VaryingValues[i], right.VaryingValues[i]);
-                return new HLSLRegister<T>(mapped);
-            }
-            else if (!left.IsVarying && !right.IsVarying)
-            {
-                return new HLSLRegister<T>(mapper(left.UniformValue, right.UniformValue));
-            }
-            else
-            {
-                throw new InvalidOperationException("Cannot map varying and uniform register together.");
-            }
-        }
-
-        public static NumericValue Map2(NumericValue left, NumericValue right, Func<RawValue, RawValue, RawValue> mapper)
-        {
-            if (left.TensorSize != right.TensorSize)
-                throw new ArgumentException("Sizes of operands must match.");
-            if (left is ScalarValue scalarLeft && right is ScalarValue scalarRight)
-                return new ScalarValue(scalarLeft.Type, Map2Registers(scalarLeft.Value, scalarRight.Value, mapper));
-            if (left is VectorValue vectorLeft && right is VectorValue vectorRight)
-            {
-                var mapped = Map2Registers(vectorLeft.Values, vectorRight.Values, (x, y) =>
-                {
-                    RawValue[] result = new RawValue[vectorLeft.Size];
-                    for (int i = 0; i < result.Length; i++)
-                        result[i] = mapper(x[i], y[i]);
-                    return result;
-                });
-                return new VectorValue(vectorLeft.Type, mapped);
-            }
-            if (left is MatrixValue matrixLeft && right is MatrixValue matrixRight)
-            {
-                var mapped = Map2Registers(matrixLeft.Values, matrixRight.Values, (x, y) =>
-                {
-                    RawValue[] result = new RawValue[x.Length];
-                    for (int i = 0; i < result.Length; i++)
-                        result[i] = mapper(x[i], y[i]);
-                    return result;
-                });
-                return new MatrixValue(matrixLeft.Type, matrixLeft.Rows, matrixLeft.Columns, mapped);
-            }
-            throw new InvalidOperationException();
-        }
-
         public static HLSLValue Scalarize(HLSLValue value, int threadIndex)
         {
             switch (value)
@@ -258,24 +208,28 @@ namespace HLSL
 
         public static ScalarValue[] RegisterToScalars(ScalarType type, HLSLRegister<RawValue[]> scalars)
         {
-            ScalarValue[] scalarValues = new ScalarValue[scalars.Get(0).Length];
+            int count = scalars.Get(0).Length;
+            ScalarValue[] scalarValues = new ScalarValue[count];
             if (scalars.IsUniform)
             {
-                for (int i = 0; i < scalarValues.Length; i++)
+                var uniform = scalars.UniformValue;
+                for (int i = 0; i < count; i++)
                 {
-                    scalarValues[i] = new ScalarValue(type, HLSLValueUtils.MakeScalarSGPR(scalars.UniformValue[i]));
+                    scalarValues[i] = new ScalarValue(type, new HLSLRegister<RawValue>(uniform[i]));
                 }
             }
             else
             {
-                for (int i = 0; i < scalarValues.Length; i++)
+                var varying = scalars.VaryingValues;
+                int threadCount = varying.Length;
+                for (int i = 0; i < count; i++)
                 {
-                    RawValue[] perThreadValues = new RawValue[scalars.Size];
-                    for (int threadIndex = 0; threadIndex < scalars.Size; threadIndex++)
+                    RawValue[] perThreadValues = new RawValue[threadCount];
+                    for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
                     {
-                        perThreadValues[threadIndex] = scalars.VaryingValues[threadIndex][i];
+                        perThreadValues[threadIndex] = varying[threadIndex][i];
                     }
-                    scalarValues[i] = new ScalarValue(type, HLSLValueUtils.MakeScalarVGPR(perThreadValues));
+                    scalarValues[i] = new ScalarValue(type, new HLSLRegister<RawValue>(perThreadValues));
                 }
             }
             return scalarValues;

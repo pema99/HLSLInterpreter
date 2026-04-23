@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using UnityShaderParser.HLSL;
 
 namespace HLSL
@@ -23,7 +24,16 @@ namespace HLSL
             }
         }
 
-        private Stack<Scope> environment = new Stack<Scope>(new[] { new Scope(false) });
+        public HLSLInterpreterContext()
+        {
+            globalScope = new Scope(false);
+            environment = new Stack<Scope>();
+            environment.Push(globalScope);
+        }
+
+        private Stack<Scope> environment;
+        private Scope globalScope;
+
         private Stack<HLSLValue> returnStack = new Stack<HLSLValue>();
         private Stack<string> namespaceStack = new Stack<string>();
 
@@ -86,7 +96,7 @@ namespace HLSL
 
         public Dictionary<string, HLSLValue> GetGlobalVariables()
         {
-            return environment.Last().Variables;
+            return globalScope.Variables;
         }
 
         // Returns a snapshot of all variables visible from the current scope.
@@ -94,7 +104,7 @@ namespace HLSL
         {
             var result = new Dictionary<string, HLSLValue>();
             // Add global scope first (lowest priority)
-            foreach (var kvp in environment.Last().Variables)
+            foreach (var kvp in globalScope.Variables)
             {
                 result[kvp.Key] = kvp.Value;
             }
@@ -112,10 +122,13 @@ namespace HLSL
 
         private bool TryFindVariable(string name, out Dictionary<string, HLSLValue> resolvedScope, out string resolvedName, out HLSLValue resolvedValue, out bool isGlobal)
         {
-            // Search local scopes, stopping at the innermost function boundary.
-            var localScopes = environment.Take(environment.Count - 1);
-            foreach (var scope in localScopes)
+            int count = environment.Count;
+            int idx = 0;
+            foreach (var scope in environment)
             {
+                if (idx == count - 1)
+                    break;
+
                 if (scope.Variables.TryGetValue(name, out var val))
                 {
                     resolvedScope = scope.Variables;
@@ -126,10 +139,11 @@ namespace HLSL
                 }
                 if (scope.IsFunction)
                     break;
+
+                idx++;
             }
 
-            // Not in local scope, try global scope with namespace resolution.
-            var globalVars = environment.Last().Variables;
+            var globalVars = globalScope.Variables;
             foreach (string candidate in CandidateNames(name))
             {
                 if (globalVars.TryGetValue(candidate, out var val))
@@ -229,24 +243,47 @@ namespace HLSL
             return false;
         }
 
-        // Yields candidate qualified names for a given name under the current namespace stack,
+        // Used to signficantly reduce allocs for the common no-namespace case.
+        private readonly string[] singleCandidateHolder = new string[1];
+
+        // Returns candidate qualified names for a given name under the current namespace stack,
         // from most-specific prefix to least-specific (unqualified).
-        private IEnumerable<string> CandidateNames(string name)
+        private string[] CandidateNames(string name)
         {
-            if (namespaceStack.Count > 0)
+            // No namespace case.
+            int nsCount = namespaceStack.Count;
+            if (nsCount == 0)
             {
-                var revNamespace = namespaceStack.Reverse().ToArray();
-                for (int i = 0; i < namespaceStack.Count + 1; i++)
+                singleCandidateHolder[0] = name;
+                return singleCandidateHolder;
+            }
+
+            // Get all parts of the prefix. If we are in A::B::C, we will have { A, B, C }.
+            var result = new string[nsCount + 1];
+            string[] nsArr = new string[nsCount];
+            int i = nsCount - 1;
+            foreach (var ns in namespaceStack)
+            {
+                nsArr[i--] = ns;
+            }
+
+            // Get all prefixes. If we are in A::B::C, we will have { A::B::C::Name, A::B::Name, A::Name, Name }
+            var sb = new StringBuilder();
+            for (int prefixLen = nsCount; prefixLen > 0; prefixLen--)
+            {
+                sb.Clear();
+                for (int p = 0; p < prefixLen; p++)
                 {
-                    int prefixLen = namespaceStack.Count - i;
-                    string prefix = string.Join("::", revNamespace.Take(prefixLen));
-                    yield return string.IsNullOrEmpty(prefix) ? name : $"{prefix}::{name}";
+                    if (p > 0)
+                        sb.Append("::");
+                    sb.Append(nsArr[p]);
                 }
+                sb.Append("::");
+                sb.Append(name);
+                result[nsCount - prefixLen] = sb.ToString();
             }
-            else
-            {
-                yield return name;
-            }
+            result[nsCount] = name;
+            return result;
         }
 
         public FunctionDefinitionNode GetFunction(HLSLExpressionEvaluator evaluator, string name, HLSLValue[] args)
@@ -325,19 +362,24 @@ namespace HLSL
         private bool TryFindTypeAlias(string name, out TypeNode resolvedType)
         {
             // Search from innermost scope outward, stopping at function boundaries for local scopes.
-            var localScopes = environment.Take(environment.Count - 1);
-            foreach (var scope in localScopes)
+            int count = environment.Count;
+            int idx = 0;
+            foreach (var scope in environment)
             {
+                if (idx == count - 1)
+                    break;
+
                 if (scope.TypeAliases.TryGetValue(name, out resolvedType))
                     return true;
                 if (scope.IsFunction)
                     break;
+
+                idx++;
             }
             // Fall through to global scope with namespace resolution.
-            var globalAliases = environment.Last().TypeAliases;
             foreach (string candidate in CandidateNames(name))
             {
-                if (globalAliases.TryGetValue(candidate, out resolvedType))
+                if (globalScope.TypeAliases.TryGetValue(candidate, out resolvedType))
                     return true;
             }
             resolvedType = null;

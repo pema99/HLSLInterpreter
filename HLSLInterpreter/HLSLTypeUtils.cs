@@ -11,34 +11,7 @@ namespace HLSL
     {
         public static RawValue GetZeroValue(ScalarType type)
         {
-            switch (type)
-            {
-                case ScalarType.Void:
-                    return default;
-                case ScalarType.Bool:
-                    return default(bool);
-                case ScalarType.Int:
-                case ScalarType.Min16Int:
-                case ScalarType.Min12Int:
-                    return default(int);
-                case ScalarType.Uint:
-                case ScalarType.Min16Uint:
-                case ScalarType.Min12Uint:
-                    return default(uint);
-                case ScalarType.Half:
-                case ScalarType.Float:
-                case ScalarType.Min16Float:
-                case ScalarType.Min10Float:
-                case ScalarType.UNormFloat:
-                case ScalarType.SNormFloat:
-                    return default(float);
-                case ScalarType.Double:
-                    return default(double);
-                case ScalarType.Char:
-                    return default(char);
-                default:
-                    throw new InvalidOperationException();
-            }
+            return default;
         }
 
         public static RawValue GetOneValue(ScalarType type)
@@ -75,7 +48,7 @@ namespace HLSL
 
         public static NumericValue GetZeroValue(NumericValue val)
         {
-            RawValue zero = GetZeroValue(val.Type);
+            RawValue zero = default;
             return val.Map(x => zero);
         }
 
@@ -446,31 +419,34 @@ namespace HLSL
             {
                 int leftThreadCount = leftNum.ThreadCount;
                 int rightThreadCount = rightNum.ThreadCount;
+
+                // Fast path
+                if (leftNum.Type == rightNum.Type &&
+                    leftNum.TensorSize == rightNum.TensorSize &&
+                    leftThreadCount == rightThreadCount &&
+                    leftNum.GetType() == rightNum.GetType())
+                    return rightNum;
+
+                // Thread counts
                 if (leftThreadCount < rightThreadCount)
                     leftNum = leftNum.Vectorize(rightThreadCount);
                 else if (rightThreadCount < leftThreadCount)
                     rightNum = rightNum.Vectorize(leftThreadCount);
 
-                ScalarType type = leftNum.Type;
-
-                bool needMatrix = leftNum is MatrixValue;
-                bool needVector = leftNum is VectorValue;
-
-                if (needMatrix)
+                // Shapes
+                if (leftNum is MatrixValue)
                 {
                     (int newRows, int newColumns) = leftNum.TensorSize;
-                    var resizedRight = rightNum.BroadcastToMatrix(newRows, newColumns);
-                    return resizedRight.Cast(type);
+                    rightNum = rightNum.BroadcastToMatrix(newRows, newColumns);
                 }
-
-                if (needVector)
+                else if (leftNum is VectorValue)
                 {
                     int newSize = leftNum.TensorSize.rows;
-                    var resizedRight = rightNum.BroadcastToVector(newSize);
-                    return resizedRight.Cast(type);
+                    rightNum = rightNum.BroadcastToVector(newSize);
                 }
 
-                return rightNum.Cast(type);
+                // Type
+                return rightNum.Cast(leftNum.Type);
             }
 
             return right;

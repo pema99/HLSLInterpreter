@@ -892,7 +892,7 @@ namespace HLSL
             x = ToFloatLike(x);
             y = ToFloatLike(y);
             (x, y) = HLSLTypeUtils.Promote(x, y, false);
-            return HLSLValueUtils.Map2(x, y, (fx, fy) => MathF.Exp(fy.Float * MathF.Log(fx.Float)));
+            return HLSLOperators.BinOp(x, y, ScalarType.Float, (_, fx, fy) => MathF.Exp(fy.Float * MathF.Log(fx.Float)));
         }
 
         public static NumericValue Radians(NumericValue x)
@@ -1001,16 +1001,36 @@ namespace HLSL
             (x, y) = HLSLTypeUtils.Promote(x, y, false);
             VectorValue vx = CastToVector(x);
             VectorValue vy = CastToVector(y);
+            ScalarType t = vx.Type;
+            int size = vx.Size;
 
-            var scalarsX = vx.ToScalars();
-            var scalarsY = vy.ToScalars();
-
-            var accum = scalarsX[0] - scalarsX[0];
-            for (int i = 0; i < scalarsX.Length; i++)
+            // Uniform case
+            if (vx.Values.IsUniform)
             {
-                accum += scalarsX[i] * scalarsY[i];
+                var ax = vx.Values.UniformValue;
+                var ay = vy.Values.UniformValue;
+                RawValue acc = default;
+                for (int i = 0; i < size; i++)
+                {
+                    acc = HLSLOperators.Add(t, acc, HLSLOperators.Mul(t, ax[i], ay[i]));
+                }
+                return new ScalarValue(t, new HLSLRegister<RawValue>(acc));
             }
-            return accum;
+
+            int threadCount = vx.ThreadCount;
+            RawValue[] result = new RawValue[threadCount];
+            for (int thread = 0; thread < threadCount; thread++)
+            {
+                var ax = vx.Values.Get(thread);
+                var ay = vy.Values.Get(thread);
+                RawValue acc = default;
+                for (int i = 0; i < size; i++)
+                {
+                    acc = HLSLOperators.Add(t, acc, HLSLOperators.Mul(t, ax[i], ay[i]));
+                }
+                result[thread] = acc;
+            }
+            return new ScalarValue(t, new HLSLRegister<RawValue>(result));
         }
 
         public static NumericValue Dst(NumericValue src0, NumericValue src1)
@@ -1033,8 +1053,7 @@ namespace HLSL
         public static NumericValue Min(NumericValue x, NumericValue y)
         {
             (x, y) = HLSLTypeUtils.Promote(x, y, false);
-            ScalarType t = x.Type;
-            return HLSLValueUtils.Map2(x, y, (l, r) => Min(t, l, r));
+            return HLSLOperators.BinOp(x, y, x.Type, Min);
         }
 
         public static NumericValue Msad4(NumericValue reference, NumericValue source, NumericValue accum)
@@ -1169,8 +1188,7 @@ namespace HLSL
         public static NumericValue Max(NumericValue x, NumericValue y)
         {
             (x, y) = HLSLTypeUtils.Promote(x, y, false);
-            ScalarType t = x.Type;
-            return HLSLValueUtils.Map2(x, y, (l, r) => Max(t, l, r));
+            return HLSLOperators.BinOp(x, y, x.Type, Max);
         }
 
         public static NumericValue Clamp(NumericValue x, NumericValue min, NumericValue max)

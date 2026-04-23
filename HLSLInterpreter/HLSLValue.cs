@@ -72,7 +72,12 @@ namespace HLSL
             if (IsVarying)
             {
                 T[] input = VaryingValues;
-                return new HLSLRegister<U>(input.Select(mapper).ToArray());
+                U[] output = new U[input.Length];
+                for (int i = 0; i < input.Length; i++)
+                {
+                    output[i] = mapper(input[i]);
+                }
+                return new HLSLRegister<U>(output);
             }
             else
             {
@@ -85,7 +90,12 @@ namespace HLSL
             if (IsVarying)
             {
                 T[] input = VaryingValues;
-                return new HLSLRegister<U>(input.Select(mapper).ToArray());
+                U[] output = new U[input.Length];
+                for (int i = 0; i < input.Length; i++)
+                {
+                    output[i] = mapper(input[i], i);
+                }
+                return new HLSLRegister<U>(output);
             }
             else
             {
@@ -120,7 +130,15 @@ namespace HLSL
             if (IsVarying)
                 return new HLSLRegister<T>(VaryingValues.ToArray());
             else
-                return new HLSLRegister<T>(Enumerable.Repeat(UniformValue, threadCount).ToArray());
+            {
+                T[] arr = new T[threadCount];
+                T v = UniformValue;
+                for (int i = 0; i < threadCount; i++)
+                {
+                    arr[i] = v;
+                }
+                return new HLSLRegister<T>(arr);
+            }
         }
 
         public HLSLRegister<T> Scalarize(int threadIndex)
@@ -335,6 +353,9 @@ namespace HLSL
 
         public override NumericValue Cast(ScalarType type)
         {
+            if (Type == type)
+                return this;
+
             return new ScalarValue(type, Value.Map(x => HLSLTypeUtils.CastNumeric(type, Type, x)));
         }
 
@@ -455,29 +476,48 @@ namespace HLSL
 
         public NumericValue Swizzle(string swizzle)
         {
-            RawValue[][] perThreadSwizzle = new RawValue[ThreadCount][];
-            for (int threadIndex = 0; threadIndex < perThreadSwizzle.Length; threadIndex++)
+            // Fast path - SGPR
+            if (Values.IsUniform)
             {
-                perThreadSwizzle[threadIndex] = new RawValue[swizzle.Length];
+                var src = Values.UniformValue;
+                if (swizzle.Length == 1)
+                {
+                    return new ScalarValue(Type, new HLSLRegister<RawValue>(src[HLSLValueUtils.VectorSwizzleCharToIndex(swizzle[0])]));
+                }
+                RawValue[] result = new RawValue[swizzle.Length];
                 for (int component = 0; component < swizzle.Length; component++)
                 {
-                    perThreadSwizzle[threadIndex][component] = Values.Get(threadIndex)[HLSLValueUtils.VectorSwizzleCharToIndex(swizzle[component])];
+                    result[component] = src[HLSLValueUtils.VectorSwizzleCharToIndex(swizzle[component])];
                 }
+                return new VectorValue(Type, new HLSLRegister<RawValue[]>(result));
             }
-            if (ThreadCount == 1)
+
+            // Semi fast path, single char swizzle
+            int threadCount = Values.VaryingValues.Length;
+            if (swizzle.Length == 1)
             {
-                if (swizzle.Length == 1)
-                    return new ScalarValue(Type, HLSLValueUtils.MakeScalarSGPR(perThreadSwizzle[0][0]));
-                else
-                    return new VectorValue(Type, HLSLValueUtils.MakeVectorSGPR(perThreadSwizzle[0]));
+                int idx = HLSLValueUtils.VectorSwizzleCharToIndex(swizzle[0]);
+                RawValue[] perThread = new RawValue[threadCount];
+                for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
+                {
+                    perThread[threadIndex] = Values.VaryingValues[threadIndex][idx];
+                }
+                return new ScalarValue(Type, new HLSLRegister<RawValue>(perThread));
             }
-            else
+
+            // Slow path, per thread multi-char swizzle
+            RawValue[][] perThreadSwizzle = new RawValue[threadCount][];
+            for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
             {
-                if (swizzle.Length == 1)
-                    return new ScalarValue(Type, HLSLValueUtils.MakeScalarVGPR(perThreadSwizzle.Select(x => x[0])));
-                else
-                    return new VectorValue(Type, HLSLValueUtils.MakeVectorVGPR(perThreadSwizzle));
+                var src = Values.VaryingValues[threadIndex];
+                var dst = new RawValue[swizzle.Length];
+                for (int component = 0; component < swizzle.Length; component++)
+                {
+                    dst[component] = src[HLSLValueUtils.VectorSwizzleCharToIndex(swizzle[component])];
+                }
+                perThreadSwizzle[threadIndex] = dst;
             }
+            return new VectorValue(Type, new HLSLRegister<RawValue[]>(perThreadSwizzle));
         }
 
         public VectorValue SwizzleAssign(string swizzle, NumericValue value)
@@ -545,7 +585,7 @@ namespace HLSL
                     RawValue[] res = new RawValue[size];
                     Array.Copy(x, res, x.Length);
                     for (int i = 0; i < sizeDiff; i++)
-                        res[x.Length + i] = HLSLTypeUtils.GetZeroValue(Type);
+                        res[x.Length + i] = default;
                     return res;
                 }
                 else if (size < x.Length) // Truncation
@@ -561,6 +601,9 @@ namespace HLSL
 
         public override NumericValue Cast(ScalarType type)
         {
+            if (Type == type)
+                return this;
+
             return new VectorValue(type, Values.Map(x =>
             {
                 RawValue[] res = new RawValue[x.Length];
@@ -763,7 +806,7 @@ namespace HLSL
                 }
                 return FromScalars(rows, columns, newScalars);
             }
-            return (MatrixValue)Copy();
+            return this;
         }
 
         public override VectorValue BroadcastToVector(int size)
@@ -773,6 +816,9 @@ namespace HLSL
 
         public override NumericValue Cast(ScalarType type)
         {
+            if (Type == type)
+                return this;
+
             return new MatrixValue(type, Rows, Columns, Values.Map(x =>
             {
                 RawValue[] res = new RawValue[x.Length];
