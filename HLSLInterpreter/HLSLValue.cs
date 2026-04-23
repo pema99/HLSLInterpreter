@@ -548,7 +548,7 @@ namespace HLSL
                     RawValue[] res = new RawValue[size];
                     Array.Copy(x, res, x.Length);
                     for (int i = 0; i < sizeDiff; i++)
-                        res[x.Length + i] = HLSLTypeUtils.GetZeroValue(Type);
+                        res[x.Length + i] = default;
                     return res;
                 }
                 else if (size < x.Length) // Truncation
@@ -769,7 +769,7 @@ namespace HLSL
                 }
                 return FromScalars(rows, columns, newScalars);
             }
-            return (MatrixValue)Copy();
+            return this;
         }
 
         public override VectorValue BroadcastToVector(int size)

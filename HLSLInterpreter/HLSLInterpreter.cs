@@ -267,7 +267,7 @@ namespace HLSL
                 switch (type)
                 {
                     case ScalarTypeNode scalarType:
-                        defaultValue = new ScalarValue(scalarType.Kind, new HLSLRegister<RawValue>(HLSLTypeUtils.GetZeroValue(scalarType.Kind)));
+                        defaultValue = new ScalarValue(scalarType.Kind, new HLSLRegister<RawValue>(default(RawValue)));
                         break;
                     case VectorTypeNode vectorType:
                         defaultValue = new VectorValue(vectorType.Kind,
