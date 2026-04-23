@@ -1001,16 +1001,36 @@ namespace HLSL
             (x, y) = HLSLTypeUtils.Promote(x, y, false);
             VectorValue vx = CastToVector(x);
             VectorValue vy = CastToVector(y);
+            ScalarType t = vx.Type;
+            int size = vx.Size;
 
-            var scalarsX = vx.ToScalars();
-            var scalarsY = vy.ToScalars();
-
-            var accum = scalarsX[0] - scalarsX[0];
-            for (int i = 0; i < scalarsX.Length; i++)
+            // Uniform case
+            if (vx.Values.IsUniform)
             {
-                accum += scalarsX[i] * scalarsY[i];
+                var ax = vx.Values.UniformValue;
+                var ay = vy.Values.UniformValue;
+                RawValue acc = default;
+                for (int i = 0; i < size; i++)
+                {
+                    acc = HLSLOperators.Add(t, acc, HLSLOperators.Mul(t, ax[i], ay[i]));
+                }
+                return new ScalarValue(t, new HLSLRegister<RawValue>(acc));
             }
-            return accum;
+
+            int threadCount = vx.ThreadCount;
+            RawValue[] result = new RawValue[threadCount];
+            for (int thread = 0; thread < threadCount; thread++)
+            {
+                var ax = vx.Values.Get(thread);
+                var ay = vy.Values.Get(thread);
+                RawValue acc = default;
+                for (int i = 0; i < size; i++)
+            {
+                    acc = HLSLOperators.Add(t, acc, HLSLOperators.Mul(t, ax[i], ay[i]));
+                }
+                result[thread] = acc;
+            }
+            return new ScalarValue(t, new HLSLRegister<RawValue>(result));
         }
 
         public static NumericValue Dst(NumericValue src0, NumericValue src1)

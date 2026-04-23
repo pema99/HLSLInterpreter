@@ -6,7 +6,7 @@ namespace HLSL
     public static class HLSLOperators
     {
         #region Helpers for binary and unary operators
-        private static RawValue Add(ScalarType type, RawValue left, RawValue right)
+        public static RawValue Add(ScalarType type, RawValue left, RawValue right)
         {
             if (type == ScalarType.Float) return left.Float + right.Float;
             if (HLSLTypeUtils.IsInt(type)) return left.Int + right.Int;
@@ -17,7 +17,7 @@ namespace HLSL
             throw new InvalidOperationException();
         }
 
-        private static RawValue Mul(ScalarType type, RawValue left, RawValue right)
+        public static RawValue Mul(ScalarType type, RawValue left, RawValue right)
         {
             if (type == ScalarType.Float) return left.Float * right.Float;
             if (HLSLTypeUtils.IsInt(type)) return left.Int * right.Int;
