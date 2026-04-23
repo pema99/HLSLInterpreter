@@ -23,7 +23,16 @@ namespace HLSL
             }
         }
 
-        private Stack<Scope> environment = new Stack<Scope>(new[] { new Scope(false) });
+        public HLSLInterpreterContext()
+        {
+            globalScope = new Scope(false);
+            environment = new Stack<Scope>();
+            environment.Push(globalScope);
+        }
+
+        private Stack<Scope> environment;
+        private Scope globalScope;
+
         private Stack<HLSLValue> returnStack = new Stack<HLSLValue>();
         private Stack<string> namespaceStack = new Stack<string>();
 
@@ -86,7 +95,7 @@ namespace HLSL
 
         public Dictionary<string, HLSLValue> GetGlobalVariables()
         {
-            return environment.Last().Variables;
+            return globalScope.Variables;
         }
 
         // Returns a snapshot of all variables visible from the current scope.
@@ -94,7 +103,7 @@ namespace HLSL
         {
             var result = new Dictionary<string, HLSLValue>();
             // Add global scope first (lowest priority)
-            foreach (var kvp in environment.Last().Variables)
+            foreach (var kvp in globalScope.Variables)
             {
                 result[kvp.Key] = kvp.Value;
             }
@@ -112,10 +121,13 @@ namespace HLSL
 
         private bool TryFindVariable(string name, out Dictionary<string, HLSLValue> resolvedScope, out string resolvedName, out HLSLValue resolvedValue, out bool isGlobal)
         {
-            // Search local scopes, stopping at the innermost function boundary.
-            var localScopes = environment.Take(environment.Count - 1);
-            foreach (var scope in localScopes)
+            int count = environment.Count;
+            int idx = 0;
+            foreach (var scope in environment)
             {
+                if (idx == count - 1)
+                    break;
+
                 if (scope.Variables.TryGetValue(name, out var val))
                 {
                     resolvedScope = scope.Variables;
@@ -126,10 +138,11 @@ namespace HLSL
                 }
                 if (scope.IsFunction)
                     break;
+
+                idx++;
             }
 
-            // Not in local scope, try global scope with namespace resolution.
-            var globalVars = environment.Last().Variables;
+            var globalVars = globalScope.Variables;
             foreach (string candidate in CandidateNames(name))
             {
                 if (globalVars.TryGetValue(candidate, out var val))
@@ -325,19 +338,24 @@ namespace HLSL
         private bool TryFindTypeAlias(string name, out TypeNode resolvedType)
         {
             // Search from innermost scope outward, stopping at function boundaries for local scopes.
-            var localScopes = environment.Take(environment.Count - 1);
-            foreach (var scope in localScopes)
+            int count = environment.Count;
+            int idx = 0;
+            foreach (var scope in environment)
             {
+                if (idx == count - 1)
+                    break;
+
                 if (scope.TypeAliases.TryGetValue(name, out resolvedType))
                     return true;
                 if (scope.IsFunction)
                     break;
+
+                idx++;
             }
             // Fall through to global scope with namespace resolution.
-            var globalAliases = environment.Last().TypeAliases;
             foreach (string candidate in CandidateNames(name))
             {
-                if (globalAliases.TryGetValue(candidate, out resolvedType))
+                if (globalScope.TypeAliases.TryGetValue(candidate, out resolvedType))
                     return true;
             }
             resolvedType = null;
