@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using UnityShaderParser.HLSL;
 
 namespace HLSL
@@ -242,24 +243,47 @@ namespace HLSL
             return false;
         }
 
-        // Yields candidate qualified names for a given name under the current namespace stack,
+        // Used to signficantly reduce allocs for the common no-namespace case.
+        private readonly string[] singleCandidateHolder = new string[1];
+
+        // Returns candidate qualified names for a given name under the current namespace stack,
         // from most-specific prefix to least-specific (unqualified).
-        private IEnumerable<string> CandidateNames(string name)
+        private string[] CandidateNames(string name)
         {
-            if (namespaceStack.Count > 0)
+            // No namespace case.
+            int nsCount = namespaceStack.Count;
+            if (nsCount == 0)
             {
-                var revNamespace = namespaceStack.Reverse().ToArray();
-                for (int i = 0; i < namespaceStack.Count + 1; i++)
+                singleCandidateHolder[0] = name;
+                return singleCandidateHolder;
+            }
+
+            // Get all parts of the prefix. If we are in A::B::C, we will have { A, B, C }.
+            var result = new string[nsCount + 1];
+            string[] nsArr = new string[nsCount];
+            int i = nsCount - 1;
+            foreach (var ns in namespaceStack)
+            {
+                nsArr[i--] = ns;
+            }
+
+            // Get all prefixes. If we are in A::B::C, we will have { A::B::C::Name, A::B::Name, A::Name, Name }
+            var sb = new StringBuilder();
+            for (int prefixLen = nsCount; prefixLen > 0; prefixLen--)
+            {
+                sb.Clear();
+                for (int p = 0; p < prefixLen; p++)
                 {
-                    int prefixLen = namespaceStack.Count - i;
-                    string prefix = string.Join("::", revNamespace.Take(prefixLen));
-                    yield return string.IsNullOrEmpty(prefix) ? name : $"{prefix}::{name}";
+                    if (p > 0)
+                        sb.Append("::");
+                    sb.Append(nsArr[p]);
                 }
+                sb.Append("::");
+                sb.Append(name);
+                result[nsCount - prefixLen] = sb.ToString();
             }
-            else
-            {
-                yield return name;
-            }
+            result[nsCount] = name;
+            return result;
         }
 
         public FunctionDefinitionNode GetFunction(HLSLExpressionEvaluator evaluator, string name, HLSLValue[] args)
