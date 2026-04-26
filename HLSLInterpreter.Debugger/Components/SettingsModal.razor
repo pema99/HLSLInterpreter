@@ -1,0 +1,63 @@
+@inherits StateAwareComponent
+
+@if (IsOpen)
+{
+    <div class="modal-overlay" @onclick="Close">
+        <div class="modal-dialog" @onclick:stopPropagation="true">
+            <div class="modal-header">Settings</div>
+            <div class="modal-body">
+                <div class="settings-row">
+                    <label class="settings-label">Entry point</label>
+                    <input class="settings-text-input" type="text"
+                           value="@State.EntryPoint"
+                           @oninput="@(e => State.EntryPoint = e.Value?.ToString() ?? "")"
+                           disabled="@IsLocked" title="Function name to call" />
+                </div>
+                <div class="settings-row">
+                    <label class="settings-label">Group offset</label>
+                    <div class="warp-control">
+                        <input class="warp-input" type="number" min="0"
+                               value="@State.GroupOffsetX"
+                               @oninput="@(e => SetInt(e, v => State.GroupOffsetX = v))"
+                               disabled="@IsLocked" title="Group X" />
+                        <span class="warp-sep">×</span>
+                        <input class="warp-input" type="number" min="0"
+                               value="@State.GroupOffsetY"
+                               @oninput="@(e => SetInt(e, v => State.GroupOffsetY = v))"
+                               disabled="@IsLocked" title="Group Y" />
+                    </div>
+                </div>
+                <div class="settings-row">
+                    <label class="settings-label">Warp size</label>
+                    <div class="warp-control">
+                        <input class="warp-input" type="number" min="1" max="32"
+                               value="@State.WarpX"
+                               @oninput="@(e => SetInt(e, v => State.WarpX = v))"
+                               disabled="@IsLocked" title="Warp X" />
+                        <span class="warp-sep">×</span>
+                        <input class="warp-input" type="number" min="1" max="32"
+                               value="@State.WarpY"
+                               @oninput="@(e => SetInt(e, v => State.WarpY = v))"
+                               disabled="@IsLocked" title="Warp Y" />
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-modal-save" @onclick="Close">Close</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public bool IsLocked { get; set; }
+
+    private Task Close() => IsOpenChanged.InvokeAsync(false);
+
+    private static void SetInt(ChangeEventArgs e, Action<int> setter)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var v)) setter(v);
+    }
+}

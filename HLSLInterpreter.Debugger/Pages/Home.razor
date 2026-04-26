@@ -3,14 +3,18 @@
 @inject NavigationManager Nav
 @inject PermalinkBaseUrl PermalinkBase
 @inject InitialCodeOverride InitialCode
-@inject TabbedEditor TabbedEditorConfig
-@inject FileDialogService FileDialogs
+@inject DebuggerAppState State
+@inject RunController RunCtl
+@inject DebugController DebugCtl
 @using HLSL
 @using UnityShaderParser.HLSL
 @using UnityShaderParser.Common
-@using System.Globalization
-@using System.IO.Compression
-@using System.Text
+@using HLSLInterpreter.Debugger.Core
+@* Razor's generated cast for `@ref` on EditorPanel writes the bare path
+   `HLSLInterpreter.Debugger.Components.EditorPanel`. With `@using HLSL`
+   in scope, `HLSLInterpreter` resolves to the parser's class instead of
+   the namespace. This alias forces the namespace lookup. *@
+@using HLSLInterpreter = global::HLSLInterpreter
 @implements IAsyncDisposable
 
 <div class="app-shell">
@@ -24,35 +28,36 @@
         </div>
 
         <div class="topbar-center">
-            @if (isDebugging)
+            @if (DebugCtl.IsDebugging)
             {
                 <div class="debug-controls">
-                    <button class="btn-dbg btn-dbg-continue" data-dbg="continue" @onclick="ContinueToBreakpoint" disabled="@(debugStepIndex >= debugTrace.Count - 1)" title="Continue (F5)"><i class="mdi mdi-play-outline"></i></button>
-                    <button class="btn-dbg" data-dbg="step-over" @onclick="StepOver" disabled="@(debugStepIndex >= debugTrace.Count - 1)" title="Step over (F10)"><i class="mdi mdi-debug-step-over"></i></button>
-                    <button class="btn-dbg" data-dbg="step-in" @onclick="StepForward" disabled="@(debugStepIndex >= debugTrace.Count - 1)" title="Step in (F11)"><i class="mdi mdi-debug-step-into icon-step-into"></i></button>
-                    <button class="btn-dbg" data-dbg="step-out" @onclick="StepOut" disabled="@(debugStepIndex >= debugTrace.Count - 1)" title="Step out (F12)"><i class="mdi mdi-debug-step-out icon-step-out"></i></button>
+                    <button class="btn-dbg btn-dbg-continue" data-dbg="continue" @onclick="ContinueToBreakpoint" disabled="@(DebugCtl.CurrentSession is null || DebugCtl.CurrentSession.StepIndex >= DebugCtl.CurrentSession.Trace.Count - 1)" title="Continue (F5)"><i class="mdi mdi-play-outline"></i></button>
+                    <button class="btn-dbg" data-dbg="step-over" @onclick="StepOver" disabled="@(DebugCtl.CurrentSession is null || DebugCtl.CurrentSession.StepIndex >= DebugCtl.CurrentSession.Trace.Count - 1)" title="Step over (F10)"><i class="mdi mdi-debug-step-over"></i></button>
+                    <button class="btn-dbg" data-dbg="step-in" @onclick="StepForward" disabled="@(DebugCtl.CurrentSession is null || DebugCtl.CurrentSession.StepIndex >= DebugCtl.CurrentSession.Trace.Count - 1)" title="Step in (F11)"><i class="mdi mdi-debug-step-into icon-step-into"></i></button>
+                    <button class="btn-dbg" data-dbg="step-out" @onclick="StepOut" disabled="@(DebugCtl.CurrentSession is null || DebugCtl.CurrentSession.StepIndex >= DebugCtl.CurrentSession.Trace.Count - 1)" title="Step out (F12)"><i class="mdi mdi-debug-step-out icon-step-out"></i></button>
                     <div class="dbg-controls-sep"></div>
-                    <button class="btn-dbg btn-dbg-continue-back" data-dbg="continue-back" @onclick="ContinueToBreakpointBack" disabled="@(debugStepIndex <= 0)" title="Continue back (Shift+F5)"><i class="mdi mdi-play-outline btn-icon-mirror"></i></button>
-                    <button class="btn-dbg" data-dbg="step-over-back" @onclick="StepOverBack" disabled="@(debugStepIndex <= 0)" title="Step over back (Shift+F10)"><i class="mdi mdi-debug-step-over btn-icon-mirror"></i></button>
-                    <button class="btn-dbg" data-dbg="step-in-back" @onclick="StepBack" disabled="@(debugStepIndex <= 0)" title="Step in back (Shift+F11)"><i class="mdi mdi-debug-step-into icon-step-into-back"></i></button>
-                    <button class="btn-dbg" data-dbg="step-out-back" @onclick="StepOutBack" disabled="@(debugStepIndex <= 0)" title="Step out back (Shift+F12)"><i class="mdi mdi-debug-step-out icon-step-out-back"></i></button>
+                    <button class="btn-dbg btn-dbg-continue-back" data-dbg="continue-back" @onclick="ContinueToBreakpointBack" disabled="@(DebugCtl.CurrentSession is null || DebugCtl.CurrentSession.StepIndex <= 0)" title="Continue back (Shift+F5)"><i class="mdi mdi-play-outline btn-icon-mirror"></i></button>
+                    <button class="btn-dbg" data-dbg="step-over-back" @onclick="StepOverBack" disabled="@(DebugCtl.CurrentSession is null || DebugCtl.CurrentSession.StepIndex <= 0)" title="Step over back (Shift+F10)"><i class="mdi mdi-debug-step-over btn-icon-mirror"></i></button>
+                    <button class="btn-dbg" data-dbg="step-in-back" @onclick="StepBack" disabled="@(DebugCtl.CurrentSession is null || DebugCtl.CurrentSession.StepIndex <= 0)" title="Step in back (Shift+F11)"><i class="mdi mdi-debug-step-into icon-step-into-back"></i></button>
+                    <button class="btn-dbg" data-dbg="step-out-back" @onclick="StepOutBack" disabled="@(DebugCtl.CurrentSession is null || DebugCtl.CurrentSession.StepIndex <= 0)" title="Step out back (Shift+F12)"><i class="mdi mdi-debug-step-out icon-step-out-back"></i></button>
                 </div>
             }
         </div>
 
         <div class="topbar-right">
-            @if (isDebugging)
+            @if (DebugCtl.IsDebugging)
             {
                 <div class="thread-selector">
                     <label class="warp-label">Thread</label>
-                    <input class="warp-input" type="number" min="0" max="@(warpX * warpY - 1)"
-                           @bind="inspectedThread" @bind:event="oninput" />
-                    <span class="warp-sep">(@(inspectedThread % warpX), @(inspectedThread / warpX))</span>
+                    <input class="warp-input" type="number" min="0" max="@(State.WarpX * State.WarpY - 1)"
+                           value="@State.InspectedThread"
+                           @oninput="@(e => { if (int.TryParse(e.Value?.ToString(), out var v)) State.InspectedThread = v; })" />
+                    <span class="warp-sep">(@(State.InspectedThread % State.WarpX), @(State.InspectedThread / State.WarpX))</span>
                 </div>
             }
-            <button class="btn-settings" @onclick="OpenSettings" title="Settings">&#x2699;&#xFE0F; Settings</button>
-            <button class="btn-run" @onclick="Run" disabled="@(isRunning || isDebugging)">
-                @if (isRunning)
+            <button class="btn-settings" @onclick="@(() => showSettings = true)" title="Settings">&#x2699;&#xFE0F; Settings</button>
+            <button class="btn-run" @onclick="Run" disabled="@(RunCtl.IsRunning || DebugCtl.IsDebugging)">
+                @if (RunCtl.IsRunning)
                 {
                     <span class="spinner"></span>
                     <span>Running...</span>
@@ -62,418 +67,63 @@
                     <span>&#9654; Run</span>
                 }
             </button>
-            @if (isDebugging)
+            @if (DebugCtl.IsDebugging)
             {
                 <button class="btn-stop" @onclick="ExitDebug" title="Stop debugging">&#x25A0; Stop</button>
             }
             else
             {
-                <button class="btn-debug-start" @onclick="StartDebug" disabled="@isRunning" title="Debug (record execution trace)">&#x1F41E; Debug</button>
+                <button class="btn-debug-start" @onclick="StartDebug" disabled="@RunCtl.IsRunning" title="Debug (record execution trace)">&#x1F41E; Debug</button>
             }
         </div>
     </header>
 
     <div class="main-split">
-        <div class="editor-panel">
-            <div class="panel-header">
-                @if (TabbedEditorConfig.Enabled)
-                {
-                    <div class="editor-toolbar-group">
-                        <button class="btn-editor-toolbar" @onclick="OpenFileDialog" title="Open file">Open</button>
-                        <button class="btn-editor-toolbar" @onclick="SaveFileDialog" title="Save">Save</button>
-                        <button class="btn-editor-toolbar" @onclick="SaveFileAsDialog" title="Save As">Save As</button>
-                    </div>
-                }
-                else
-                {
-                    <span>Input</span>
-                }
-                <select class="footer-select" title="Font size" @onchange="OnFontSizeChanged">
-                    @foreach (var size in fontSizes)
-                    {
-                        <option value="@size" selected="@(size == fontSize)">@size</option>
-                    }
-                </select>
-            </div>
-            @if (TabbedEditorConfig.Enabled)
-            {
-                <div class="editor-tabs">
-                    @for (int i = 0; i < editorTabs.Count; i++)
-                    {
-                        var idx = i;
-                        <div class="editor-tab @(idx == activeTabIndex ? "active" : "")"
-                             @onclick="() => SwitchTab(idx)">
-                            @editorTabs[idx].Name
-                            <span class="editor-tab-close" @onclick="() => CloseTab(idx)" @onclick:stopPropagation>&#x2715;</span>
-                        </div>
-                    }
-                </div>
-            }
-            <div id="monaco-container" class="editor-container"></div>
-        </div>
+        <EditorPanel @ref="editorPanel"
+                     InitialCode="@initialEditorCode"
+                     InitialCodeName="@(InitialCode.Name ?? "new.hlsl")"
+                     InitialCodePath="@InitialCode.Path"
+                     DotNetRef="@dotNetRef"
+                     OnTabSwitched="@OnEditorTabSwitched" />
 
         <div class="resize-h-handle" title="Drag to resize"></div>
 
-        @{
-            var _dbgStep = (isDebugging && debugStepIndex >= 0 && debugStepIndex < debugTrace.Count)
-                ? debugTrace[debugStepIndex] : null;
-            var _frameIdx = _dbgStep != null
-                ? Math.Clamp(selectedFrame, 0, Math.Max(0, _dbgStep.FrameThreadStates.Length - 1)) : 0;
-            var threadStates = (_dbgStep != null && _frameIdx < _dbgStep.FrameThreadStates.Length)
-                ? _dbgStep.FrameThreadStates[_frameIdx]
-                : Array.Empty<HLSLExecutionState.ThreadState>();
-        }
         <div class="output-panel">
-            @if (isDebugging)
+            @if (DebugCtl.IsDebugging)
             {
-                <!-- Variables -->
-                <div class="debug-section debug-section-vars @(varsCollapsed ? "section-collapsed" : "")">
-                    <div class="panel-header collapsible-header" @onclick="() => varsCollapsed = !varsCollapsed">
-                        <div class="panel-header-left">
-                            <span class="collapse-icon @(varsCollapsed ? "" : "expanded")">&#x203A;</span>
-                            <span>Variables</span>
-                        </div>
-                    </div>
-                    @if (!varsCollapsed)
-                    {
-                        <div class="output-body debug-vars-body">
-                            @if (debugStepIndex >= 0 && debugStepIndex < debugTrace.Count)
-                            {
-                                var step = debugTrace[debugStepIndex];
-                                var localFrameIdx = Math.Clamp(selectedFrame, 0, Math.Max(0, step.FrameVariables.Length - 1));
-                                var locals = localFrameIdx < step.FrameVariables.Length ? step.FrameVariables[localFrameIdx] : null;
-                                var globals = step.GlobalVariables;
+                <VariablesPanel Step="@DebugCtl.CurrentSession?.Current" />
 
-                                bool hasLocals = locals != null && locals.Count > 0;
-                                bool hasGlobals = globals != null && globals.Count > 0;
+                <CallStackPanel Step="@DebugCtl.CurrentSession?.Current"
+                                DebugBottomMode="@debugBottomMode"
+                                DebugBottomModeChanged="@OnDebugBottomModeChanged"
+                                ThreadStates="@CurrentThreadStates"
+                                OnExpand="@(() => needsThreadGridInit = true)" />
 
-                                if (!hasLocals && !hasGlobals)
-                                {
-                                    <div class="hint">No variables in scope.</div>
-                                }
-                                else
-                                {
-                                    <div class="var-list">
-                                        @{
-                                            var rows = new List<VarRow>();
-                                            if (hasLocals)
-                                                foreach (var kvp in locals!)
-                                                    BuildVarRows(rows, kvp.Key, kvp.Value, 0, kvp.Key);
-                                            var globalRows = new List<VarRow>();
-                                            if (hasGlobals)
-                                                foreach (var kvp in globals!)
-                                                    BuildVarRows(globalRows, kvp.Key, kvp.Value, 0, "g:" + kvp.Key);
-                                        }
-                                        @if (hasLocals)
-                                        {
-                                            <div class="var-subsection-header" @onclick="() => localVarsCollapsed = !localVarsCollapsed">
-                                                <span class="collapse-icon @(localVarsCollapsed ? "" : "expanded")">&#x203A;</span>
-                                                <span>Locals</span>
-                                            </div>
-                                            if (!localVarsCollapsed)
-                                            {
-                                                foreach (var row in rows)
-                                                {
-                                                    var rowPath = row.Path;
-                                                    <div class="var-row" style="padding-left: @(6 + row.Depth * 18)px">
-                                                        @if (row.IsExpandable)
-                                                        {
-                                                            <span class="var-toggle @(expandedVarPaths.Contains(rowPath) ? "expanded" : "")"
-                                                                  @onclick="() => ToggleVarPath(rowPath)">&#x25BA;</span>
-                                                        }
-                                                        else
-                                                        {
-                                                            <span class="var-toggle-spacer"></span>
-                                                        }
-                                                        <span class="var-row-name" title="@row.Name">@row.Name</span>
-                                                        <span class="var-row-value">@FormatValue(row.Value, inspectedThread)</span>
-                                                    </div>
-                                                }
-                                            }
-                                        }
-                                        @if (hasGlobals)
-                                        {
-                                            <div class="var-subsection-header" @onclick="() => globalVarsCollapsed = !globalVarsCollapsed">
-                                                <span class="collapse-icon @(globalVarsCollapsed ? "" : "expanded")">&#x203A;</span>
-                                                <span>Globals</span>
-                                            </div>
-                                            if (!globalVarsCollapsed)
-                                            {
-                                                foreach (var row in globalRows)
-                                                {
-                                                    var rowPath = row.Path;
-                                                    <div class="var-row" style="padding-left: @(6 + row.Depth * 18)px">
-                                                        @if (row.IsExpandable)
-                                                        {
-                                                            <span class="var-toggle @(expandedVarPaths.Contains(rowPath) ? "expanded" : "")"
-                                                                  @onclick="() => ToggleVarPath(rowPath)">&#x25BA;</span>
-                                                        }
-                                                        else
-                                                        {
-                                                            <span class="var-toggle-spacer"></span>
-                                                        }
-                                                        <span class="var-row-name" title="@row.Name">@row.Name</span>
-                                                        <span class="var-row-value">@FormatValue(row.Value, inspectedThread)</span>
-                                                    </div>
-                                                }
-                                            }
-                                        }
-                                    </div>
-                                }
-                            }
-                            else
-                            {
-                                <div class="hint">Use Step or Continue to inspect variables.</div>
-                            }
-                        </div>
-                        <div class="resize-v-handle" title="Drag to resize"></div>
-                    }
-                </div>
+                <ImmediatePanel Session="@DebugCtl.CurrentSession"
+                                DebugCode="@DebugCtl.DebugCode"
+                                ConfigureGlobals="@RunCtl.SetSharedGlobals"
+                                ParserConfigFactory="@MakeParserConfig" />
 
-                <!-- Call Stack + Execution State -->
-                <div class="debug-section debug-section-callstack @(callStackCollapsed ? "section-collapsed" : "")">
-                    <div class="panel-header collapsible-header" @onclick="() => { callStackCollapsed = !callStackCollapsed; if (!callStackCollapsed) needsThreadGridInit = true; }">
-                        <div class="panel-header-left">
-                            <span class="collapse-icon @(callStackCollapsed ? "" : "expanded")">&#x203A;</span>
-                            <span>Call Stack</span>
-                        </div>
-                        @if (!callStackCollapsed && threadStates.Length > 0 && debugBottomMode == "ThreadStates")
-                        {
-                            <span class="thread-legend">
-                                <span class="tl-dot tc-active"></span>Active thread
-                                <span class="tl-dot tc-diverged"></span>Inactive thread
-                            </span>
-                        }
-                    </div>
-                    @if (!callStackCollapsed)
-                    {
-                        <div class="callstack-exec-body">
-                            <div class="callstack-pane">
-                                @if (debugStepIndex >= 0 && debugStepIndex < debugTrace.Count)
-                                {
-                                    var stack = debugTrace[debugStepIndex].CallStack;
-                                    <table class="var-table">
-                                        <tbody>
-                                            @for (int i = 0; i < stack.Length; i++)
-                                            {
-                                                var fi = i;
-                                                <tr class="@(fi == selectedFrame ? "callstack-selected" : "")"
-                                                    @onclick="() => selectedFrame = fi"
-                                                    style="cursor: pointer;">
-                                                    <td class="var-name">@stack[i]</td>
-                                                </tr>
-                                            }
-                                            <tr style="cursor: default;">
-                                                <td class="var-name" style="color: #555; font-style: italic;">[Globals]</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                }
-                                else
-                                {
-                                    <div class="hint">Use Step or Continue to inspect call stack.</div>
-                                }
-                            </div>
-                            @{
-                                bool showImage = debugBottomMode == "PixelColors" || debugBottomMode == "Both";
-                            }
-                            @if (threadStates.Length > 0 || showImage)
-                            {
-                                <div class="resize-inner-h-handle" id="callstack-exec-divider"></div>
-                                <div class="exec-state-pane">
-                                    <div class="exec-state-body" id="thread-grid-container">
-                                        @if (showImage)
-                                        {
-                                            <div class="image-container" id="image-container-debug" data-mode-target="debug">
-                                                <canvas class="image-canvas color-canvas-2d"></canvas>
-                                                <canvas class="image-overlay"></canvas>
-                                            </div>
-                                        }
-                                        else
-                                        {
-                                            <div class="thread-grid">
-                                                @for (int ti = 0; ti < threadStates.Length; ti++)
-                                                {
-                                                    var tidx = ti;
-                                                    var state = threadStates[ti];
-                                                    var stateClass = state switch {
-                                                        HLSLExecutionState.ThreadState.Active    => "tc-active",
-                                                        HLSLExecutionState.ThreadState.Inactive  => "tc-diverged",
-                                                        HLSLExecutionState.ThreadState.Suspended => "tc-suspended",
-                                                        _ => ""
-                                                    };
-                                                    var label = $"Thread ({ti % warpX}, {ti / warpX}) - {state}";
-                                                    <div class="thread-cell @stateClass @(tidx == inspectedThread ? "tc-selected" : "")"
-                                                         title="@label"
-                                                         @onclick="() => inspectedThread = tidx"></div>
-                                                }
-                                            </div>
-                                        }
-                                    </div>
-                                    <div class="bottom-mode-row">
-                                        <label>Mode</label>
-                                        <select @bind="debugBottomMode">
-                                            <option value="ThreadStates">Thread states</option>
-                                            <option value="PixelColors">Pixel colors</option>
-                                            <option value="Both">Both</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            }
-                        </div>
-                        <div class="resize-v-handle" title="Drag to resize"></div>
-                    }
-                </div>
-
-                <!-- Immediate -->
-                <div class="debug-section debug-section-immediate @(immediateCollapsed ? "section-collapsed" : "")">
-                    <div class="panel-header collapsible-header" @onclick="() => immediateCollapsed = !immediateCollapsed">
-                        <div class="panel-header-left">
-                            <span class="collapse-icon @(immediateCollapsed ? "" : "expanded")">&#x203A;</span>
-                            <span>Immediate</span>
-                        </div>
-                    </div>
-                    @if (!immediateCollapsed)
-                    {
-                        <div class="output-body imm-body">
-                            @if (immediateHistory.Count == 0)
-                            {
-                                <div class="hint">Evaluate expressions in the current scope.</div>
-                            }
-                            else
-                            {
-                                <div class="imm-history">
-                                    @foreach (var entry in immediateHistory)
-                                    {
-                                        <div class="imm-entry">
-                                            <div class="imm-expr"><span class="imm-prompt">&gt;</span> @entry.Expression</div>
-                                            <div class="imm-result @(entry.IsError ? "imm-error" : "")">@entry.Result</div>
-                                            @if (entry.ImageDataUrl != null)
-                                            {
-                                                <img class="imm-image" src="@entry.ImageDataUrl" />
-                                            }
-                                        </div>
-                                    }
-                                </div>
-                            }
-                        </div>
-                        <div class="imm-input-row">
-                            <span class="imm-prompt-inline">&gt;</span>
-                            <input class="imm-input" type="text" placeholder="Expression..."
-                                   @bind="immediateInput" @bind:event="oninput"
-                                   @onkeydown="OnImmediateKeyDown" />
-                            <button class="imm-eval-btn" @onclick="EvaluateImmediate" disabled="@(debugStepIndex < 0)">Eval</button>
-                        </div>
-                        <div class="resize-v-handle" title="Drag to resize"></div>
-                    }
-                </div>
-
-                <!-- Console Output -->
-                <div class="debug-section debug-section-console @(consoleCollapsed ? "section-collapsed" : "")">
-                    <div class="panel-header collapsible-header" @onclick="() => consoleCollapsed = !consoleCollapsed">
-                        <div class="panel-header-left">
-                            <span class="collapse-icon @(consoleCollapsed ? "" : "expanded")">&#x203A;</span>
-                            <span>Console</span>
-                        </div>
-                    </div>
-                    @if (!consoleCollapsed)
-                    {
-                        <div class="output-body debug-console-body">
-                            @if (hasError)
-                            {
-                                <pre class="error-text">@errorMessage</pre>
-                            }
-                            else if (!string.IsNullOrEmpty(CurrentDebugOutput))
-                            {
-                                <pre class="output-text">@CurrentDebugOutput</pre>
-                            }
-                            else
-                            {
-                                <div class="hint">No output yet.</div>
-                            }
-                        </div>
-                        <div class="resize-v-handle" title="Drag to resize"></div>
-                    }
-                </div>
+                <ConsolePanel Variant="ConsolePanel.ConsoleVariant.Debug"
+                              HasError="@RunCtl.HasError" ErrorMessage="@RunCtl.ErrorMessage"
+                              Output="@DebugCtl.CurrentDebugOutput" />
 
                 <div class="debug-panel-spacer"></div>
             }
             else
             {
-                <!-- Color Output -->
-                <div class="debug-section debug-section-image @(imageCollapsed ? "section-collapsed" : "")">
-                    <div class="panel-header collapsible-header" @onclick="ToggleImageSection">
-                        <div class="panel-header-left">
-                            <span class="collapse-icon @(imageCollapsed ? "" : "expanded")">&#x203A;</span>
-                            <span>Color Output</span>
-                        </div>
-                        <div class="panel-header-actions" @onclick:stopPropagation="true">
-                            @if (isGpuMode)
-                            {
-                                <button class="btn-time-ctrl" title="@(gpuPaused ? "Play" : "Pause")" @onclick="ToggleGpuPause">
-                                    <i class="mdi @(gpuPaused ? "mdi-play" : "mdi-pause")"></i>
-                                </button>
-                                <button class="btn-time-ctrl" title="Restart time" @onclick="RestartGpuTime">
-                                    <i class="mdi mdi-restart"></i>
-                                </button>
-                            }
-                            <label class="settings-toggle panel-header-toggle" title="Use GPU">
-                                <input type="checkbox" @bind="gpuPreviewEnabled" @bind:after="Run" disabled="@(isRunning || isDebugging)" />
-                                <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
-                                <span class="panel-header-toggle-label">Use GPU</span>
-                            </label>
-                        </div>
-                    </div>
-                    @* Keep canvases mounted even when collapsed so the GPU loop's
-                       references stay valid across collapse/expand. *@
-                    <div class="image-container @(isGpuMode ? "gpu-mode" : "")" id="image-container"
-                         data-mode-target="regular" style="@(imageCollapsed ? "display:none" : "")">
-                        <canvas class="image-canvas color-canvas-2d"></canvas>
-                        <canvas id="color-canvas-gpu" class="image-canvas"></canvas>
-                        <canvas class="image-overlay"></canvas>
-                    </div>
-                    @if (!imageCollapsed)
-                    {
-                        <div class="resize-v-handle" title="Drag to resize"></div>
-                    }
-                </div>
+                <ColorOutputPanel IsGpuMode="@RunCtl.IsGpuMode" GpuPaused="@RunCtl.GpuPaused"
+                                  GpuPreviewEnabledChanged="@OnGpuPreviewToggle"
+                                  IsRunning="@RunCtl.IsRunning" IsDebugging="@DebugCtl.IsDebugging"
+                                  IsCollapsed="@imageCollapsed"
+                                  IsCollapsedChanged="@(c => imageCollapsed = c)"
+                                  OnExpand="@OnImageSectionExpanded"
+                                  OnToggleGpuPause="@RunCtl.ToggleGpuPauseAsync"
+                                  OnRestartGpuTime="@RunCtl.RestartGpuTimeAsync" />
 
-                <!-- Console -->
-                <div class="debug-section debug-section-console @(consoleCollapsed ? "section-collapsed" : "")"
-                     style="--section-h: 260px;">
-                    <div class="panel-header collapsible-header" @onclick="() => consoleCollapsed = !consoleCollapsed">
-                        <div class="panel-header-left">
-                            <span class="collapse-icon @(consoleCollapsed ? "" : "expanded")">&#x203A;</span>
-                            <span>Console</span>
-                        </div>
-                    </div>
-                    @if (!consoleCollapsed)
-                    {
-                        <div class="output-body">
-                            @if (hasError)
-                            {
-                                <pre class="error-text">@errorMessage</pre>
-                            }
-                            else if (gpuPreviewEnabled)
-                            {
-                                <div class="hint">Console output unavailable in GPU mode.</div>
-                            }
-                            else if (output == null)
-                            {
-                                <div class="hint">Press <strong>Run</strong> or <strong>Ctrl+Enter</strong> to execute.</div>
-                            }
-                            else if (output.Length == 0)
-                            {
-                                <div class="hint">No output.</div>
-                            }
-                            else
-                            {
-                                <pre class="output-text">@output</pre>
-                            }
-                        </div>
-                        <div class="resize-v-handle" title="Drag to resize"></div>
-                    }
-                </div>
+                <ConsolePanel Variant="ConsolePanel.ConsoleVariant.Run"
+                              HasError="@RunCtl.HasError" ErrorMessage="@RunCtl.ErrorMessage"
+                              Output="@RunCtl.Output" IsGpuPreview="@State.GpuPreviewEnabled" />
 
                 <div class="debug-panel-spacer"></div>
             }
@@ -481,39 +131,7 @@
     </div>
 </div>
 
-@if (showSettings)
-{
-    <div class="modal-overlay" @onclick="CloseSettings">
-        <div class="modal-dialog" @onclick:stopPropagation="true">
-            <div class="modal-header">Settings</div>
-            <div class="modal-body">
-                <div class="settings-row">
-                    <label class="settings-label">Entry point</label>
-                    <input class="settings-text-input" type="text" @bind="entryPoint" @bind:event="oninput" disabled="@(isRunning || isDebugging)" title="Function name to call" />
-                </div>
-                <div class="settings-row">
-                    <label class="settings-label">Group offset</label>
-                    <div class="warp-control">
-                        <input class="warp-input" type="number" min="0" @bind="groupOffsetX" @bind:event="oninput" disabled="@(isRunning || isDebugging)" title="Group X" />
-                        <span class="warp-sep">×</span>
-                        <input class="warp-input" type="number" min="0" @bind="groupOffsetY" @bind:event="oninput" disabled="@(isRunning || isDebugging)" title="Group Y" />
-                    </div>
-                </div>
-                <div class="settings-row">
-                    <label class="settings-label">Warp size</label>
-                    <div class="warp-control">
-                        <input class="warp-input" type="number" min="1" max="32" @bind="warpX" @bind:event="oninput" disabled="@(isRunning || isDebugging)" title="Warp X" />
-                        <span class="warp-sep">×</span>
-                        <input class="warp-input" type="number" min="1" max="32" @bind="warpY" @bind:event="oninput" disabled="@(isRunning || isDebugging)" title="Warp Y" />
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-modal-save" @onclick="CloseSettings">Close</button>
-            </div>
-        </div>
-    </div>
-}
+<SettingsModal @bind-IsOpen="showSettings" IsLocked="@(RunCtl.IsRunning || DebugCtl.IsDebugging)" />
 
 @code {
     private static readonly string DefaultCode =
@@ -555,242 +173,95 @@ float4 main(float4 position : SV_Position) : SV_Target
 }
 ";
 
-    private static readonly int[] fontSizes = { 12, 13, 14, 15, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36 };
-    private int fontSize = 16;
-
-    private async Task OnFontSizeChanged(ChangeEventArgs e)
-    {
-        if (int.TryParse(e.Value?.ToString(), out int size))
-        {
-            fontSize = size;
-            await JS.InvokeVoidAsync("setMonacoFontSize", size);
-        }
-    }
-
     // --- Core state ---
-    private HLSLRunner runner = new HLSLRunner();
-    // --- Tabs ---
-    private class EditorTab { public string Name = ""; public string Code = ""; public string? Path = null; }
-    private List<EditorTab> editorTabs = new();
-    private int activeTabIndex = 0;
-
-    private async Task SwitchTab(int index)
-    {
-        if (index == activeTabIndex) return;
-        editorTabs[activeTabIndex].Code = await JS.InvokeAsync<string>("getMonacoValue");
-        if (isDebugging) await JS.InvokeVoidAsync("highlightDebugLine", 0);
-        activeTabIndex = index;
-        await JS.InvokeVoidAsync("setMonacoValue", editorTabs[activeTabIndex].Code);
-        if (isDebugging && activeTabIndex == debugTabIndex)
-            await JS.InvokeVoidAsync("highlightDebugLine", currentDebugLine);
-    }
-
-    private async Task CloseTab(int index)
-    {
-        if (editorTabs.Count <= 1) return;
-        if (index == activeTabIndex)
-        {
-            int newActive = index > 0 ? index - 1 : 1;
-            activeTabIndex = newActive;
-            await JS.InvokeVoidAsync("setMonacoValue", editorTabs[newActive].Code);
-        }
-        editorTabs.RemoveAt(index);
-        if (activeTabIndex > index) activeTabIndex--;
-    }
-
-    private async Task OpenFileDialog()
-    {
-        var (path, content) = await FileDialogs.OpenFile();
-        if (path == null || content == null) return;
-        var existing = editorTabs.FindIndex(t => t.Path == path);
-        if (existing >= 0) { await SwitchTab(existing); return; }
-        editorTabs[activeTabIndex].Code = await JS.InvokeAsync<string>("getMonacoValue");
-        string name = System.IO.Path.GetFileName(path);
-        editorTabs.Add(new EditorTab { Name = name, Code = content, Path = path });
-        activeTabIndex = editorTabs.Count - 1;
-        await JS.InvokeVoidAsync("setMonacoValue", content);
-        StateHasChanged();
-    }
-
-    private async Task SaveFileDialog()
-    {
-        string code = await JS.InvokeAsync<string>("getMonacoValue");
-        string? savedPath = await FileDialogs.SaveFile(code, editorTabs[activeTabIndex].Path);
-        if (savedPath == null) return;
-        editorTabs[activeTabIndex].Path = savedPath;
-        editorTabs[activeTabIndex].Name = System.IO.Path.GetFileName(savedPath);
-        editorTabs[activeTabIndex].Code = code;
-        StateHasChanged();
-    }
-
-    private async Task SaveFileAsDialog()
-    {
-        string code = await JS.InvokeAsync<string>("getMonacoValue");
-        string? savedPath = await FileDialogs.SaveFileAs(code);
-        if (savedPath == null) return;
-        editorTabs[activeTabIndex].Path = savedPath;
-        editorTabs[activeTabIndex].Name = System.IO.Path.GetFileName(savedPath);
-        editorTabs[activeTabIndex].Code = code;
-        StateHasChanged();
-    }
+    private EditorPanel? editorPanel;
+    private string initialEditorCode = "";
 
     [JSInvokable]
     public async Task OpenFileInTab(string name, string content, string? path = null)
     {
-        if (!TabbedEditorConfig.Enabled) return;
-        var existing = editorTabs.FindIndex(t => t.Name == name);
-        if (existing >= 0)
-        {
-            await SwitchTab(existing);
-        }
-        else
-        {
-            editorTabs[activeTabIndex].Code = await JS.InvokeAsync<string>("getMonacoValue");
-            editorTabs.Add(new EditorTab { Name = name, Code = content, Path = string.IsNullOrEmpty(path) ? null : path });
-            activeTabIndex = editorTabs.Count - 1;
-            await JS.InvokeVoidAsync("setMonacoValue", content);
-        }
-        StateHasChanged();
+        if (editorPanel != null) await editorPanel.OpenFileInTab(name, content, path);
     }
 
-    private string? output;
-    private bool isRunning;
-    private bool hasError;
-    private string errorMessage = "";
-    private Exception? lastException;
-    private int warpX = 16;
-    private int warpY = 16;
-    private string entryPoint = "main";
-    private int groupOffsetX = 0;
-    private int groupOffsetY = 0;
-    private bool isGpuMode = false;
-    private bool gpuPreviewEnabled = false;
-    private bool gpuPaused = false;
-    private (float Time, int CanvasW, int CanvasH)? gpuCaptured = null;
-    private (int X, int Y)? _savedGroupOffsets = null;
-    private string _debugBottomMode = "ThreadStates";
-    private string debugBottomMode
+    private async Task OnEditorTabSwitched(int newIndex)
     {
-        get => _debugBottomMode;
-        set
-        {
-            if (_debugBottomMode == value) return;
-            _debugBottomMode = value;
-            if (value == "PixelColors" || value == "Both") needsImageRender = true;
-            else needsThreadGridInit = true;
-        }
+        if (DebugCtl.IsDebugging && newIndex == DebugCtl.DebugTabIndex && editorPanel != null)
+            await editorPanel.HighlightLine(DebugCtl.CurrentDebugLine);
     }
 
-    // --- Settings ---
-    private bool showSettings = false;
-    private void OpenSettings() { showSettings = true; }
-    private void CloseSettings() { showSettings = false; }
-    private bool hasImage = false;
-    private bool needsImageRender = false;
-    private int imageWidth, imageHeight;
-    private byte[]? imagePixels;
+    private string debugBottomMode = "ThreadStates";
 
-    // --- Debug state ---
-    private bool isDebugging = false;
-    private int debugTabIndex = -1;
-    private List<DebugStep> debugTrace = new();
-    private int debugStepIndex = -1;
-    private HashSet<int> breakpoints = new();
-    private int _inspectedThread = 0;
-    private DotNetObjectReference<Home>? dotNetRef;
-    private bool needsThreadGridInit = false;
-    private bool needsSectionHeightRestore = false;
-    private string debugCode = "";
-
-    // --- Collapse state ---
-    private int selectedFrame = 0;
-    private HashSet<string> expandedVarPaths = new();
-    private bool varsCollapsed = false;
-    private bool localVarsCollapsed = false;
-    private bool globalVarsCollapsed = false;
-    private bool callStackCollapsed = false;
-    private bool imageCollapsed = false;
-    private bool consoleCollapsed = false;
-    private bool immediateCollapsed = false;
-
-    // --- Immediate window ---
-    private string immediateInput = "";
-    private List<ImmediateEntry> immediateHistory = new();
-
-    private sealed class ImmediateEntry
+    private void OnDebugBottomModeChanged(string v)
     {
-        public string Expression { get; init; } = "";
-        public string Result { get; init; } = "";
-        public bool IsError { get; init; }
-        public string? ImageDataUrl { get; init; }
+        if (debugBottomMode == v) return;
+        debugBottomMode = v;
+        if (v == "PixelColors" || v == "Both") needsImageRender = true;
+        else needsThreadGridInit = true;
     }
 
-    private int inspectedThread
+    private async Task OnGpuPreviewToggle(bool v)
     {
-        get => _inspectedThread;
-        set => _inspectedThread = Math.Clamp(value, 0, Math.Max(0, warpX * warpY - 1));
+        State.GpuPreviewEnabled = v;
+        await Run();
     }
 
-    private int currentDebugLine =>
-        (debugStepIndex >= 0 && debugStepIndex < debugTrace.Count)
-            ? debugTrace[debugStepIndex].Line : 0;
-
-    private sealed class DebugStep
+    private void OnImageSectionExpanded()
     {
-        public int Line { get; init; }
-        public string[] CallStack { get; init; } = Array.Empty<string>();
-        public int CallDepth => CallStack.Length;
-        // Per-frame local variables, index 0 = innermost (current) frame
-        public Dictionary<string, HLSLValue>[] FrameVariables { get; init; } = Array.Empty<Dictionary<string, HLSLValue>>();
-        public Dictionary<string, HLSLValue> GlobalVariables { get; init; } = new();
-        public int OutputOffset { get; init; }
-        public HLSLExecutionState.ThreadState[][] FrameThreadStates { get; init; } = Array.Empty<HLSLExecutionState.ThreadState[]>();
+        if (RunCtl.HasImage && RunCtl.ImagePixels != null) needsImageRender = true;
     }
 
-    // Console output visible at the current debug step (output produced by statements executed so far).
-    private string CurrentDebugOutput
+    private HLSLExecutionState.ThreadState[] CurrentThreadStates
     {
         get
         {
-            if (output == null || debugStepIndex < 0) return "";
-            // Output produced *through* step N ends at the start of step N+1's offset (or total length if last).
-            int endOffset = debugStepIndex < debugTrace.Count - 1
-                ? debugTrace[debugStepIndex + 1].OutputOffset
-                : output.Length;
-            return output[..Math.Min(endOffset, output.Length)];
+            var step = DebugCtl.CurrentSession?.Current;
+            if (step == null) return Array.Empty<HLSLExecutionState.ThreadState>();
+            int fIdx = Math.Clamp(State.SelectedFrame, 0, Math.Max(0, step.FrameThreadStates.Length - 1));
+            return fIdx < step.FrameThreadStates.Length
+                ? step.FrameThreadStates[fIdx]
+                : Array.Empty<HLSLExecutionState.ThreadState>();
         }
     }
 
+    private bool showSettings = false;
+    private bool needsImageRender = false;
+
+    private DotNetObjectReference<Home>? dotNetRef;
+    private bool needsThreadGridInit = false;
+    private bool needsSectionHeightRestore = false;
+    private bool imageCollapsed = false;
+
     protected override void OnInitialized()
     {
-        if (TabbedEditorConfig.Enabled)
-            editorTabs.Add(new EditorTab { Name = InitialCode.Name ?? "new.hlsl", Code = InitialCode.Code ?? DefaultCode, Path = InitialCode.Path });
+        dotNetRef = DotNetObjectReference.Create(this);
+        State.PropertyChanged += OnStateChanged;
+        RunCtl.PropertyChanged += OnStateChanged;
+        DebugCtl.PropertyChanged += OnStateChanged;
+
+        // Resolve initial code: permalink param wins over file-argument override, falls back to default.
+        string code = InitialCode.Code ?? DefaultCode;
+        var param = PermalinkCodec.GetQueryParam(Nav.Uri, "c");
+        if (!string.IsNullOrEmpty(param))
+        {
+            try { code = PermalinkCodec.DecompressCode(param); }
+            catch { }
+        }
+        initialEditorCode = code;
+        State.ApplyFromUrl(Nav.Uri);
+    }
+
+    private void OnStateChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        // Auto-expand the image section when GPU mode flips on so the canvas mounts before gpuRender.
+        if (sender == RunCtl && e.PropertyName == nameof(RunController.IsGpuMode) && RunCtl.IsGpuMode)
+            imageCollapsed = false;
+        InvokeAsync(StateHasChanged);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            dotNetRef = DotNetObjectReference.Create(this);
-
-            // Load code from permalink, file argument, or default
-            string initialCode = InitialCode.Code ?? DefaultCode;
-            var param = GetQueryParam(Nav.Uri, "c");
-            if (!string.IsNullOrEmpty(param))
-            {
-                try { initialCode = DecompressCode(param); }
-                catch { }
-            }
-            ApplyPermalinkSettings();
-
-            if (TabbedEditorConfig.Enabled && editorTabs.Count > 0)
-                editorTabs[0].Code = initialCode;
-
-            await JS.InvokeVoidAsync("initMonaco", "monaco-container", initialCode, dotNetRef);
-
-            if (TabbedEditorConfig.Enabled)
-                FileDialogs.FileDropped = async (name, content, path) => await OpenFileInTab(name, content, path);
-
             await Run();
         }
 
@@ -802,28 +273,28 @@ float4 main(float4 position : SV_Position) : SV_Target
 
         // imagestate.js applies this cache to image-containers as they mount,
         // so we don't have to race Blazor's render lifecycle.
-        if (needsImageRender && imagePixels != null)
+        if (needsImageRender && RunCtl.ImagePixels != null)
         {
             needsImageRender = false;
             await JS.InvokeVoidAsync("restoreImageSectionHeight");
-            await JS.InvokeVoidAsync("imgSetWarp", warpX, warpY);
-            await JS.InvokeVoidAsync("imgSetPixels", imagePixels, imageWidth, imageHeight);
+            await JS.InvokeVoidAsync("imgSetWarp", State.WarpX, State.WarpY);
+            await JS.InvokeVoidAsync("imgSetPixels", RunCtl.ImagePixels, RunCtl.ImageWidth, RunCtl.ImageHeight);
         }
 
-        await JS.InvokeVoidAsync("imgSetRegularMode", isGpuMode ? "gpu" : "cpu");
-        string debugMode = isDebugging
+        await JS.InvokeVoidAsync("imgSetRegularMode", RunCtl.IsGpuMode ? "gpu" : "cpu");
+        string debugMode = DebugCtl.IsDebugging
             ? (debugBottomMode == "Both" ? "both"
                 : debugBottomMode == "PixelColors" ? "debug"
                 : "idle")
             : "idle";
         await JS.InvokeVoidAsync("imgSetDebugMode", debugMode);
 
-        if (isDebugging && warpX > 0)
+        if (DebugCtl.IsDebugging && State.WarpX > 0)
         {
             await JS.InvokeVoidAsync("imgSetDebugPixel",
-                _inspectedThread % warpX, _inspectedThread / warpX);
-            var step = (debugStepIndex >= 0 && debugStepIndex < debugTrace.Count) ? debugTrace[debugStepIndex] : null;
-            var fIdx = step != null ? Math.Clamp(selectedFrame, 0, Math.Max(0, step.FrameThreadStates.Length - 1)) : 0;
+                State.InspectedThread % State.WarpX, State.InspectedThread / State.WarpX);
+            var step = DebugCtl.CurrentSession?.Current;
+            var fIdx = step != null ? Math.Clamp(State.SelectedFrame, 0, Math.Max(0, step.FrameThreadStates.Length - 1)) : 0;
             var states = (step != null && fIdx < step.FrameThreadStates.Length)
                 ? step.FrameThreadStates[fIdx] : Array.Empty<HLSLExecutionState.ThreadState>();
             await JS.InvokeVoidAsync("imgSetThreadStates", states.Select(s => (int)s).ToArray());
@@ -835,8 +306,8 @@ float4 main(float4 position : SV_Position) : SV_Target
             await JS.InvokeVoidAsync("imgSetDebugPixel", null, null);
             await JS.InvokeVoidAsync("imgSetThreadStates", (int[]?)null);
             await JS.InvokeVoidAsync("imgSetDebugClickHandler", false);
-            if (!isGpuMode)
-                await JS.InvokeVoidAsync("imgSetCpuClickHandler", warpX, warpY);
+            if (!RunCtl.IsGpuMode)
+                await JS.InvokeVoidAsync("imgSetCpuClickHandler", State.WarpX, State.WarpY);
             else
                 await JS.InvokeVoidAsync("imgSetCpuClickHandler", null, null);
         }
@@ -844,910 +315,144 @@ float4 main(float4 position : SV_Position) : SV_Target
         if (needsThreadGridInit)
         {
             needsThreadGridInit = false;
-            await JS.InvokeVoidAsync("initThreadGridResize", "thread-grid-container", warpX, warpY);
+            await JS.InvokeVoidAsync("initThreadGridResize", "thread-grid-container", State.WarpX, State.WarpY);
         }
     }
 
     private async Task Run()
     {
-        isRunning = true;
-        hasError = false;
-        errorMessage = "";
-        lastException = null;
-        output = "";
-        imagePixels = null;
-        gpuCaptured = null;
-        hasImage = false;
-        isGpuMode = false;
-        // RunCpu needs any prior GPU loop dead so its ResizeObserver stops
-        // pushing stale dimensions into the viewport.
-        try { await JS.InvokeVoidAsync("gpuStop"); } catch { }
-        StateHasChanged();
-        await Task.Yield();
-
-        if (gpuPreviewEnabled)
-            await RunGpu();
-        else
-            await RunCpu();
-
-        isRunning = false;
-        StateHasChanged();
-    }
-
-    private async Task RunCpu()
-    {
-        var sw = new System.IO.StringWriter();
-        var oldOut = Console.Out;
-        Console.SetOut(sw);
-        try
-        {
-            string code = await JS.InvokeAsync<string>("getMonacoValue");
-            int wx = Math.Max(1, warpX);
-            int wy = Math.Max(1, warpY);
-            int threadCount = wx * wy;
-
-            runner.DebugHook = null;
-            runner.Reset();
-            runner.SetWarpSize(wx, wy);
-            SetSharedGlobals(runner, wx, wy);
-            runner.ProcessCode(code, MakeParserConfig());
-
-            var threadArg = BuildThreadArg(wx, wy, threadCount, groupOffsetX, groupOffsetY);
-            HLSLValue result = CallMain(threadArg);
-            TryExtractImage(result, wx, wy);
-        }
-        catch (Exception ex)
-        {
-            hasError = true;
-            errorMessage = ex.Message;
-        }
-        finally { Console.SetOut(oldOut); }
-
-        output = sw.ToString();
-        needsImageRender = hasImage;
-    }
-
-    private async Task RunGpu()
-    {
-        bool hasGpu = false;
-        try { hasGpu = await JS.InvokeAsync<bool>("gpuIsAvailable"); }
-        catch { hasGpu = false; }
-        if (!hasGpu)
-        {
-            hasError = true;
-            errorMessage = "WebGPU is not available in this browser. Use Debug to step through on the CPU interpreter instead.";
-            return;
-        }
-
-        hasImage = true;
-        isGpuMode = true;
-        gpuPaused = false;
-        // Expand the section so color-canvas-gpu is in the DOM for gpuRender.
-        imageCollapsed = false;
-        StateHasChanged();
-        await Task.Yield();
-
-        try
-        {
-            string code = await JS.InvokeAsync<string>("getMonacoValue");
-            int wx = Math.Max(1, warpX);
-            int wy = Math.Max(1, warpY);
-            await JS.InvokeVoidAsync("gpuRender", "color-canvas-gpu", code,
-                entryPoint, wx, wy, dotNetRef);
-        }
-        catch (Exception ex)
-        {
-            hasError = true;
-            errorMessage = ex.Message;
-            lastException = ex;
-        }
+        if (editorPanel == null) return;
+        await RunCtl.RunAsync(
+            getCode: () => editorPanel.GetCode().AsTask(),
+            makeParserConfig: MakeParserConfig,
+            dotNetRef: dotNetRef,
+            beforeGpuRender: async () =>
+            {
+                imageCollapsed = false;
+                StateHasChanged();
+                await Task.Yield();
+            });
+        needsImageRender = RunCtl.HasImage;
     }
 
     [JSInvokable]
     public void SetInspectedPixel(int px, int py)
     {
-        if (warpX <= 0) return;
-        inspectedThread = py * warpX + px;
+        if (State.WarpX <= 0) return;
+        State.InspectedThread = py * State.WarpX + px;
         StateHasChanged();
-    }
-
-    private async Task ToggleGpuPause()
-    {
-        if (gpuPaused)
-        {
-            try { await JS.InvokeVoidAsync("gpuResume"); } catch { }
-            gpuPaused = false;
-        }
-        else
-        {
-            try { await JS.InvokeVoidAsync("gpuPause"); } catch { }
-            gpuPaused = true;
-        }
-    }
-
-    private async Task RestartGpuTime()
-    {
-        try { await JS.InvokeVoidAsync("gpuRestart"); } catch { }
     }
 
     [JSInvokable]
     public async Task StartDebugAtPixel(int px, int py, float time, int canvasW, int canvasH)
     {
-        try { await JS.InvokeVoidAsync("gpuStop"); } catch { }
-
-        int wx = Math.Max(1, warpX);
-        int wy = Math.Max(1, warpY);
-        _savedGroupOffsets = (groupOffsetX, groupOffsetY);
-        groupOffsetX = px / wx;
-        groupOffsetY = py / wy;
-        _inspectedThread = (py % wy) * wx + (px % wx);
-        gpuCaptured = (time, canvasW, canvasH);
+        int wx = Math.Max(1, State.WarpX);
+        int wy = Math.Max(1, State.WarpY);
+        DebugCtl.SaveGroupOffsetsForRestore();
+        State.GroupOffsetX = px / wx;
+        State.GroupOffsetY = py / wy;
+        State.InspectedThread = (py % wy) * wx + (px % wx);
+        RunCtl.GpuCaptured = (time, canvasW, canvasH);
 
         await StartDebug();
     }
 
-    private void SetSharedGlobals(HLSLRunner r, int wx, int wy)
-    {
-        r.SetVariable("_WarpSize", new VectorValue(ScalarType.Float,
-            new HLSLRegister<RawValue[]>(new RawValue[] { (float)wx, (float)wy })));
-        bool useCapture = gpuPreviewEnabled && gpuCaptured.HasValue;
-        float resW = useCapture ? gpuCaptured.Value.CanvasW : wx;
-        float resH = useCapture ? gpuCaptured.Value.CanvasH : wy;
-        float t = useCapture ? gpuCaptured.Value.Time : 0f;
-        r.SetVariable("_Resolution", new VectorValue(ScalarType.Float,
-            new HLSLRegister<RawValue[]>(new RawValue[] { resW, resH })));
-        r.SetVariable("_Time", new ScalarValue(ScalarType.Float, new HLSLRegister<RawValue>(t)));
-    }
-
-    // --- Debug: record trace ---
     private async Task StartDebug()
     {
-        isRunning = true;
-        hasError = false;
-        errorMessage = "";
-        lastException = null;
-        output = null;
-        // Debug-button entry while GPU is on: snapshot canvas size + time so
-        // the warp render reproduces the same _Resolution and _Time the GPU
-        // saw. Pixel-click entries set gpuCaptured themselves.
-        if (gpuPreviewEnabled && !gpuCaptured.HasValue)
-        {
-            try
-            {
-                var snap = await JS.InvokeAsync<float[]>("gpuSnapshot");
-                if (snap != null && snap.Length == 3 && snap[1] > 0 && snap[2] > 0)
-                    gpuCaptured = (snap[0], (int)snap[1], (int)snap[2]);
-            }
-            catch { }
-        }
-        try { await JS.InvokeVoidAsync("gpuStop"); } catch { }
-        isGpuMode = false;
-        hasImage = false;
-        imagePixels = null;
-        debugTrace = new();
-        debugStepIndex = -1;
+        if (editorPanel == null) return;
         await JS.InvokeVoidAsync("saveSectionHeights");
-        StateHasChanged();
-        await Task.Yield();
 
-        var sw = new System.IO.StringWriter();
-        var oldOut = Console.Out;
-        Console.SetOut(sw);
+        bool entered = await DebugCtl.StartSessionAsync(
+            getCode: () => editorPanel.GetCode().AsTask(),
+            makeParserConfig: MakeParserConfig);
+        needsImageRender = RunCtl.HasImage;
 
-        try
+        if (!entered)
         {
-            string code = await JS.InvokeAsync<string>("getMonacoValue");
-            debugCode = code;
-            immediateHistory = new();
-            int wx = Math.Max(1, warpX);
-            int wy = Math.Max(1, warpY);
-            int threadCount = wx * wy;
-
-            runner.Reset();
-            runner.SetWarpSize(wx, wy);
-            SetSharedGlobals(runner, wx, wy);
-
-            runner.DebugHook = node =>
-            {
-                Dictionary<string, HLSLValue> CopyFrame(Dictionary<string, HLSLValue> frame)
-                {
-                    var copy = new Dictionary<string, HLSLValue>();
-                    foreach (var kvp in frame)
-                    {
-                        HLSLValue val = kvp.Value is ReferenceValue rv ? rv.Get() : kvp.Value;
-                        try { copy[kvp.Key] = val?.Copy() ?? val!; }
-                        catch { copy[kvp.Key] = val!; }
-                    }
-                    return copy;
-                }
-
-                var frameCopies = runner.GetVariablesPerFrame().Select(CopyFrame).ToArray();
-                var globalCopy = CopyFrame(runner.GetGlobalVariables());
-
-                debugTrace.Add(new DebugStep
-                {
-                    Line = node.Span.Start.Line,
-                    CallStack = runner.GetCallStack(),
-                    FrameVariables = frameCopies,
-                    GlobalVariables = globalCopy,
-                    OutputOffset = sw.GetStringBuilder().Length,
-                    FrameThreadStates = runner.GetThreadStatesPerFrame()
-                });
-            };
-
-            runner.ProcessCode(code, MakeParserConfig(), out var diagnostics, out _);
-            var compileErrors = diagnostics.Where(d => (d.Kind & DiagnosticFlags.OnlyErrors) != 0).ToList();
-            if (compileErrors.Count > 0)
-            {
-                hasError = true;
-                errorMessage = string.Join("\n", compileErrors.Select(d => $"Line {d.Location.Line}, col {d.Location.Column}: {d.Text}"));
-                lastException = null;
-            }
-            else
-            {
-                var threadArg = BuildThreadArg(wx, wy, threadCount, groupOffsetX, groupOffsetY);
-                HLSLValue result = CallMain(threadArg);
-                TryExtractImage(result, wx, wy);
-            }
-        }
-        catch (Exception ex)
-        {
-            hasError = true;
-            errorMessage = ex.Message;
-            lastException = ex;
-        }
-        finally
-        {
-            runner.DebugHook = null;
-            Console.SetOut(oldOut);
-        }
-
-        output = sw.ToString();
-        needsImageRender = hasImage;
-        isRunning = false;
-
-        if (hasError && !(lastException is HLSLRunner.TestFailException && debugTrace.Count > 0))
-        {
-            // Compile/parse/runtime error, nothing useful to debug
             needsSectionHeightRestore = true;
-            StateHasChanged();
             return;
         }
 
-        isDebugging = true;
-        await JS.InvokeVoidAsync("setMonacoReadOnly", true);
-        debugTabIndex = activeTabIndex;
-        immediateCollapsed = false;
-        consoleCollapsed = false;
+        await editorPanel.SetReadOnly(true);
+        DebugCtl.DebugTabIndex = editorPanel.ActiveTabIndex;
         imageCollapsed = true;
-
-        // When failing, start at the last recorded step so the failing statement is highlighted
-        if (debugTrace.Count > 0)
-        {
-            debugStepIndex = hasError ? debugTrace.Count - 1 : 0;
-            await JS.InvokeVoidAsync("highlightDebugLine", currentDebugLine);
-        }
+        if (DebugCtl.CurrentSession?.Trace.Count > 0)
+            await editorPanel.HighlightLine(DebugCtl.CurrentDebugLine);
 
         needsSectionHeightRestore = true;
         needsThreadGridInit = true;
-        StateHasChanged();
     }
 
-    // --- Debug navigation ---
     private async Task EnsureOnDebugTab()
     {
-        if (debugTabIndex >= 0 && activeTabIndex != debugTabIndex)
-            await SwitchTab(debugTabIndex);
+        if (editorPanel == null) return;
+        if (DebugCtl.DebugTabIndex >= 0 && editorPanel.ActiveTabIndex != DebugCtl.DebugTabIndex)
+            await editorPanel.SwitchTab(DebugCtl.DebugTabIndex);
     }
 
-    private async Task StepForward()
+    private async Task StepForward()      => await NavigateAndHighlight(() => DebugCtl.StepForward());
+    private async Task StepBack()         => await NavigateAndHighlight(() => DebugCtl.StepBack());
+    private async Task StepOver()         => await NavigateAndHighlight(() => DebugCtl.StepOver());
+    private async Task StepOut()          => await NavigateAndHighlight(() => DebugCtl.StepOut());
+    private async Task StepOverBack()     => await NavigateAndHighlight(() => DebugCtl.StepOverBack());
+    private async Task StepOutBack()      => await NavigateAndHighlight(() => DebugCtl.StepOutBack());
+    private async Task ContinueToBreakpoint()     => await NavigateAndHighlight(() => DebugCtl.ContinueToBreakpoint());
+    private async Task ContinueToBreakpointBack() => await NavigateAndHighlight(() => DebugCtl.ContinueToBreakpointBack());
+
+    private async Task NavigateAndHighlight(Action move)
     {
         await EnsureOnDebugTab();
-        if (debugStepIndex < debugTrace.Count - 1)
-        {
-            debugStepIndex++;
-            selectedFrame = 0;
-            await JS.InvokeVoidAsync("highlightDebugLine", currentDebugLine);
-            StateHasChanged();
-        }
-    }
-
-    private async Task StepBack()
-    {
-        await EnsureOnDebugTab();
-        if (debugStepIndex > 0)
-        {
-            debugStepIndex--;
-            selectedFrame = 0;
-            await JS.InvokeVoidAsync("highlightDebugLine", currentDebugLine);
-            StateHasChanged();
-        }
-    }
-
-    private async Task StepOver()
-    {
-        await EnsureOnDebugTab();
-        if (debugStepIndex >= debugTrace.Count - 1) return;
-        int depth = debugTrace[debugStepIndex].CallDepth;
-        int next = debugStepIndex + 1;
-        if (depth > 0)
-        {
-            while (next < debugTrace.Count - 1 && debugTrace[next].CallDepth > depth)
-                next++;
-        }
-        debugStepIndex = next;
-        selectedFrame = 0;
-        await JS.InvokeVoidAsync("highlightDebugLine", currentDebugLine);
-        StateHasChanged();
-    }
-
-    private async Task StepOut()
-    {
-        await EnsureOnDebugTab();
-        if (debugStepIndex >= debugTrace.Count - 1) return;
-        int depth = debugTrace[debugStepIndex].CallDepth;
-        int next = debugStepIndex + 1;
-        while (next < debugTrace.Count - 1 && debugTrace[next].CallDepth >= depth)
-            next++;
-        debugStepIndex = next;
-        selectedFrame = 0;
-        await JS.InvokeVoidAsync("highlightDebugLine", currentDebugLine);
-        StateHasChanged();
-    }
-
-    private async Task ContinueToBreakpoint()
-    {
-        await EnsureOnDebugTab();
-        int next = debugStepIndex + 1;
-        while (next < debugTrace.Count && !breakpoints.Contains(debugTrace[next].Line))
-            next++;
-        debugStepIndex = Math.Min(next, debugTrace.Count - 1);
-        selectedFrame = 0;
-        await JS.InvokeVoidAsync("highlightDebugLine", currentDebugLine);
-        StateHasChanged();
-    }
-
-    private async Task ContinueToBreakpointBack()
-    {
-        await EnsureOnDebugTab();
-        int prev = debugStepIndex - 1;
-        while (prev > 0 && !breakpoints.Contains(debugTrace[prev].Line))
-            prev--;
-        debugStepIndex = Math.Max(prev, 0);
-        selectedFrame = 0;
-        await JS.InvokeVoidAsync("highlightDebugLine", currentDebugLine);
-        StateHasChanged();
-    }
-
-    private async Task StepOverBack()
-    {
-        await EnsureOnDebugTab();
-        if (debugStepIndex <= 0) return;
-        int depth = debugTrace[debugStepIndex].CallDepth;
-        int prev = debugStepIndex - 1;
-        while (prev > 0 && debugTrace[prev].CallDepth > depth)
-            prev--;
-        debugStepIndex = prev;
-        selectedFrame = 0;
-        await JS.InvokeVoidAsync("highlightDebugLine", currentDebugLine);
-        StateHasChanged();
-    }
-
-    private async Task StepOutBack()
-    {
-        await EnsureOnDebugTab();
-        if (debugStepIndex <= 0) return;
-        int depth = debugTrace[debugStepIndex].CallDepth;
-        int prev = debugStepIndex - 1;
-        while (prev > 0 && debugTrace[prev].CallDepth >= depth)
-            prev--;
-        debugStepIndex = prev;
-        selectedFrame = 0;
-        await JS.InvokeVoidAsync("highlightDebugLine", currentDebugLine);
-        StateHasChanged();
-    }
-
-
-    private void ToggleImageSection()
-    {
-        imageCollapsed = !imageCollapsed;
-        if (!imageCollapsed && hasImage && imagePixels != null)
-            needsImageRender = true;
+        if (DebugCtl.CurrentSession == null) return;
+        move();
+        if (editorPanel != null) await editorPanel.HighlightLine(DebugCtl.CurrentDebugLine);
     }
 
     private async Task ExitDebug()
     {
         await JS.InvokeVoidAsync("saveSectionHeights");
-        isDebugging = false;
-        await JS.InvokeVoidAsync("setMonacoReadOnly", false);
-        debugTabIndex = -1;
-        debugTrace = new();
-        debugStepIndex = -1;
-        consoleCollapsed = false;
-        imageCollapsed = false;
-        gpuCaptured = null;
-        isGpuMode = false;
-        if (_savedGroupOffsets.HasValue)
+        DebugCtl.ExitSession();
+        if (editorPanel != null)
         {
-            (groupOffsetX, groupOffsetY) = _savedGroupOffsets.Value;
-            _savedGroupOffsets = null;
+            await editorPanel.SetReadOnly(false);
+            await editorPanel.HighlightLine(0);
         }
-        await JS.InvokeVoidAsync("highlightDebugLine", 0);
+        imageCollapsed = false;
         await JS.InvokeVoidAsync("disposeThreadGridResize");
         needsSectionHeightRestore = true;
-        StateHasChanged();
-        if (gpuPreviewEnabled) await Run();
+        if (State.GpuPreviewEnabled) await Run();
     }
 
     [JSInvokable]
     public async Task ToggleBreakpoint(int line)
     {
-        if (breakpoints.Contains(line))
-            breakpoints.Remove(line);
-        else
-            breakpoints.Add(line);
-
-        await JS.InvokeVoidAsync("setBreakpoints", breakpoints.ToArray());
-        StateHasChanged();
-    }
-
-    // --- Value formatting ---
-    // --- Hierarchical variable list ---
-    private sealed class VarRow
-    {
-        public string Path = "";
-        public string Name = "";
-        public HLSLValue Value = null!;
-        public int Depth;
-        public bool IsExpandable;
-    }
-
-    private void ToggleVarPath(string path)
-    {
-        if (!expandedVarPaths.Remove(path))
-            expandedVarPaths.Add(path);
-    }
-
-    private void BuildVarRows(List<VarRow> rows, string name, HLSLValue value, int depth, string path)
-    {
-        if (value is ReferenceValue rv) value = rv.Get();
-        bool isExpandable = value is StructValue or ArrayValue or MatrixValue;
-        rows.Add(new VarRow { Path = path, Name = name, Value = value, Depth = depth, IsExpandable = isExpandable });
-
-        if (!isExpandable || !expandedVarPaths.Contains(path)) return;
-
-        if (value is StructValue sv)
-        {
-            foreach (var kvp in sv.Members)
-                BuildVarRows(rows, kvp.Key, kvp.Value, depth + 1, $"{path}.{kvp.Key}");
-        }
-        else if (value is ArrayValue av)
-        {
-            for (int i = 0; i < av.Values.Length; i++)
-                BuildVarRows(rows, $"[{i}]", av.Values[i], depth + 1, $"{path}[{i}]");
-        }
-        else if (value is MatrixValue mv)
-        {
-            for (int r = 0; r < mv.Rows; r++)
-            {
-                VectorValue rowVec;
-                int cols = mv.Columns;
-                if (mv.Values.IsVarying)
-                {
-                    var perThread = mv.Values.VaryingValues
-                        .Select(elems => elems.Skip(r * cols).Take(cols).ToArray())
-                        .ToArray();
-                    rowVec = new VectorValue(mv.Type, new HLSLRegister<RawValue[]>(perThread));
-                }
-                else
-                {
-                    var rowElems = mv.Values.UniformValue.Skip(r * cols).Take(cols).ToArray();
-                    rowVec = new VectorValue(mv.Type, new HLSLRegister<RawValue[]>(rowElems));
-                }
-                BuildVarRows(rows, $"[{r}]", rowVec, depth + 1, $"{path}[{r}]");
-            }
-        }
-    }
-
-    private string FormatValue(HLSLValue value, int threadIndex)
-    {
-        if (value is ReferenceValue rv) value = rv.Get();
-        if (value == null) return "null";
-
-        return value switch
-        {
-            ScalarValue sv => FormatScalar(sv, threadIndex),
-            VectorValue vv => FormatVector(vv, threadIndex),
-            MatrixValue mv => FormatMatrix(mv, threadIndex),
-            StructValue sv2 => FormatStruct(sv2, threadIndex),
-            ArrayValue av => $"[{av.Values.Length}]",
-            PredefinedObjectValue pov => pov.ToString(),
-            _ => value.GetType().Name
-        };
-    }
-
-    private string FormatScalar(ScalarValue sv, int threadIndex)
-    {
-        try
-        {
-            int idx = Math.Min(threadIndex, sv.ThreadCount - 1);
-            return FormatRawValue(sv.Value.Get(idx), sv.Type);
-        }
-        catch { return "?"; }
-    }
-
-    private string FormatVector(VectorValue vv, int threadIndex)
-    {
-        try
-        {
-            int idx = Math.Min(threadIndex, vv.ThreadCount - 1);
-            RawValue[] comps = vv.Values.Get(idx);
-            if (comps == null) return "(null)";
-            return $"({string.Join(", ", comps.Select(c => FormatRawValue(c, vv.Type)))})";
-        }
-        catch { return "?"; }
-    }
-
-    private string FormatMatrix(MatrixValue mv, int threadIndex)
-    {
-        return $"[{mv.Rows}×{mv.Columns}]";
-    }
-
-    private string FormatStruct(StructValue sv, int threadIndex)
-    {
-        try
-        {
-            var parts = sv.Members.Take(4).Select(kv => $"{kv.Key}: {FormatValue(kv.Value, threadIndex)}");
-            string body = string.Join(", ", parts);
-            if (sv.Members.Count > 4) body += ", ...";
-            return "{" + body + "}";
-        }
-        catch { return "{struct}"; }
-    }
-
-    private static string FormatRawValue(RawValue rv, ScalarType type)
-    {
-        if (HLSLTypeUtils.IsInt(type)) return rv.Int.ToString(CultureInfo.InvariantCulture);
-        if (HLSLTypeUtils.IsUint(type)) return rv.Uint.ToString(CultureInfo.InvariantCulture);
-        if (type == ScalarType.Double) return rv.Double.ToString("G6", CultureInfo.InvariantCulture);
-        if (HLSLTypeUtils.IsFloat(type)) return rv.Float.ToString("G6", CultureInfo.InvariantCulture);
-        if (type == ScalarType.Bool) return rv.Bool.ToString(CultureInfo.InvariantCulture);
-        if (type == ScalarType.Char) return rv.Char.ToString(CultureInfo.InvariantCulture);
-        return rv.Int.ToString(CultureInfo.InvariantCulture);
-    }
-
-    public sealed class HoverInfo
-    {
-        public string Value { get; set; } = "";
-        public int Width { get; set; }
-        public int Height { get; set; }
-        public byte[]? Rgba { get; set; }
-        public int InspectedX { get; set; }
-        public int InspectedY { get; set; }
+        DebugCtl.ToggleBreakpoint(line);
+        await JS.InvokeVoidAsync("setBreakpoints", DebugCtl.Breakpoints.ToArray());
     }
 
     [JSInvokable]
-    public HoverInfo? GetHoverInfo(string identifier)
-    {
-        if (!isDebugging || debugStepIndex < 0 || debugStepIndex >= debugTrace.Count)
-            return null;
-        var step = debugTrace[debugStepIndex];
-        HLSLValue? val = null;
-        if (step.FrameVariables.Length > 0 && step.FrameVariables[0].TryGetValue(identifier, out var lv))
-            val = lv;
-        else if (step.GlobalVariables.TryGetValue(identifier, out var gv))
-            val = gv;
-        if (val == null) return null;
+    public HoverInfo? GetHoverInfo(string identifier) => editorPanel?.BuildHoverInfo(identifier);
 
-        byte[]? rgba = null;
-        try { rgba = RenderVariableImage(val is ReferenceValue rv ? rv.Get() : val, warpX, warpY); }
-        catch (Exception ex) { Console.WriteLine($"[hover] image render failed for '{identifier}': {ex.Message}"); }
-        return new HoverInfo
-        {
-            Value = FormatValue(val, inspectedThread),
-            Width = warpX,
-            Height = warpY,
-            Rgba = rgba,
-            InspectedX = warpX > 0 ? inspectedThread % warpX : 0,
-            InspectedY = warpX > 0 ? inspectedThread / warpX : 0,
-        };
-    }
-
-    private static byte[]? RenderVariableImage(HLSLValue val, int wx, int wy)
-    {
-        int threadCount = wx * wy;
-        if (val is VectorValue vv)
-        {
-            var asFloat = (VectorValue)vv.Cast(ScalarType.Float);
-            int components = vv.Size;
-            // Normalize against the RGB peak so dim values stay visible. Alpha
-            // passes through verbatim.
-            float peak = 1f;
-            int rgbChannels = Math.Min(3, components);
-            for (int i = 0; i < threadCount; i++)
-            {
-                var c = asFloat.Values.Get(i);
-                for (int k = 0; k < rgbChannels; k++)
-                    if (c[k].Float > peak) peak = c[k].Float;
-            }
-            float scale = 1f / peak;
-            var rgba = new byte[threadCount * 4];
-            for (int i = 0; i < threadCount; i++)
-            {
-                var c = asFloat.Values.Get(i);
-                rgba[i * 4 + 0] = FloatToByte((components > 0 ? c[0].Float : 0f) * scale);
-                rgba[i * 4 + 1] = FloatToByte((components > 1 ? c[1].Float : 0f) * scale);
-                rgba[i * 4 + 2] = FloatToByte((components > 2 ? c[2].Float : 0f) * scale);
-                rgba[i * 4 + 3] = FloatToByte(components > 3 ? c[3].Float : 1f);
-            }
-            return rgba;
-        }
-        if (val is ScalarValue sv && sv.Type != ScalarType.Void)
-        {
-            float peak = 1f;
-            for (int i = 0; i < threadCount; i++)
-            {
-                float v = sv.AsFloat(i);
-                if (v > peak) peak = v;
-            }
-            float scale = 1f / peak;
-            var rgba = new byte[threadCount * 4];
-            for (int i = 0; i < threadCount; i++)
-            {
-                byte gray = FloatToByte(sv.AsFloat(i) * scale);
-                rgba[i * 4 + 0] = gray;
-                rgba[i * 4 + 1] = gray;
-                rgba[i * 4 + 2] = gray;
-                rgba[i * 4 + 3] = 255;
-            }
-            return rgba;
-        }
-        return null;
-    }
-
-    // --- Helpers shared by Run and StartDebug ---
     private HLSLParserConfig MakeParserConfig()
     {
-        string? filePath = TabbedEditorConfig.Enabled && editorTabs.Count > 0
-            ? editorTabs[activeTabIndex].Path
-            : null;
+        string? filePath = editorPanel?.ActiveTabPath;
         return new HLSLParserConfig
         {
             BasePath = filePath != null ? System.IO.Path.GetDirectoryName(filePath) ?? "" : ""
         };
     }
 
-    private static VectorValue BuildThreadArg(int wx, int wy, int threadCount, int groupOffsetX = 0, int groupOffsetY = 0)
-    {
-        var threadIds = new RawValue[threadCount][];
-        for (int i = 0; i < threadCount; i++)
-            threadIds[i] = new RawValue[] {
-                (float)(i % wx + groupOffsetX * wx) + 0.5f,
-                (float)(i / wx + groupOffsetY * wy) + 0.5f,
-                0.0f,
-                1.0f
-            };
-        return new VectorValue(ScalarType.Float, new HLSLRegister<RawValue[]>(threadIds).Converge());
-    }
-
-    private HLSLValue CallMain(VectorValue threadArg)
-    {
-        try
-        {
-            return runner.CallFunction(entryPoint, threadArg);
-        }
-        catch (Exception ex) when (ex.Message.Contains($"Unknown function '{entryPoint}' called."))
-        {
-            return runner.CallFunction(entryPoint);
-        }
-    }
-
-    private static HLSLValue CallMainWith(HLSLRunner r, VectorValue threadArg, string entryPoint)
-    {
-        try
-        {
-            return r.CallFunction(entryPoint, threadArg);
-        }
-        catch (Exception ex) when (ex.Message.Contains($"Unknown function '{entryPoint}' called."))
-        {
-            return r.CallFunction(entryPoint);
-        }
-    }
-
-    private async Task OnImmediateKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter") await EvaluateImmediate();
-    }
-
-    private async Task EvaluateImmediate()
-    {
-        string expr = immediateInput.Trim();
-        if (string.IsNullOrEmpty(expr) || debugStepIndex < 0 || string.IsNullOrEmpty(debugCode)) return;
-        immediateInput = "";
-
-        int wx = Math.Max(1, warpX);
-        int wy = Math.Max(1, warpY);
-        int threadCount = wx * wy;
-
-        string resultStr;
-        bool isError = false;
-        HLSLValue evalResult = null;
-
-        try
-        {
-            var evalRunner = new HLSLRunner(wx, wy);
-            SetSharedGlobals(evalRunner, wx, wy);
-
-            Exception evalError = null;
-            int stepCount = 0;
-            int targetStep = debugStepIndex;
-
-            evalRunner.DebugHook = _ =>
-            {
-                if (stepCount == targetStep)
-                {
-                    try { evalResult = evalRunner.EvaluateExpression(expr); }
-                    catch (Exception ex) { evalError = ex; }
-                    throw new OperationCanceledException();
-                }
-                stepCount++;
-            };
-
-            var sw = new System.IO.StringWriter();
-            var oldOut = Console.Out;
-            Console.SetOut(sw);
-            try
-            {
-                bool cancelledInProcessCode = false;
-                try { evalRunner.ProcessCode(debugCode, MakeParserConfig()); }
-                catch (OperationCanceledException) { cancelledInProcessCode = true; }
-                if (!cancelledInProcessCode)
-                {
-                    var threadArg = BuildThreadArg(wx, wy, threadCount, groupOffsetX, groupOffsetY);
-                    try { CallMainWith(evalRunner, threadArg, entryPoint); }
-                    catch (OperationCanceledException) { }
-                }
-            }
-            finally { Console.SetOut(oldOut); }
-
-            if (evalError != null) { resultStr = evalError.Message; isError = true; }
-            else if (evalResult != null) resultStr = FormatValue(evalResult, inspectedThread);
-            else { resultStr = "(step not reached - expression may be after this point)"; isError = true; }
-        }
-        catch (Exception ex)
-        {
-            resultStr = ex.Message;
-            isError = true;
-        }
-
-        string? imageDataUrl = null;
-        if (!isError && evalResult != null)
-        {
-            byte[]? rgba = null;
-            try { rgba = RenderVariableImage(evalResult is ReferenceValue rv ? rv.Get() : evalResult, wx, wy); }
-            catch { }
-            if (rgba != null)
-            {
-                int ix = warpX > 0 ? inspectedThread % warpX : 0;
-                int iy = warpX > 0 ? inspectedThread / warpX : 0;
-                try { imageDataUrl = await JS.InvokeAsync<string>("rgbaToDataUrl", rgba, wx, wy, ix, iy, 0.7); }
-                catch { }
-            }
-        }
-
-        immediateHistory.Add(new ImmediateEntry { Expression = expr, Result = resultStr, IsError = isError, ImageDataUrl = imageDataUrl });
-        StateHasChanged();
-        await Task.Yield();
-        await JS.InvokeVoidAsync("scrollImmediateToBottom");
-    }
-
-    private void TryExtractImage(HLSLValue result, int wx, int wy)
-    {
-        int threadCount = wx * wy;
-
-        if (result is VectorValue vv)
-        {
-            int components = vv.Size;
-            imageWidth = wx;
-            imageHeight = wy;
-            imagePixels = new byte[threadCount * 4];
-            var asFloat = (VectorValue)vv.Cast(ScalarType.Float);
-            for (int i = 0; i < threadCount; i++)
-            {
-                var c = asFloat.Values.Get(i);
-                imagePixels[i * 4 + 0] = FloatToByte(components > 0 ? c[0].Float : 0f);
-                imagePixels[i * 4 + 1] = FloatToByte(components > 1 ? c[1].Float : 0f);
-                imagePixels[i * 4 + 2] = FloatToByte(components > 2 ? c[2].Float : 0f);
-                imagePixels[i * 4 + 3] = FloatToByte(components > 3 ? c[3].Float : 1f);
-            }
-            hasImage = true;
-        }
-        else if (result is ScalarValue sv && sv.Type != ScalarType.Void)
-        {
-            imageWidth = wx;
-            imageHeight = wy;
-            imagePixels = new byte[threadCount * 4];
-            for (int i = 0; i < threadCount; i++)
-            {
-                byte gray = FloatToByte(sv.AsFloat(i));
-                imagePixels[i * 4 + 0] = gray;
-                imagePixels[i * 4 + 1] = gray;
-                imagePixels[i * 4 + 2] = gray;
-                imagePixels[i * 4 + 3] = 255;
-            }
-            hasImage = true;
-        }
-    }
-
-    private static byte FloatToByte(float v) => (byte)(Math.Clamp(v, 0f, 1f) * 255f + 0.5f);
-
-    // --- Permalink ---
-    private static string GetQueryParam(string url, string key)
-    {
-        var query = new Uri(url).Query.TrimStart('?');
-        foreach (var part in query.Split('&'))
-        {
-            var kv = part.Split('=', 2);
-            if (kv.Length == 2 && Uri.UnescapeDataString(kv[0]) == key)
-                return Uri.UnescapeDataString(kv[1]);
-        }
-        return null;
-    }
-
-    private static string CompressCode(string code)
-    {
-        var bytes = Encoding.UTF8.GetBytes(code);
-        using var output = new MemoryStream();
-        using (var gz = new GZipStream(output, CompressionLevel.Optimal))
-            gz.Write(bytes, 0, bytes.Length);
-        return Convert.ToBase64String(output.ToArray())
-            .Replace('+', '-').Replace('/', '_').TrimEnd('=');
-    }
-
-    private static string DecompressCode(string encoded)
-    {
-        encoded = encoded.Replace('-', '+').Replace('_', '/');
-        switch (encoded.Length % 4)
-        {
-            case 2: encoded += "=="; break;
-            case 3: encoded += "="; break;
-        }
-        var bytes = Convert.FromBase64String(encoded);
-        using var input = new MemoryStream(bytes);
-        using var gz = new GZipStream(input, CompressionMode.Decompress);
-        using var output = new MemoryStream();
-        gz.CopyTo(output);
-        return Encoding.UTF8.GetString(output.ToArray());
-    }
-
     private async Task CopyPermalink()
     {
-        string code = await JS.InvokeAsync<string>("getMonacoValue");
-        string encoded = CompressCode(code);
+        string code = editorPanel != null ? await editorPanel.GetCode() : "";
         string baseUrl = PermalinkBase.Url ?? new Uri(Nav.Uri).GetLeftPart(UriPartial.Path);
-        string permalink = $"{baseUrl.TrimEnd('/')}/?c={encoded}"
-            + $"&e={Uri.EscapeDataString(entryPoint)}"
-            + $"&wx={warpX}&wy={warpY}"
-            + $"&gx={groupOffsetX}&gy={groupOffsetY}"
-            + $"&g={(gpuPreviewEnabled ? 1 : 0)}";
-        await JS.InvokeVoidAsync("copyToClipboard", permalink);
-    }
-
-    private void ApplyPermalinkSettings()
-    {
-        var e = GetQueryParam(Nav.Uri, "e");
-        if (!string.IsNullOrEmpty(e)) entryPoint = e;
-        if (int.TryParse(GetQueryParam(Nav.Uri, "wx"), out var wx) && wx > 0) warpX = wx;
-        if (int.TryParse(GetQueryParam(Nav.Uri, "wy"), out var wy) && wy > 0) warpY = wy;
-        if (int.TryParse(GetQueryParam(Nav.Uri, "gx"), out var gx) && gx >= 0) groupOffsetX = gx;
-        if (int.TryParse(GetQueryParam(Nav.Uri, "gy"), out var gy) && gy >= 0) groupOffsetY = gy;
-        var g = GetQueryParam(Nav.Uri, "g");
-        if (g == "1") gpuPreviewEnabled = true;
-        else if (g == "0") gpuPreviewEnabled = false;
+        await PermalinkCodec.CopyToClipboardAsync(JS, code, baseUrl, State.ToPermalinkSettings());
     }
 
     public async ValueTask DisposeAsync()
     {
+        State.PropertyChanged -= OnStateChanged;
+        RunCtl.PropertyChanged -= OnStateChanged;
+        DebugCtl.PropertyChanged -= OnStateChanged;
         dotNetRef?.Dispose();
         await JS.InvokeVoidAsync("highlightDebugLine", 0);
         await JS.InvokeVoidAsync("setBreakpoints", Array.Empty<int>());

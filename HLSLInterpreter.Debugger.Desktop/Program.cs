@@ -4,6 +4,7 @@ using BlazorDesktop.Hosting;
 using HLSLInterpreter.Debugger.Desktop.Components;
 using HLSLInterpreter.Debugger.Desktop;
 using HLSLInterpreter.Debugger;
+using HLSLInterpreter.Debugger.Core;
 
 var builder = BlazorDesktopHostBuilder.CreateDefault(args);
 
@@ -22,6 +23,9 @@ if (args.Length > 0 && File.Exists(args[0]))
 builder.Services.AddSingleton(new InitialCodeOverride { Code = initialCode, Name = initialName, Path = args.Length > 0 ? args[0] : null });
 builder.Services.AddSingleton(new TabbedEditor { Enabled = true });
 builder.Services.AddSingleton<FileDialogService, WpfFileDialogService>();
+builder.Services.AddScoped<DebuggerAppState>();
+builder.Services.AddScoped<RunController>();
+builder.Services.AddScoped<DebugController>();
 
 builder.Window.UseTitle("HLSL Interpreter");
 builder.Window.UseWidth(1600);
