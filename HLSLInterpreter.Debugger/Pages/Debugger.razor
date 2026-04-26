@@ -83,7 +83,8 @@
                      InitialCodeName="@(InitialCode.Name ?? "new.hlsl")"
                      InitialCodePath="@InitialCode.Path"
                      DotNetRef="@dotNetRef"
-                     OnTabSwitched="@OnEditorTabSwitched" />
+                     OnTabSwitched="@OnEditorTabSwitched"
+                     OnReady="@Run" />
 
         <div class="resize-h-handle" title="Drag to resize"></div>
 
@@ -258,10 +259,6 @@ float4 main(float4 position : SV_Position) : SV_Target
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
-        {
-            await Run();
-        }
 
         if (needsSectionHeightRestore)
         {
