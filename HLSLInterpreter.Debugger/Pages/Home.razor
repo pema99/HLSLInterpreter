@@ -274,26 +274,49 @@
                                     <div class="hint">Use Step or Continue to inspect call stack.</div>
                                 }
                             </div>
-                            @if (threadStates.Length > 0)
+                            @{
+                                bool showImage = debugBottomMode == "PixelColors" || debugBottomMode == "Both";
+                            }
+                            @if (threadStates.Length > 0 || showImage)
                             {
                                 <div class="resize-inner-h-handle" id="callstack-exec-divider"></div>
-                                <div class="exec-state-body" id="thread-grid-container">
-                                    <div class="thread-grid">
-                                        @for (int ti = 0; ti < threadStates.Length; ti++)
+                                <div class="exec-state-pane">
+                                    <div class="exec-state-body" id="thread-grid-container">
+                                        @if (showImage)
                                         {
-                                            var tidx = ti;
-                                            var state = threadStates[ti];
-                                            var stateClass = state switch {
-                                                HLSLExecutionState.ThreadState.Active    => "tc-active",
-                                                HLSLExecutionState.ThreadState.Inactive  => "tc-diverged",
-                                                HLSLExecutionState.ThreadState.Suspended => "tc-suspended",
-                                                _ => ""
-                                            };
-                                            var label = $"Thread ({ti % warpX}, {ti / warpX}) – {state}";
-                                            <div class="thread-cell @stateClass @(tidx == inspectedThread ? "tc-selected" : "")"
-                                                 title="@label"
-                                                 @onclick="() => inspectedThread = tidx"></div>
+                                            <div class="image-container" id="image-container-debug" data-mode-target="debug">
+                                                <canvas class="image-canvas color-canvas-2d"></canvas>
+                                                <canvas class="image-overlay"></canvas>
+                                            </div>
                                         }
+                                        else
+                                        {
+                                            <div class="thread-grid">
+                                                @for (int ti = 0; ti < threadStates.Length; ti++)
+                                                {
+                                                    var tidx = ti;
+                                                    var state = threadStates[ti];
+                                                    var stateClass = state switch {
+                                                        HLSLExecutionState.ThreadState.Active    => "tc-active",
+                                                        HLSLExecutionState.ThreadState.Inactive  => "tc-diverged",
+                                                        HLSLExecutionState.ThreadState.Suspended => "tc-suspended",
+                                                        _ => ""
+                                                    };
+                                                    var label = $"Thread ({ti % warpX}, {ti / warpX}) - {state}";
+                                                    <div class="thread-cell @stateClass @(tidx == inspectedThread ? "tc-selected" : "")"
+                                                         title="@label"
+                                                         @onclick="() => inspectedThread = tidx"></div>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                    <div class="bottom-mode-row">
+                                        <label>Mode</label>
+                                        <select @bind="debugBottomMode">
+                                            <option value="ThreadStates">Thread states</option>
+                                            <option value="PixelColors">Pixel colors</option>
+                                            <option value="Both">Both</option>
+                                        </select>
                                     </div>
                                 </div>
                             }
@@ -369,33 +392,38 @@
                     }
                 </div>
 
-                <!-- Color Output -->
-                @if (hasImage)
-                {
-                    <div class="debug-section debug-section-image @(imageCollapsed ? "section-collapsed" : "")">
-                        <div class="panel-header collapsible-header" @onclick="ToggleImageSection">
-                            <div class="panel-header-left">
-                                <span class="collapse-icon @(imageCollapsed ? "" : "expanded")">&#x203A;</span>
-                                <span>Color Output</span>
-                            </div>
-                        </div>
-                        @if (!imageCollapsed)
-                        {
-                            <div class="image-container">
-                                <canvas id="color-canvas"></canvas>
-                            </div>
-                            <div class="resize-v-handle" title="Drag to resize"></div>
-                        }
-                    </div>
-                }
-
                 <div class="debug-panel-spacer"></div>
             }
             else
             {
+                <!-- Color Output -->
+                <div class="debug-section debug-section-image @(imageCollapsed ? "section-collapsed" : "")">
+                    <div class="panel-header collapsible-header" @onclick="ToggleImageSection">
+                        <div class="panel-header-left">
+                            <span class="collapse-icon @(imageCollapsed ? "" : "expanded")">&#x203A;</span>
+                            <span>Color Output</span>
+                        </div>
+                        <label class="settings-toggle panel-header-toggle" title="Use GPU"
+                               @onclick:stopPropagation="true">
+                            <input type="checkbox" @bind="gpuPreviewEnabled" @bind:after="Run" disabled="@(isRunning || isDebugging)" />
+                            <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
+                            <span class="panel-header-toggle-label">Use GPU</span>
+                        </label>
+                    </div>
+                    @if (!imageCollapsed)
+                    {
+                        <div class="image-container @(isGpuMode ? "gpu-mode" : "")" id="image-container" data-mode-target="regular">
+                            <canvas class="image-canvas color-canvas-2d"></canvas>
+                            <canvas id="color-canvas-gpu" class="image-canvas"></canvas>
+                            <canvas class="image-overlay"></canvas>
+                        </div>
+                        <div class="resize-v-handle" title="Drag to resize"></div>
+                    }
+                </div>
+
                 <!-- Console -->
                 <div class="debug-section debug-section-console @(consoleCollapsed ? "section-collapsed" : "")"
-                     style="--section-h: 240px;">
+                     style="--section-h: 260px;">
                     <div class="panel-header collapsible-header" @onclick="() => consoleCollapsed = !consoleCollapsed">
                         <div class="panel-header-left">
                             <span class="collapse-icon @(consoleCollapsed ? "" : "expanded")">&#x203A;</span>
@@ -405,21 +433,21 @@
                     @if (!consoleCollapsed)
                     {
                         <div class="output-body">
-                            @if (output == null && !isRunning)
+                            @if (hasError)
+                            {
+                                <pre class="error-text">@errorMessage</pre>
+                            }
+                            else if (gpuPreviewEnabled)
+                            {
+                                <div class="hint">Console output unavailable in GPU mode.</div>
+                            }
+                            else if (output == null)
                             {
                                 <div class="hint">Press <strong>Run</strong> or <strong>Ctrl+Enter</strong> to execute.</div>
                             }
-                            else if (isRunning)
-                            {
-                                <div class="hint running-hint"><span class="spinner spinner-output"></span> Running...</div>
-                            }
-                            else if (output!.Length == 0 && !hasError)
+                            else if (output.Length == 0)
                             {
                                 <div class="hint">No output.</div>
-                            }
-                            else if (hasError)
-                            {
-                                <pre class="error-text">@errorMessage</pre>
                             }
                             else
                             {
@@ -429,26 +457,6 @@
                         <div class="resize-v-handle" title="Drag to resize"></div>
                     }
                 </div>
-
-                <!-- Color Output -->
-                @if (hasImage)
-                {
-                    <div class="debug-section debug-section-image @(imageCollapsed ? "section-collapsed" : "")">
-                        <div class="panel-header collapsible-header" @onclick="ToggleImageSection">
-                            <div class="panel-header-left">
-                                <span class="collapse-icon @(imageCollapsed ? "" : "expanded")">&#x203A;</span>
-                                <span>Color Output</span>
-                            </div>
-                        </div>
-                        @if (!imageCollapsed)
-                        {
-                            <div class="image-container">
-                                <canvas id="color-canvas"></canvas>
-                            </div>
-                            <div class="resize-v-handle" title="Drag to resize"></div>
-                        }
-                    </div>
-                }
 
                 <div class="debug-panel-spacer"></div>
             }
@@ -508,8 +516,8 @@ float3 hueShift (float3 color, float shift)
 
 float4 main(float4 position : SV_Position) : SV_Target
 {
-    float2 res = float2(WARP_SIZE_X, WARP_SIZE_Y);
-    float2 uv = (position.xy / res) - 0.5;
+    float2 uv = (position.xy / _Resolution) - 0.5;
+    uv.x *= _Resolution.x/_Resolution.y;
     float dist = length(uv);
     float angle = atan2(uv.y, uv.x) + 0.4;
     float wave = sin(dist * TWIST - angle * ARMS);
@@ -638,6 +646,22 @@ float4 main(float4 position : SV_Position) : SV_Target
     private string entryPoint = "main";
     private int groupOffsetX = 0;
     private int groupOffsetY = 0;
+    private bool isGpuMode = false;
+    private bool gpuPreviewEnabled = false;
+    private (float Time, int CanvasW, int CanvasH)? gpuCaptured = null;
+    private (int X, int Y)? _savedGroupOffsets = null;
+    private string _debugBottomMode = "ThreadStates";
+    private string debugBottomMode
+    {
+        get => _debugBottomMode;
+        set
+        {
+            if (_debugBottomMode == value) return;
+            _debugBottomMode = value;
+            if (value == "PixelColors" || value == "Both") needsImageRender = true;
+            else needsThreadGridInit = true;
+        }
+    }
 
     // --- Settings ---
     private bool showSettings = false;
@@ -746,6 +770,8 @@ float4 main(float4 position : SV_Position) : SV_Target
 
             if (TabbedEditorConfig.Enabled)
                 FileDialogs.FileDropped = async (name, content, path) => await OpenFileInTab(name, content, path);
+
+            await Run();
         }
 
         if (needsSectionHeightRestore)
@@ -754,11 +780,45 @@ float4 main(float4 position : SV_Position) : SV_Target
             await JS.InvokeVoidAsync("restoreSectionHeights");
         }
 
+        // imagestate.js applies this cache to image-containers as they mount,
+        // so we don't have to race Blazor's render lifecycle.
         if (needsImageRender && imagePixels != null)
         {
             needsImageRender = false;
             await JS.InvokeVoidAsync("restoreImageSectionHeight");
-            await JS.InvokeVoidAsync("renderPixels", "color-canvas", imagePixels, imageWidth, imageHeight);
+            await JS.InvokeVoidAsync("imgSetWarp", warpX, warpY);
+            await JS.InvokeVoidAsync("imgSetPixels", imagePixels, imageWidth, imageHeight);
+        }
+
+        await JS.InvokeVoidAsync("imgSetRegularMode", isGpuMode ? "gpu" : "cpu");
+        string debugMode = isDebugging
+            ? (debugBottomMode == "Both" ? "both"
+                : debugBottomMode == "PixelColors" ? "debug"
+                : "idle")
+            : "idle";
+        await JS.InvokeVoidAsync("imgSetDebugMode", debugMode);
+
+        if (isDebugging && warpX > 0)
+        {
+            await JS.InvokeVoidAsync("imgSetDebugPixel",
+                _inspectedThread % warpX, _inspectedThread / warpX);
+            var step = (debugStepIndex >= 0 && debugStepIndex < debugTrace.Count) ? debugTrace[debugStepIndex] : null;
+            var fIdx = step != null ? Math.Clamp(selectedFrame, 0, Math.Max(0, step.FrameThreadStates.Length - 1)) : 0;
+            var states = (step != null && fIdx < step.FrameThreadStates.Length)
+                ? step.FrameThreadStates[fIdx] : Array.Empty<HLSLExecutionState.ThreadState>();
+            await JS.InvokeVoidAsync("imgSetThreadStates", states.Select(s => (int)s).ToArray());
+            await JS.InvokeVoidAsync("imgSetCpuClickHandler", null, null);
+            await JS.InvokeVoidAsync("imgSetDebugClickHandler", true);
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("imgSetDebugPixel", null, null);
+            await JS.InvokeVoidAsync("imgSetThreadStates", (int[]?)null);
+            await JS.InvokeVoidAsync("imgSetDebugClickHandler", false);
+            if (!isGpuMode)
+                await JS.InvokeVoidAsync("imgSetCpuClickHandler", warpX, warpY);
+            else
+                await JS.InvokeVoidAsync("imgSetCpuClickHandler", null, null);
         }
 
         if (needsThreadGridInit)
@@ -768,23 +828,37 @@ float4 main(float4 position : SV_Position) : SV_Target
         }
     }
 
-    // --- Run (normal mode) ---
     private async Task Run()
     {
         isRunning = true;
         hasError = false;
         errorMessage = "";
         lastException = null;
-        output = null;
-        hasImage = false;
+        output = "";
         imagePixels = null;
+        gpuCaptured = null;
+        hasImage = false;
+        isGpuMode = false;
+        // RunCpu needs any prior GPU loop dead so its ResizeObserver stops
+        // pushing stale dimensions into the viewport.
+        try { await JS.InvokeVoidAsync("gpuStop"); } catch { }
         StateHasChanged();
         await Task.Yield();
 
+        if (gpuPreviewEnabled)
+            await RunGpu();
+        else
+            await RunCpu();
+
+        isRunning = false;
+        StateHasChanged();
+    }
+
+    private async Task RunCpu()
+    {
         var sw = new System.IO.StringWriter();
         var oldOut = Console.Out;
         Console.SetOut(sw);
-
         try
         {
             string code = await JS.InvokeAsync<string>("getMonacoValue");
@@ -795,8 +869,7 @@ float4 main(float4 position : SV_Position) : SV_Target
             runner.DebugHook = null;
             runner.Reset();
             runner.SetWarpSize(wx, wy);
-            runner.SetVariable("WARP_SIZE_X", new ScalarValue(ScalarType.Uint, new HLSLRegister<RawValue>((uint)wx)));
-            runner.SetVariable("WARP_SIZE_Y", new ScalarValue(ScalarType.Uint, new HLSLRegister<RawValue>((uint)wy)));
+            SetSharedGlobals(runner, wx, wy);
             runner.ProcessCode(code, MakeParserConfig());
 
             var threadArg = BuildThreadArg(wx, wy, threadCount, groupOffsetX, groupOffsetY);
@@ -808,15 +881,82 @@ float4 main(float4 position : SV_Position) : SV_Target
             hasError = true;
             errorMessage = ex.Message;
         }
-        finally
-        {
-            Console.SetOut(oldOut);
-        }
+        finally { Console.SetOut(oldOut); }
 
         output = sw.ToString();
         needsImageRender = hasImage;
-        isRunning = false;
+    }
+
+    private async Task RunGpu()
+    {
+        bool hasGpu = false;
+        try { hasGpu = await JS.InvokeAsync<bool>("gpuIsAvailable"); }
+        catch { hasGpu = false; }
+        if (!hasGpu)
+        {
+            hasError = true;
+            errorMessage = "WebGPU is not available in this browser. Use Debug to step through on the CPU interpreter instead.";
+            return;
+        }
+
+        hasImage = true;
+        isGpuMode = true;
+        // Expand the section so color-canvas-gpu is in the DOM for gpuRender.
+        imageCollapsed = false;
         StateHasChanged();
+        await Task.Yield();
+
+        try
+        {
+            string code = await JS.InvokeAsync<string>("getMonacoValue");
+            int wx = Math.Max(1, warpX);
+            int wy = Math.Max(1, warpY);
+            await JS.InvokeVoidAsync("gpuRender", "color-canvas-gpu", code,
+                entryPoint, wx, wy, dotNetRef);
+        }
+        catch (Exception ex)
+        {
+            hasError = true;
+            errorMessage = ex.Message;
+            lastException = ex;
+        }
+    }
+
+    [JSInvokable]
+    public void SetInspectedPixel(int px, int py)
+    {
+        if (warpX <= 0) return;
+        inspectedThread = py * warpX + px;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public async Task StartDebugAtPixel(int px, int py, float time, int canvasW, int canvasH)
+    {
+        try { await JS.InvokeVoidAsync("gpuStop"); } catch { }
+
+        int wx = Math.Max(1, warpX);
+        int wy = Math.Max(1, warpY);
+        _savedGroupOffsets = (groupOffsetX, groupOffsetY);
+        groupOffsetX = px / wx;
+        groupOffsetY = py / wy;
+        _inspectedThread = (py % wy) * wx + (px % wx);
+        gpuCaptured = (time, canvasW, canvasH);
+
+        await StartDebug();
+    }
+
+    private void SetSharedGlobals(HLSLRunner r, int wx, int wy)
+    {
+        r.SetVariable("_WarpSize", new VectorValue(ScalarType.Float,
+            new HLSLRegister<RawValue[]>(new RawValue[] { (float)wx, (float)wy })));
+        bool useCapture = gpuPreviewEnabled && gpuCaptured.HasValue;
+        float resW = useCapture ? gpuCaptured.Value.CanvasW : wx;
+        float resH = useCapture ? gpuCaptured.Value.CanvasH : wy;
+        float t = useCapture ? gpuCaptured.Value.Time : 0f;
+        r.SetVariable("_Resolution", new VectorValue(ScalarType.Float,
+            new HLSLRegister<RawValue[]>(new RawValue[] { resW, resH })));
+        r.SetVariable("_Time", new ScalarValue(ScalarType.Float, new HLSLRegister<RawValue>(t)));
     }
 
     // --- Debug: record trace ---
@@ -827,6 +967,21 @@ float4 main(float4 position : SV_Position) : SV_Target
         errorMessage = "";
         lastException = null;
         output = null;
+        // Debug-button entry while GPU is on: snapshot canvas size + time so
+        // the warp render reproduces the same _Resolution and _Time the GPU
+        // saw. Pixel-click entries set gpuCaptured themselves.
+        if (gpuPreviewEnabled && !gpuCaptured.HasValue)
+        {
+            try
+            {
+                var snap = await JS.InvokeAsync<float[]>("gpuSnapshot");
+                if (snap != null && snap.Length == 3 && snap[1] > 0 && snap[2] > 0)
+                    gpuCaptured = (snap[0], (int)snap[1], (int)snap[2]);
+            }
+            catch { }
+        }
+        try { await JS.InvokeVoidAsync("gpuStop"); } catch { }
+        isGpuMode = false;
         hasImage = false;
         imagePixels = null;
         debugTrace = new();
@@ -850,8 +1005,7 @@ float4 main(float4 position : SV_Position) : SV_Target
 
             runner.Reset();
             runner.SetWarpSize(wx, wy);
-            runner.SetVariable("WARP_SIZE_X", new ScalarValue(ScalarType.Uint, new HLSLRegister<RawValue>((uint)wx)));
-            runner.SetVariable("WARP_SIZE_Y", new ScalarValue(ScalarType.Uint, new HLSLRegister<RawValue>((uint)wy)));
+            SetSharedGlobals(runner, wx, wy);
 
             runner.DebugHook = node =>
             {
@@ -1072,10 +1226,18 @@ float4 main(float4 position : SV_Position) : SV_Target
         debugStepIndex = -1;
         consoleCollapsed = false;
         imageCollapsed = false;
+        gpuCaptured = null;
+        isGpuMode = false;
+        if (_savedGroupOffsets.HasValue)
+        {
+            (groupOffsetX, groupOffsetY) = _savedGroupOffsets.Value;
+            _savedGroupOffsets = null;
+        }
         await JS.InvokeVoidAsync("highlightDebugLine", 0);
         await JS.InvokeVoidAsync("disposeThreadGridResize");
         needsSectionHeightRestore = true;
         StateHasChanged();
+        if (gpuPreviewEnabled) await Run();
     }
 
     [JSInvokable]
@@ -1215,18 +1377,92 @@ float4 main(float4 position : SV_Position) : SV_Target
         return rv.Int.ToString(CultureInfo.InvariantCulture);
     }
 
+    public sealed class HoverInfo
+    {
+        public string Value { get; set; } = "";
+        public int Width { get; set; }
+        public int Height { get; set; }
+        public byte[]? Rgba { get; set; }
+        public int InspectedX { get; set; }
+        public int InspectedY { get; set; }
+    }
+
     [JSInvokable]
-    public string? GetHoverValue(string identifier)
+    public HoverInfo? GetHoverInfo(string identifier)
     {
         if (!isDebugging || debugStepIndex < 0 || debugStepIndex >= debugTrace.Count)
             return null;
         var step = debugTrace[debugStepIndex];
-        // Check locals in the current (innermost) frame first
-        if (step.FrameVariables.Length > 0 && step.FrameVariables[0].TryGetValue(identifier, out var localVal))
-            return FormatValue(localVal, inspectedThread);
-        // Fall back to globals
-        if (step.GlobalVariables.TryGetValue(identifier, out var globalVal))
-            return FormatValue(globalVal, inspectedThread);
+        HLSLValue? val = null;
+        if (step.FrameVariables.Length > 0 && step.FrameVariables[0].TryGetValue(identifier, out var lv))
+            val = lv;
+        else if (step.GlobalVariables.TryGetValue(identifier, out var gv))
+            val = gv;
+        if (val == null) return null;
+
+        byte[]? rgba = null;
+        try { rgba = RenderVariableImage(val is ReferenceValue rv ? rv.Get() : val, warpX, warpY); }
+        catch (Exception ex) { Console.WriteLine($"[hover] image render failed for '{identifier}': {ex.Message}"); }
+        return new HoverInfo
+        {
+            Value = FormatValue(val, inspectedThread),
+            Width = warpX,
+            Height = warpY,
+            Rgba = rgba,
+            InspectedX = warpX > 0 ? inspectedThread % warpX : 0,
+            InspectedY = warpX > 0 ? inspectedThread / warpX : 0,
+        };
+    }
+
+    private static byte[]? RenderVariableImage(HLSLValue val, int wx, int wy)
+    {
+        int threadCount = wx * wy;
+        if (val is VectorValue vv)
+        {
+            var asFloat = (VectorValue)vv.Cast(ScalarType.Float);
+            int components = vv.Size;
+            // Normalize against the RGB peak so dim values stay visible. Alpha
+            // passes through verbatim.
+            float peak = 1f;
+            int rgbChannels = Math.Min(3, components);
+            for (int i = 0; i < threadCount; i++)
+            {
+                var c = asFloat.Values.Get(i);
+                for (int k = 0; k < rgbChannels; k++)
+                    if (c[k].Float > peak) peak = c[k].Float;
+            }
+            float scale = 1f / peak;
+            var rgba = new byte[threadCount * 4];
+            for (int i = 0; i < threadCount; i++)
+            {
+                var c = asFloat.Values.Get(i);
+                rgba[i * 4 + 0] = FloatToByte((components > 0 ? c[0].Float : 0f) * scale);
+                rgba[i * 4 + 1] = FloatToByte((components > 1 ? c[1].Float : 0f) * scale);
+                rgba[i * 4 + 2] = FloatToByte((components > 2 ? c[2].Float : 0f) * scale);
+                rgba[i * 4 + 3] = FloatToByte(components > 3 ? c[3].Float : 1f);
+            }
+            return rgba;
+        }
+        if (val is ScalarValue sv && sv.Type != ScalarType.Void)
+        {
+            float peak = 1f;
+            for (int i = 0; i < threadCount; i++)
+            {
+                float v = sv.AsFloat(i);
+                if (v > peak) peak = v;
+            }
+            float scale = 1f / peak;
+            var rgba = new byte[threadCount * 4];
+            for (int i = 0; i < threadCount; i++)
+            {
+                byte gray = FloatToByte(sv.AsFloat(i) * scale);
+                rgba[i * 4 + 0] = gray;
+                rgba[i * 4 + 1] = gray;
+                rgba[i * 4 + 2] = gray;
+                rgba[i * 4 + 3] = 255;
+            }
+            return rgba;
+        }
         return null;
     }
 
@@ -1300,8 +1536,7 @@ float4 main(float4 position : SV_Position) : SV_Target
         try
         {
             var evalRunner = new HLSLRunner(wx, wy);
-            evalRunner.SetVariable("WARP_SIZE_X", new ScalarValue(ScalarType.Uint, new HLSLRegister<RawValue>((uint)wx)));
-            evalRunner.SetVariable("WARP_SIZE_Y", new ScalarValue(ScalarType.Uint, new HLSLRegister<RawValue>((uint)wy)));
+            SetSharedGlobals(evalRunner, wx, wy);
 
             HLSLValue evalResult = null;
             Exception evalError = null;

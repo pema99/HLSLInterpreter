@@ -6,3 +6,5 @@
 combine.sh
 .claude
 CLAUDE.md
+# Build-time copy of HLSLInterpreter/HLSLTest.hlsl.
+HLSLInterpreter.Debugger/wwwroot/lib/HLSLTest.hlsl

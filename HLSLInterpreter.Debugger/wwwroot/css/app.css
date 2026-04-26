@@ -183,6 +183,39 @@
     overflow-y: auto;
 }
 
+/* VS Code-style thin scrollbars throughout the output panel. */
+.output-panel,
+.output-panel *,
+.output-body {
+    scrollbar-width: thin;
+    scrollbar-color: #4f4f4f transparent;
+}
+.output-panel::-webkit-scrollbar,
+.output-panel *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+.output-panel::-webkit-scrollbar-track,
+.output-panel *::-webkit-scrollbar-track {
+    background: transparent;
+}
+.output-panel::-webkit-scrollbar-thumb,
+.output-panel *::-webkit-scrollbar-thumb {
+    background: #4f4f4f;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    border-radius: 6px;
+}
+.output-panel::-webkit-scrollbar-thumb:hover,
+.output-panel *::-webkit-scrollbar-thumb:hover {
+    background: #6f6f6f;
+    background-clip: padding-box;
+}
+.output-panel::-webkit-scrollbar-corner,
+.output-panel *::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
 .panel-header {
     display: flex;
     align-items: center;
@@ -368,22 +401,45 @@
     background: #007acc;
 }
 
+.image-slot {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
 .image-container {
     flex: 1;
     min-height: 0;
-    padding: 12px;
+    padding: 0;
     background: #141414;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    position: relative;
     overflow: hidden;
 }
+/* The overlay's red rect stands in for the cursor over the painted image, so
+   we hide the system cursor on the canvas only. The letterboxed padding keeps
+   the default cursor since it sits on the container. */
+.image-container .image-canvas { cursor: none; }
+.exec-state-body .image-container .image-canvas { cursor: default; }
+.image-container.panning,
+.image-container.panning .image-canvas { cursor: grabbing; }
 
-#color-canvas {
-    display: block;
+.image-canvas {
+    position: absolute;
     image-rendering: pixelated;
     image-rendering: crisp-edges;
+    transform-origin: 0 0;
 }
+.image-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    display: block;
+}
+
+#color-canvas-gpu { display: none; }
+.image-container.gpu-mode #color-canvas { display: none; }
+.image-container.gpu-mode #color-canvas-gpu { display: block; }
 
 /* Debug controls in topbar */
 .debug-controls {
@@ -546,6 +602,76 @@
     color: #cccccc;
     width: 90px;
     flex-shrink: 0;
+}
+
+.settings-toggle {
+    position: relative;
+    display: inline-block;
+    cursor: pointer;
+}
+.settings-toggle input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+.settings-toggle-track {
+    display: inline-block;
+    width: 36px;
+    height: 20px;
+    background: #3c3c3c;
+    border: 1px solid #555;
+    border-radius: 10px;
+    position: relative;
+    transition: background 0.15s, border-color 0.15s;
+}
+.settings-toggle-thumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    background: #d4d4d4;
+    border-radius: 50%;
+    transition: left 0.15s, background 0.15s;
+}
+.settings-toggle input:checked + .settings-toggle-track {
+    background: #007acc;
+    border-color: #007acc;
+}
+.settings-toggle input:checked + .settings-toggle-track .settings-toggle-thumb {
+    left: 18px;
+    background: #ffffff;
+}
+.settings-toggle input:disabled + .settings-toggle-track {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.panel-header-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 100%;
+}
+.panel-header-toggle .settings-toggle-track {
+    width: 26px;
+    height: 14px;
+    border-radius: 8px;
+}
+.panel-header-toggle .settings-toggle-thumb {
+    width: 10px;
+    height: 10px;
+    top: 1px;
+    left: 1px;
+}
+.panel-header-toggle input:checked + .settings-toggle-track .settings-toggle-thumb {
+    left: 14px;
+}
+.panel-header-toggle-label {
+    font-size: 11px;
+    color: #cccccc;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .settings-text-input {
@@ -786,7 +912,7 @@
 }
 
 .debug-section-vars {
-    height: var(--section-h, 240px);
+    height: var(--section-h, 260px);
     min-height: 0;
     flex-shrink: 0;
 }
@@ -796,7 +922,7 @@
 }
 
 .debug-section-console {
-    height: var(--section-h, 240px);
+    height: var(--section-h, 260px);
     min-height: 0;
     flex-shrink: 0;
 }
@@ -813,7 +939,7 @@
 }
 
 .debug-section-exec {
-    height: var(--section-h, 240px);
+    height: var(--section-h, 260px);
     min-height: 0;
     flex-shrink: 0;
 }
@@ -848,7 +974,7 @@
 
 /* Immediate window */
 .debug-section-immediate {
-    height: var(--section-h, 240px);
+    height: var(--section-h, 260px);
     min-height: 0;
     flex-shrink: 0;
     display: flex;
@@ -956,7 +1082,7 @@
 }
 
 .debug-section-callstack {
-    height: var(--section-h, 240px);
+    height: var(--section-h, 260px);
     min-height: 0;
     flex-shrink: 0;
     display: flex;
@@ -968,7 +1094,9 @@
 }
 
 .debug-section-image {
-    height: var(--section-h, 240px);
+    /* 0.65 of the output-panel's default 38vw. Pegged to the viewport so the
+       height is stable when the panel resizes. */
+    height: var(--section-h, 24.7vw);
     min-height: 0;
     flex-shrink: 0;
 }
@@ -1016,6 +1144,12 @@
 
 /* Execution state section (kept for non-debug image-section) */
 
+.exec-state-pane {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
 .exec-state-body {
     flex: 1;
     min-height: 0;
@@ -1024,6 +1158,42 @@
     align-items: center;
     justify-content: center;
     padding: 6px;
+}
+/* When the pane hosts the image-container, let it fill the content box. */
+.exec-state-body:has(.image-container) {
+    align-items: stretch;
+    justify-content: stretch;
+}
+
+.bottom-mode-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 12px;
+    border-top: 1px solid #3c3c3c;
+    background: #1e1e1e;
+    flex-shrink: 0;
+}
+.bottom-mode-row label {
+    font-size: 11px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.bottom-mode-row select {
+    height: 18px;
+    padding: 0 4px;
+    background: #3c3c3c;
+    color: #d4d4d4;
+    border: 1px solid #555;
+    border-radius: 3px;
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+    font-size: 11px;
+    cursor: pointer;
+}
+.bottom-mode-row select:focus {
+    outline: none;
+    border-color: #007acc;
 }
 
 /* Execution state grid */

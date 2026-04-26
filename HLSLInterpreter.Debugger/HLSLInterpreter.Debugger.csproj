@@ -14,4 +14,15 @@
     <ProjectReference Include="..\HLSLInterpreter\HLSLInterpreter.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="wwwroot\lib\HLSLTest.hlsl" Visible="false" />
+  </ItemGroup>
+
+  <!-- gpu.js fetches HLSLTest.hlsl and prepends it to the user shader. -->
+  <Target Name="CopyHLSLTestPreamble" BeforeTargets="ResolveStaticWebAssetsInputs;BeforeBuild">
+    <Copy SourceFiles="..\HLSLInterpreter\HLSLTest.hlsl"
+          DestinationFiles="wwwroot\lib\HLSLTest.hlsl"
+          SkipUnchangedFiles="true" />
+  </Target>
+
 </Project>
