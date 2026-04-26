@@ -2,13 +2,16 @@
 @using HLSLInterpreter.Debugger.Core
 @inherits StateAwareComponent
 
+@{
+    var threadStates = Step?.GetThreadStatesAt(State.SelectedFrame) ?? Array.Empty<HLSLExecutionState.ThreadState>();
+}
 <div class="debug-section debug-section-callstack @(collapsed ? "section-collapsed" : "")">
     <div class="panel-header collapsible-header" @onclick="ToggleCollapsed">
         <div class="panel-header-left">
             <span class="collapse-icon @(collapsed ? "" : "expanded")">&#x203A;</span>
             <span>Call Stack</span>
         </div>
-        @if (!collapsed && ThreadStates.Length > 0 && DebugBottomMode == "ThreadStates")
+        @if (!collapsed && threadStates.Length > 0 && Mode == DebugBottomMode.ThreadStates)
         {
             <span class="thread-legend">
                 <span class="tl-dot tc-active"></span>Active thread
@@ -46,9 +49,9 @@
                 }
             </div>
             @{
-                bool showImage = DebugBottomMode == "PixelColors" || DebugBottomMode == "Both";
+                bool showImage = Mode == DebugBottomMode.PixelColors || Mode == DebugBottomMode.Both;
             }
-            @if (ThreadStates.Length > 0 || showImage)
+            @if (threadStates.Length > 0 || showImage)
             {
                 <div class="resize-inner-h-handle" id="callstack-exec-divider"></div>
                 <div class="exec-state-pane">
@@ -63,10 +66,10 @@
                         else
                         {
                             <div class="thread-grid">
-                                @for (int ti = 0; ti < ThreadStates.Length; ti++)
+                                @for (int ti = 0; ti < threadStates.Length; ti++)
                                 {
                                     var tidx = ti;
-                                    var state = ThreadStates[ti];
+                                    var state = threadStates[ti];
                                     var stateClass = state switch {
                                         HLSLExecutionState.ThreadState.Active    => "tc-active",
                                         HLSLExecutionState.ThreadState.Inactive  => "tc-diverged",
@@ -83,10 +86,10 @@
                     </div>
                     <div class="bottom-mode-row">
                         <label>Mode</label>
-                        <select value="@DebugBottomMode" @onchange="OnModeChanged">
-                            <option value="ThreadStates">Thread states</option>
-                            <option value="PixelColors">Pixel colors</option>
-                            <option value="Both">Both</option>
+                        <select value="@Mode" @onchange="OnModeChanged">
+                            <option value="@DebugBottomMode.ThreadStates">Thread states</option>
+                            <option value="@DebugBottomMode.PixelColors">Pixel colors</option>
+                            <option value="@DebugBottomMode.Both">Both</option>
                         </select>
                     </div>
                 </div>
@@ -97,10 +100,11 @@
 </div>
 
 @code {
+    public enum DebugBottomMode { ThreadStates, PixelColors, Both }
+
     [Parameter] public DebuggerSession.Step? Step { get; set; }
-    [Parameter] public string DebugBottomMode { get; set; } = "ThreadStates";
-    [Parameter] public EventCallback<string> DebugBottomModeChanged { get; set; }
-    [Parameter] public HLSLExecutionState.ThreadState[] ThreadStates { get; set; } = Array.Empty<HLSLExecutionState.ThreadState>();
+    [Parameter] public DebugBottomMode Mode { get; set; } = DebugBottomMode.ThreadStates;
+    [Parameter] public EventCallback<DebugBottomMode> ModeChanged { get; set; }
     [Parameter] public EventCallback OnExpand { get; set; }
 
     private bool collapsed;
@@ -113,7 +117,7 @@
 
     private async Task OnModeChanged(ChangeEventArgs e)
     {
-        var v = e.Value?.ToString() ?? "ThreadStates";
-        await DebugBottomModeChanged.InvokeAsync(v);
+        if (Enum.TryParse<DebugBottomMode>(e.Value?.ToString(), out var v))
+            await ModeChanged.InvokeAsync(v);
     }
 }

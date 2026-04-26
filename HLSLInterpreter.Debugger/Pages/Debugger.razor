@@ -23,7 +23,12 @@
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
                 HLSLInterpreter
             </a>
-            <button class="btn-permalink" @onclick="CopyPermalink" title="Copy permalink to clipboard">&#x1F517; Copy permalink</button>
+            <button class="btn-permalink" title="Copy permalink to clipboard"
+                    @onclick="@(async () => {
+                        string code = editorPanel != null ? await editorPanel.GetCode() : "";
+                        string baseUrl = PermalinkBase.Url ?? new Uri(Nav.Uri).GetLeftPart(UriPartial.Path);
+                        await PermalinkCodec.CopyToClipboardAsync(JS, code, baseUrl, State.ToPermalinkSettings());
+                    })">&#x1F517; Copy permalink</button>
         </div>
 
         <div class="topbar-center">
@@ -82,7 +87,6 @@
                      InitialCode="@initialEditorCode"
                      InitialCodeName="@(InitialCode.Name ?? "new.hlsl")"
                      InitialCodePath="@InitialCode.Path"
-                     DotNetRef="@dotNetRef"
                      OnTabSwitched="@OnEditorTabSwitched"
                      OnReady="@Run" />
 
@@ -94,9 +98,8 @@
                 <VariablesPanel Step="@DebugCtl.CurrentSession?.Current" />
 
                 <CallStackPanel Step="@DebugCtl.CurrentSession?.Current"
-                                DebugBottomMode="@debugBottomMode"
-                                DebugBottomModeChanged="@OnDebugBottomModeChanged"
-                                ThreadStates="@CurrentThreadStates"
+                                Mode="@debugBottomMode"
+                                ModeChanged="@OnDebugBottomModeChanged"
                                 OnExpand="@(() => needsThreadGridInit = true)" />
 
                 <ImmediatePanel Session="@DebugCtl.CurrentSession"
@@ -176,25 +179,19 @@ float4 main(float4 position : SV_Position) : SV_Target
     private EditorPanel? editorPanel;
     private string initialEditorCode = "";
 
-    [JSInvokable]
-    public async Task OpenFileInTab(string name, string content, string? path = null)
-    {
-        if (editorPanel != null) await editorPanel.OpenFileInTab(name, content, path);
-    }
-
     private async Task OnEditorTabSwitched(int newIndex)
     {
         if (DebugCtl.IsDebugging && newIndex == DebugCtl.DebugTabIndex && editorPanel != null)
             await editorPanel.HighlightLine(DebugCtl.CurrentDebugLine);
     }
 
-    private string debugBottomMode = "ThreadStates";
+    private CallStackPanel.DebugBottomMode debugBottomMode = CallStackPanel.DebugBottomMode.ThreadStates;
 
-    private void OnDebugBottomModeChanged(string v)
+    private void OnDebugBottomModeChanged(CallStackPanel.DebugBottomMode v)
     {
         if (debugBottomMode == v) return;
         debugBottomMode = v;
-        if (v == "PixelColors" || v == "Both") needsImageRender = true;
+        if (v == CallStackPanel.DebugBottomMode.PixelColors || v == CallStackPanel.DebugBottomMode.Both) needsImageRender = true;
         else needsThreadGridInit = true;
     }
 
@@ -209,18 +206,6 @@ float4 main(float4 position : SV_Position) : SV_Target
         if (RunCtl.HasImage && RunCtl.ImagePixels != null) needsImageRender = true;
     }
 
-    private HLSLExecutionState.ThreadState[] CurrentThreadStates
-    {
-        get
-        {
-            var step = DebugCtl.CurrentSession?.Current;
-            if (step == null) return Array.Empty<HLSLExecutionState.ThreadState>();
-            int fIdx = Math.Clamp(State.SelectedFrame, 0, Math.Max(0, step.FrameThreadStates.Length - 1));
-            return fIdx < step.FrameThreadStates.Length
-                ? step.FrameThreadStates[fIdx]
-                : Array.Empty<HLSLExecutionState.ThreadState>();
-        }
-    }
 
     private bool showSettings = false;
     private bool needsImageRender = false;
@@ -259,6 +244,8 @@ float4 main(float4 position : SV_Position) : SV_Target
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (firstRender)
+            await JS.InvokeVoidAsync("setDebuggerRef", dotNetRef);
 
         if (needsSectionHeightRestore)
         {
@@ -278,9 +265,12 @@ float4 main(float4 position : SV_Position) : SV_Target
 
         await JS.InvokeVoidAsync("imgSetRegularMode", RunCtl.IsGpuMode ? "gpu" : "cpu");
         string debugMode = DebugCtl.IsDebugging
-            ? (debugBottomMode == "Both" ? "both"
-                : debugBottomMode == "PixelColors" ? "debug"
-                : "idle")
+            ? debugBottomMode switch
+            {
+                CallStackPanel.DebugBottomMode.Both => "both",
+                CallStackPanel.DebugBottomMode.PixelColors => "debug",
+                _ => "idle",
+            }
             : "idle";
         await JS.InvokeVoidAsync("imgSetDebugMode", debugMode);
 
@@ -288,10 +278,8 @@ float4 main(float4 position : SV_Position) : SV_Target
         {
             await JS.InvokeVoidAsync("imgSetDebugPixel",
                 State.InspectedThread % State.WarpX, State.InspectedThread / State.WarpX);
-            var step = DebugCtl.CurrentSession?.Current;
-            var fIdx = step != null ? Math.Clamp(State.SelectedFrame, 0, Math.Max(0, step.FrameThreadStates.Length - 1)) : 0;
-            var states = (step != null && fIdx < step.FrameThreadStates.Length)
-                ? step.FrameThreadStates[fIdx] : Array.Empty<HLSLExecutionState.ThreadState>();
+            var states = DebugCtl.CurrentSession?.Current?.GetThreadStatesAt(State.SelectedFrame)
+                ?? Array.Empty<HLSLExecutionState.ThreadState>();
             await JS.InvokeVoidAsync("imgSetThreadStates", states.Select(s => (int)s).ToArray());
             await JS.InvokeVoidAsync("imgSetCpuClickHandler", null, null);
             await JS.InvokeVoidAsync("imgSetDebugClickHandler", true);
@@ -417,16 +405,6 @@ float4 main(float4 position : SV_Position) : SV_Target
         if (State.GpuPreviewEnabled) await Run();
     }
 
-    [JSInvokable]
-    public async Task ToggleBreakpoint(int line)
-    {
-        DebugCtl.ToggleBreakpoint(line);
-        await JS.InvokeVoidAsync("setBreakpoints", DebugCtl.Breakpoints.ToArray());
-    }
-
-    [JSInvokable]
-    public HoverInfo? GetHoverInfo(string identifier) => editorPanel?.BuildHoverInfo(identifier);
-
     private HLSLParserConfig MakeParserConfig()
     {
         string? filePath = editorPanel?.ActiveTabPath;
@@ -434,13 +412,6 @@ float4 main(float4 position : SV_Position) : SV_Target
         {
             BasePath = filePath != null ? System.IO.Path.GetDirectoryName(filePath) ?? "" : ""
         };
-    }
-
-    private async Task CopyPermalink()
-    {
-        string code = editorPanel != null ? await editorPanel.GetCode() : "";
-        string baseUrl = PermalinkBase.Url ?? new Uri(Nav.Uri).GetLeftPart(UriPartial.Path);
-        await PermalinkCodec.CopyToClipboardAsync(JS, code, baseUrl, State.ToPermalinkSettings());
     }
 
     public async ValueTask DisposeAsync()

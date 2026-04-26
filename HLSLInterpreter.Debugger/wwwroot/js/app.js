@@ -1,8 +1,10 @@
 window.monacoEditorInitialized = false;
 window._monacoEditor = null;
 
-window.initMonaco = function (containerId, initialCode, dotNetRef) {
-    if (dotNetRef) window._dotNetDebugRef = dotNetRef;
+window.setDebuggerRef = function (ref) { window._dotNetDebugRef = ref; };
+
+window.initMonaco = function (containerId, initialCode, editorRef) {
+    if (editorRef) window._dotNetEditorRef = editorRef;
     require.config({
         paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs' }
     });
@@ -349,10 +351,10 @@ window.initMonaco = function (containerId, initialCode, dotNetRef) {
 
             monaco.languages.registerHoverProvider('hlsl', {
                 provideHover: async function (model, position) {
-                    if (!window._dotNetDebugRef) return null;
+                    if (!window._dotNetEditorRef) return null;
                     var word = model.getWordAtPosition(position);
                     if (!word) return null;
-                    var info = await window._dotNetDebugRef.invokeMethodAsync('GetHoverInfo', word.word);
+                    var info = await window._dotNetEditorRef.invokeMethodAsync('GetHoverInfo', word.word);
                     if (info == null) return null;
                     var contents = [{ value: '```\n' + word.word + ' = ' + info.value + '\n```' }];
                     if (info.rgba && info.width > 0 && info.height > 0) {
@@ -432,8 +434,8 @@ window.initMonaco = function (containerId, initialCode, dotNetRef) {
                 // On the web, read via FileReader since the filesystem path isn't available
                 var reader = new FileReader();
                 reader.onload = function (ev) {
-                    if (window._dotNetDebugRef)
-                        window._dotNetDebugRef.invokeMethodAsync('OpenFileInTab', file.name, ev.target.result, '');
+                    if (window._dotNetEditorRef)
+                        window._dotNetEditorRef.invokeMethodAsync('OpenFileInTab', file.name, ev.target.result, '');
                     else
                         window._monacoEditor.setValue(ev.target.result);
                 };
@@ -446,8 +448,8 @@ window.initMonaco = function (containerId, initialCode, dotNetRef) {
             var t = e.target.type;
             if ((t === monaco.editor.MouseTargetType.GUTTER_LINE_NUMBERS ||
                  t === monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) &&
-                e.target.position && window._dotNetDebugRef) {
-                window._dotNetDebugRef.invokeMethodAsync('ToggleBreakpoint', e.target.position.lineNumber);
+                e.target.position && window._dotNetEditorRef) {
+                window._dotNetEditorRef.invokeMethodAsync('ToggleBreakpoint', e.target.position.lineNumber);
             }
         });
 
@@ -461,9 +463,9 @@ window.initMonaco = function (containerId, initialCode, dotNetRef) {
             if (btn && !btn.disabled) btn.click();
         }
         function toggleBreakpointAtCursor() {
-            if (window._dotNetDebugRef) {
+            if (window._dotNetEditorRef) {
                 var pos = window._monacoEditor.getPosition();
-                if (pos) window._dotNetDebugRef.invokeMethodAsync('ToggleBreakpoint', pos.lineNumber);
+                if (pos) window._dotNetEditorRef.invokeMethodAsync('ToggleBreakpoint', pos.lineNumber);
             }
         }
         window._monacoEditor.addCommand(monaco.KeyCode.F5, function () {
@@ -512,9 +514,9 @@ document.addEventListener('keydown', function (e) {
         clickDbgGlobal('continue-back');
     } else if (e.key === 'F9') {
         e.preventDefault();
-        if (window._monacoEditor && window._dotNetDebugRef) {
+        if (window._monacoEditor && window._dotNetEditorRef) {
             var pos = window._monacoEditor.getPosition();
-            if (pos) window._dotNetDebugRef.invokeMethodAsync('ToggleBreakpoint', pos.lineNumber);
+            if (pos) window._dotNetEditorRef.invokeMethodAsync('ToggleBreakpoint', pos.lineNumber);
         }
     } else if (e.key === 'F10' && !e.shiftKey) {
         e.preventDefault();

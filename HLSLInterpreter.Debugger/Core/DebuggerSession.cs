@@ -15,6 +15,13 @@ public sealed class DebuggerSession
         HLSLExecutionState.ThreadState[][] FrameThreadStates)
     {
         public int CallDepth => CallStack.Length;
+
+        public HLSLExecutionState.ThreadState[] GetThreadStatesAt(int frameIndex)
+        {
+            if (FrameThreadStates.Length == 0) return Array.Empty<HLSLExecutionState.ThreadState>();
+            int idx = Math.Clamp(frameIndex, 0, FrameThreadStates.Length - 1);
+            return FrameThreadStates[idx];
+        }
     }
 
     public IReadOnlyList<Step> Trace { get; }

@@ -1,5 +1,6 @@
 @using HLSL
 @using HLSLInterpreter.Debugger.Core
+@implements IDisposable
 @inject IJSRuntime JS
 @inject FileDialogService FileDialogs
 @inject TabbedEditorOptions TabbedEditorConfig
@@ -48,12 +49,10 @@
     [Parameter] public string InitialCode { get; set; } = "";
     [Parameter] public string InitialCodeName { get; set; } = "new.hlsl";
     [Parameter] public string? InitialCodePath { get; set; }
-    // Typed as object? because the concrete DotNetObjectReference<Home> would force Razor's
-    // generated code in Home to resolve `HLSLInterpreter.Debugger.Pages.Home`, which clashes
-    // with the parser library's HLSL.HLSLInterpreter class brought in via @using HLSL.
-    [Parameter] public object? DotNetRef { get; set; }
     [Parameter] public EventCallback<int> OnTabSwitched { get; set; }
     [Parameter] public EventCallback OnReady { get; set; }
+
+    private DotNetObjectReference<EditorPanel>? _selfRef;
 
     private static readonly int[] fontSizes = { 12, 13, 14, 15, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36 };
     private int fontSize = 16;
@@ -69,6 +68,16 @@
     public ValueTask<string> GetCode() => JS.InvokeAsync<string>("getMonacoValue");
     public ValueTask SetReadOnly(bool readOnly) => JS.InvokeVoidAsync("setMonacoReadOnly", readOnly);
     public ValueTask HighlightLine(int line) => JS.InvokeVoidAsync("highlightDebugLine", line);
+
+    [JSInvokable]
+    public HoverInfo? GetHoverInfo(string identifier) => BuildHoverInfo(identifier);
+
+    [JSInvokable]
+    public async Task ToggleBreakpoint(int line)
+    {
+        DebugCtl.ToggleBreakpoint(line);
+        await JS.InvokeVoidAsync("setBreakpoints", DebugCtl.Breakpoints.ToArray());
+    }
 
     public HoverInfo? BuildHoverInfo(string identifier)
     {
@@ -97,6 +106,7 @@
 
     protected override void OnInitialized()
     {
+        _selfRef = DotNetObjectReference.Create(this);
         if (TabbedEditorConfig.Enabled)
             tabs.Add(new EditorTab { Name = InitialCodeName, Code = InitialCode, Path = InitialCodePath });
     }
@@ -105,12 +115,14 @@
     {
         if (firstRender)
         {
-            await JS.InvokeVoidAsync("initMonaco", "monaco-container", InitialCode, DotNetRef);
+            await JS.InvokeVoidAsync("initMonaco", "monaco-container", InitialCode, _selfRef);
             if (TabbedEditorConfig.Enabled)
                 FileDialogs.FileDropped = async (name, content, path) => await OpenFileInTab(name, content, path);
             await OnReady.InvokeAsync();
         }
     }
+
+    public void Dispose() => _selfRef?.Dispose();
 
     private async Task OnFontSizeChanged(ChangeEventArgs e)
     {
@@ -179,6 +191,7 @@
         StateHasChanged();
     }
 
+    [JSInvokable]
     public async Task OpenFileInTab(string name, string content, string? path = null)
     {
         if (!TabbedEditorConfig.Enabled) return;
