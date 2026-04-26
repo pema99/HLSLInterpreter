@@ -169,9 +169,7 @@ function scheduleFrame() {
     active.animFrameId = requestAnimationFrame(renderFrame);
 }
 
-function renderFrame(now) {
-    const r = active;
-    if (!r || !r.running) return;
+function drawFrame(r, now) {
     const prevW = r.canvas.width, prevH = r.canvas.height;
     fitCanvas(r.canvas);
     if ((r.canvas.width !== prevW || r.canvas.height !== prevH)
@@ -192,12 +190,8 @@ function renderFrame(now) {
     r.device.queue.writeBuffer(r.uniformBuffer, 0, u);
 
     let view;
-    try {
-        view = r.context.getCurrentTexture().createView();
-    } catch (e) {
-        r.running = false;
-        return;
-    }
+    try { view = r.context.getCurrentTexture().createView(); }
+    catch (e) { return false; }
 
     const enc = r.device.createCommandEncoder();
     const pass = enc.beginRenderPass({
@@ -213,7 +207,16 @@ function renderFrame(now) {
     pass.draw(3);
     pass.end();
     r.device.queue.submit([enc.finish()]);
+    return true;
+}
 
+function renderFrame(now) {
+    const r = active;
+    if (!r || !r.running) return;
+    if (!drawFrame(r, now)) {
+        r.running = false;
+        return;
+    }
     scheduleFrame();
 }
 
@@ -226,6 +229,30 @@ window.gpuStop = function () {
     active.running = false;
     if (active.animFrameId) cancelAnimationFrame(active.animFrameId);
     active.animFrameId = null;
+};
+
+window.gpuPause = function () {
+    if (!active || !active.running) return;
+    active.running = false;
+    if (active.animFrameId) cancelAnimationFrame(active.animFrameId);
+    active.animFrameId = null;
+};
+
+window.gpuResume = function () {
+    if (!active || active.running) return;
+    // Rebase startTimeMs so _Time picks up where it left off.
+    active.startTimeMs = performance.now() - (active.lastTime || 0) * 1000;
+    active.running = true;
+    scheduleFrame();
+};
+
+window.gpuRestart = function () {
+    if (!active) return;
+    active.startTimeMs = performance.now();
+    active.lastTime = 0;
+    // If paused, draw one frame at t=0 so the user sees the reset without
+    // changing the pause state.
+    if (!active.running) drawFrame(active, performance.now());
 };
 
 // Live canvas size + elapsed time, so a Debug-button entry can reproduce the

@@ -407,20 +407,33 @@
                             <span class="collapse-icon @(imageCollapsed ? "" : "expanded")">&#x203A;</span>
                             <span>Color Output</span>
                         </div>
-                        <label class="settings-toggle panel-header-toggle" title="Use GPU"
-                               @onclick:stopPropagation="true">
-                            <input type="checkbox" @bind="gpuPreviewEnabled" @bind:after="Run" disabled="@(isRunning || isDebugging)" />
-                            <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
-                            <span class="panel-header-toggle-label">Use GPU</span>
-                        </label>
+                        <div class="panel-header-actions" @onclick:stopPropagation="true">
+                            @if (isGpuMode)
+                            {
+                                <button class="btn-time-ctrl" title="@(gpuPaused ? "Play" : "Pause")" @onclick="ToggleGpuPause">
+                                    <i class="mdi @(gpuPaused ? "mdi-play" : "mdi-pause")"></i>
+                                </button>
+                                <button class="btn-time-ctrl" title="Restart time" @onclick="RestartGpuTime">
+                                    <i class="mdi mdi-restart"></i>
+                                </button>
+                            }
+                            <label class="settings-toggle panel-header-toggle" title="Use GPU">
+                                <input type="checkbox" @bind="gpuPreviewEnabled" @bind:after="Run" disabled="@(isRunning || isDebugging)" />
+                                <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
+                                <span class="panel-header-toggle-label">Use GPU</span>
+                            </label>
+                        </div>
+                    </div>
+                    @* Keep canvases mounted even when collapsed so the GPU loop's
+                       references stay valid across collapse/expand. *@
+                    <div class="image-container @(isGpuMode ? "gpu-mode" : "")" id="image-container"
+                         data-mode-target="regular" style="@(imageCollapsed ? "display:none" : "")">
+                        <canvas class="image-canvas color-canvas-2d"></canvas>
+                        <canvas id="color-canvas-gpu" class="image-canvas"></canvas>
+                        <canvas class="image-overlay"></canvas>
                     </div>
                     @if (!imageCollapsed)
                     {
-                        <div class="image-container @(isGpuMode ? "gpu-mode" : "")" id="image-container" data-mode-target="regular">
-                            <canvas class="image-canvas color-canvas-2d"></canvas>
-                            <canvas id="color-canvas-gpu" class="image-canvas"></canvas>
-                            <canvas class="image-overlay"></canvas>
-                        </div>
                         <div class="resize-v-handle" title="Drag to resize"></div>
                     }
                 </div>
@@ -522,7 +535,7 @@ float4 main(float4 position : SV_Position) : SV_Target
 {
     float2 uv = (position.xy / _Resolution) - 0.5;
     uv.x *= _Resolution.x/_Resolution.y;
-    float dist = length(uv);
+    float dist = length(uv) + _Time*0.2;
     float angle = atan2(uv.y, uv.x) + 0.4;
     float wave = sin(dist * TWIST - angle * ARMS);
     wave = wave * 0.5 + 0.5;
@@ -652,6 +665,7 @@ float4 main(float4 position : SV_Position) : SV_Target
     private int groupOffsetY = 0;
     private bool isGpuMode = false;
     private bool gpuPreviewEnabled = false;
+    private bool gpuPaused = false;
     private (float Time, int CanvasW, int CanvasH)? gpuCaptured = null;
     private (int X, int Y)? _savedGroupOffsets = null;
     private string _debugBottomMode = "ThreadStates";
@@ -907,6 +921,7 @@ float4 main(float4 position : SV_Position) : SV_Target
 
         hasImage = true;
         isGpuMode = true;
+        gpuPaused = false;
         // Expand the section so color-canvas-gpu is in the DOM for gpuRender.
         imageCollapsed = false;
         StateHasChanged();
@@ -934,6 +949,25 @@ float4 main(float4 position : SV_Position) : SV_Target
         if (warpX <= 0) return;
         inspectedThread = py * warpX + px;
         StateHasChanged();
+    }
+
+    private async Task ToggleGpuPause()
+    {
+        if (gpuPaused)
+        {
+            try { await JS.InvokeVoidAsync("gpuResume"); } catch { }
+            gpuPaused = false;
+        }
+        else
+        {
+            try { await JS.InvokeVoidAsync("gpuPause"); } catch { }
+            gpuPaused = true;
+        }
+    }
+
+    private async Task RestartGpuTime()
+    {
+        try { await JS.InvokeVoidAsync("gpuRestart"); } catch { }
     }
 
     [JSInvokable]

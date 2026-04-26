@@ -674,6 +674,31 @@
     letter-spacing: 0.5px;
 }
 
+.btn-time-ctrl {
+    display: inline-flex;
+    align-items: stretch;
+    justify-content: stretch;
+    box-sizing: border-box;
+    height: 18px;
+    width: 22px;
+    padding: 0;
+    background: #3c3c3c;
+    color: #d4d4d4;
+    border: 1px solid #555;
+    border-radius: 3px;
+    font-size: 13px;
+    cursor: pointer;
+}
+.btn-time-ctrl:hover { background: #4e4e4e; }
+.btn-time-ctrl > .mdi {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    line-height: 1;
+    transform: translateY(1px);
+}
+
 .settings-text-input {
     height: 30px;
     padding: 0 8px;
