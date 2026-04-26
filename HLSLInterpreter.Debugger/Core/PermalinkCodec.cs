@@ -68,10 +68,6 @@ public static class PermalinkCodec
             + $"&g={(settings.GpuPreviewEnabled ? 1 : 0)}";
     }
 
-    /// <summary>
-    /// Returns a copy of <paramref name="current"/> with any settings present in the URL applied.
-    /// Missing or invalid query parameters are left at their current values.
-    /// </summary>
     public static PermalinkSettings ApplyToSettings(string url, PermalinkSettings current)
     {
         var ep = GetQueryParam(url, "e");

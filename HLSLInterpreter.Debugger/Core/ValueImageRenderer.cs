@@ -7,11 +7,6 @@ public static class ValueImageRenderer
 {
     public static byte FloatToByte(float v) => (byte)(Math.Clamp(v, 0f, 1f) * 255f + 0.5f);
 
-    /// <summary>
-    /// Render any HLSLValue into RGBA bytes for hover/immediate previews.
-    /// Normalizes against the RGB peak so dim values stay visible.
-    /// Returns null if the value type can't be rendered.
-    /// </summary>
     public static byte[]? RenderVariableImage(HLSLValue val, int wx, int wy)
     {
         int threadCount = wx * wy;
@@ -62,10 +57,6 @@ public static class ValueImageRenderer
         return null;
     }
 
-    /// <summary>
-    /// Render the entry-point return value as RGBA bytes (no normalization, raw [0,1] clip).
-    /// Returns null if the value type can't be displayed as an image.
-    /// </summary>
     public static byte[]? TryExtractImage(HLSLValue result, int wx, int wy)
     {
         int threadCount = wx * wy;

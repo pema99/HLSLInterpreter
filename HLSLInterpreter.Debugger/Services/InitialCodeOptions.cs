@@ -1,6 +1,6 @@
-namespace HLSLInterpreter.Debugger;
+namespace HLSLInterpreter.Debugger.Services;
 
-public class InitialCodeOverride
+public class InitialCodeOptions
 {
     public string? Code { get; init; }
     public string? Name { get; init; }

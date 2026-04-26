@@ -1,8 +1,5 @@
 namespace HLSLInterpreter.Debugger.Core;
 
-/// <summary>
-/// DTO returned to JS for the editor's hover popup.
-/// </summary>
 public sealed class HoverInfo
 {
     public string Value { get; set; } = "";

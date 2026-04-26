@@ -1,15 +1,12 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using HLSL;
+using HLSLInterpreter.Debugger.Core;
 using Microsoft.JSInterop;
 using UnityShaderParser.HLSL;
 
-namespace HLSLInterpreter.Debugger.Core;
+namespace HLSLInterpreter.Debugger.Services;
 
-/// <summary>
-/// Owns shader execution (CPU + GPU paths), the resulting output/image, and run-time error state.
-/// Long-lived (DI-scoped). UI consumers re-render via <see cref="PropertyChanged"/>.
-/// </summary>
 public sealed class RunController : INotifyPropertyChanged
 {
     private readonly IJSRuntime _js;
@@ -113,8 +110,8 @@ public sealed class RunController : INotifyPropertyChanged
             SetSharedGlobals(Runner);
             Runner.ProcessCode(code, makeParserConfig());
 
-            var threadArg = DebugDispatch.BuildThreadArg(wx, wy, threadCount, _state.GroupOffsetX, _state.GroupOffsetY);
-            HLSLValue result = DebugDispatch.CallEntryPoint(Runner, threadArg, _state.EntryPoint);
+            var threadArg = DebuggerSession.BuildThreadArg(wx, wy, threadCount, _state.GroupOffsetX, _state.GroupOffsetY);
+            HLSLValue result = DebuggerSession.CallEntryPoint(Runner, threadArg, _state.EntryPoint);
             TryExtractImage(result, wx, wy);
         }
         catch (Exception ex)
@@ -205,10 +202,6 @@ public sealed class RunController : INotifyPropertyChanged
         ImagePixels = null;
     }
 
-    /// <summary>
-    /// If GPU preview is enabled and we don't already have a snapshot, capture the canvas
-    /// size + time so debug recording reproduces the same _Resolution/_Time the GPU saw.
-    /// </summary>
     public async Task SnapshotGpuIfNeededAsync()
     {
         if (!_state.GpuPreviewEnabled || GpuCaptured.HasValue) return;
@@ -220,15 +213,6 @@ public sealed class RunController : INotifyPropertyChanged
         }
         catch { }
     }
-
-    public void SetError(string message, Exception? exception = null)
-    {
-        HasError = true;
-        ErrorMessage = message;
-        LastException = exception;
-    }
-
-    public void SetOutput(string? value) => Output = value;
 
     private bool Set<T>(ref T field, T value, [CallerMemberName] string? name = null)
     {

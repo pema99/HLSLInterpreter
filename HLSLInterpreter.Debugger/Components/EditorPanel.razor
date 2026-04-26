@@ -2,7 +2,7 @@
 @using HLSLInterpreter.Debugger.Core
 @inject IJSRuntime JS
 @inject FileDialogService FileDialogs
-@inject TabbedEditor TabbedEditorConfig
+@inject TabbedEditorOptions TabbedEditorConfig
 @inject DebuggerAppState State
 @inject DebugController DebugCtl
 
@@ -69,7 +69,6 @@
     public ValueTask SetReadOnly(bool readOnly) => JS.InvokeVoidAsync("setMonacoReadOnly", readOnly);
     public ValueTask HighlightLine(int line) => JS.InvokeVoidAsync("highlightDebugLine", line);
 
-    /// <summary>Builds the popup payload for an identifier hover. Returns null when not debugging or the symbol is unknown.</summary>
     public HoverInfo? BuildHoverInfo(string identifier)
     {
         if (!DebugCtl.IsDebugging || DebugCtl.CurrentSession?.Current is not { } step)

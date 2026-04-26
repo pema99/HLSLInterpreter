@@ -1,13 +1,9 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using HLSLInterpreter.Debugger.Core;
 
-namespace HLSLInterpreter.Debugger.Core;
+namespace HLSLInterpreter.Debugger.Services;
 
-/// <summary>
-/// Shared mutable state for cross-cutting user settings + the currently inspected thread.
-/// Components that read from this should subscribe to <see cref="PropertyChanged"/> (or inherit
-/// <c>StateAwareComponent</c>) to re-render when values change.
-/// </summary>
 public sealed class DebuggerAppState : INotifyPropertyChanged
 {
     public event PropertyChangedEventHandler? PropertyChanged;

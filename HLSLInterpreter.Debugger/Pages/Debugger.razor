@@ -1,14 +1,13 @@
 @page "/"
 @inject IJSRuntime JS
 @inject NavigationManager Nav
-@inject PermalinkBaseUrl PermalinkBase
-@inject InitialCodeOverride InitialCode
+@inject PermalinkOptions PermalinkBase
+@inject InitialCodeOptions InitialCode
 @inject DebuggerAppState State
 @inject RunController RunCtl
 @inject DebugController DebugCtl
 @using HLSL
 @using UnityShaderParser.HLSL
-@using UnityShaderParser.Common
 @using HLSLInterpreter.Debugger.Core
 @* Razor's generated cast for `@ref` on EditorPanel writes the bare path
    `HLSLInterpreter.Debugger.Components.EditorPanel`. With `@using HLSL`
@@ -173,7 +172,6 @@ float4 main(float4 position : SV_Position) : SV_Target
 }
 ";
 
-    // --- Core state ---
     private EditorPanel? editorPanel;
     private string initialEditorCode = "";
 
@@ -226,7 +224,7 @@ float4 main(float4 position : SV_Position) : SV_Target
     private bool showSettings = false;
     private bool needsImageRender = false;
 
-    private DotNetObjectReference<Home>? dotNetRef;
+    private DotNetObjectReference<Debugger>? dotNetRef;
     private bool needsThreadGridInit = false;
     private bool needsSectionHeightRestore = false;
     private bool imageCollapsed = false;

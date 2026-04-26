@@ -114,8 +114,8 @@
                 catch (OperationCanceledException) { cancelledInProcessCode = true; }
                 if (!cancelledInProcessCode)
                 {
-                    var threadArg = DebugDispatch.BuildThreadArg(wx, wy, threadCount, State.GroupOffsetX, State.GroupOffsetY);
-                    try { DebugDispatch.CallEntryPoint(evalRunner, threadArg, State.EntryPoint); }
+                    var threadArg = DebuggerSession.BuildThreadArg(wx, wy, threadCount, State.GroupOffsetX, State.GroupOffsetY);
+                    try { DebuggerSession.CallEntryPoint(evalRunner, threadArg, State.EntryPoint); }
                     catch (OperationCanceledException) { }
                 }
             }

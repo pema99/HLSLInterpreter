@@ -1,15 +1,11 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using HLSL;
+using HLSLInterpreter.Debugger.Core;
 using UnityShaderParser.HLSL;
 
-namespace HLSLInterpreter.Debugger.Core;
+namespace HLSLInterpreter.Debugger.Services;
 
-/// <summary>
-/// Owns the active debug recording, breakpoints, and trace navigation. Long-lived (DI-scoped);
-/// the <see cref="CurrentSession"/> comes and goes as the user starts/stops debugging.
-/// UI consumers re-render via <see cref="PropertyChanged"/>.
-/// </summary>
 public sealed class DebugController : INotifyPropertyChanged
 {
     private readonly DebuggerAppState _state;
@@ -37,7 +33,6 @@ public sealed class DebugController : INotifyPropertyChanged
 
     private (int X, int Y)? _savedGroupOffsets;
 
-    /// <summary>Persistent set of breakpoint line numbers; survives across debug sessions.</summary>
     public HashSet<int> Breakpoints { get; } = new();
 
     public int CurrentDebugLine => CurrentSession?.CurrentLine ?? 0;
@@ -54,11 +49,6 @@ public sealed class DebugController : INotifyPropertyChanged
         _savedGroupOffsets = (_state.GroupOffsetX, _state.GroupOffsetY);
     }
 
-    /// <summary>
-    /// Records a new debug session. Returns true if debug mode was entered (trace recorded
-    /// successfully, or a TestFailException with a partial trace). Returns false on
-    /// compile/parse/runtime errors with no useful trace.
-    /// </summary>
     public async Task<bool> StartSessionAsync(
         Func<Task<string>> getCode,
         Func<HLSLParserConfig> makeParserConfig)
@@ -107,10 +97,6 @@ public sealed class DebugController : INotifyPropertyChanged
         return true;
     }
 
-    /// <summary>
-    /// Tears down the current debug session and restores GPU/group-offset state.
-    /// Caller is responsible for editor read-only toggle and any UI cleanup.
-    /// </summary>
     public void ExitSession()
     {
         IsDebugging = false;
@@ -140,8 +126,8 @@ public sealed class DebugController : INotifyPropertyChanged
         if (CurrentSession == null) return;
         nav(CurrentSession);
         _state.SelectedFrame = 0;
-        // Notify listeners so UI re-renders. PropertyChanged for "CurrentSession" is a stand-in
-        // for "step index changed" — the ref didn't change, but the cursor inside it did.
+        // PropertyChanged for "CurrentSession" is a stand-in for "step index changed". The ref
+        // didn't change, but the cursor inside it did, and listeners need to re-render.
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CurrentSession)));
     }
 
