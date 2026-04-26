@@ -1,4 +1,5 @@
 @inherits StateAwareComponent
+@using HLSLInterpreter.Debugger.Services
 
 @if (IsOpen)
 {
@@ -7,7 +8,27 @@
             <div class="modal-header">Settings</div>
             <div class="modal-body">
                 <div class="settings-row">
-                    <label class="settings-label">Entry point</label>
+                    <label class="settings-label">Render mode</label>
+                    <select class="settings-text-input"
+                            value="@State.ShaderRenderMode"
+                            @onchange="@(e => SetShaderRenderMode(e.Value?.ToString()))"
+                            disabled="@IsLocked" title="Pixel: fullscreen quad fragment shader. Vert+Frag: cube mesh through user vertex+fragment shaders.">
+                        <option value="@ShaderRenderMode.Pixel">Pixel</option>
+                        <option value="@ShaderRenderMode.VertFrag">Vert+Frag</option>
+                    </select>
+                </div>
+                @if (State.ShaderRenderMode == ShaderRenderMode.VertFrag)
+                {
+                    <div class="settings-row">
+                        <label class="settings-label">Vertex entry</label>
+                        <input class="settings-text-input" type="text"
+                               value="@State.VertexEntryPoint"
+                               @oninput="@(e => State.VertexEntryPoint = e.Value?.ToString() ?? "")"
+                               disabled="@IsLocked" title="Vertex shader function name" />
+                    </div>
+                }
+                <div class="settings-row">
+                    <label class="settings-label">@(State.ShaderRenderMode == ShaderRenderMode.VertFrag ? "Fragment entry" : "Entry point")</label>
                     <input class="settings-text-input" type="text"
                            value="@State.EntryPoint"
                            @oninput="@(e => State.EntryPoint = e.Value?.ToString() ?? "")"
@@ -59,5 +80,10 @@
     private static void SetInt(ChangeEventArgs e, Action<int> setter)
     {
         if (int.TryParse(e.Value?.ToString(), out var v)) setter(v);
+    }
+
+    private void SetShaderRenderMode(string? value)
+    {
+        if (Enum.TryParse<ShaderRenderMode>(value, out var mode)) State.ShaderRenderMode = mode;
     }
 }

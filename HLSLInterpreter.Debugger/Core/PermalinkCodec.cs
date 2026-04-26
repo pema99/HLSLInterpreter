@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Text;
+using HLSLInterpreter.Debugger.Services;
 using Microsoft.JSInterop;
 
 namespace HLSLInterpreter.Debugger.Core;
@@ -10,7 +11,9 @@ public sealed record PermalinkSettings(
     int WarpY,
     int GroupOffsetX,
     int GroupOffsetY,
-    bool GpuPreviewEnabled);
+    bool GpuPreviewEnabled,
+    ShaderRenderMode ShaderRenderMode,
+    string VertexEntryPoint);
 
 public static class PermalinkCodec
 {
@@ -65,7 +68,9 @@ public static class PermalinkCodec
             + $"&e={Uri.EscapeDataString(settings.EntryPoint)}"
             + $"&wx={settings.WarpX}&wy={settings.WarpY}"
             + $"&gx={settings.GroupOffsetX}&gy={settings.GroupOffsetY}"
-            + $"&g={(settings.GpuPreviewEnabled ? 1 : 0)}";
+            + $"&g={(settings.GpuPreviewEnabled ? 1 : 0)}"
+            + $"&m={(settings.ShaderRenderMode == ShaderRenderMode.VertFrag ? "vf" : "p")}"
+            + $"&ev={Uri.EscapeDataString(settings.VertexEntryPoint)}";
     }
 
     public static PermalinkSettings ApplyToSettings(string url, PermalinkSettings current)
@@ -78,6 +83,10 @@ public static class PermalinkCodec
         int groupOffsetY = (int.TryParse(GetQueryParam(url, "gy"), out var gy) && gy >= 0) ? gy : current.GroupOffsetY;
         var g = GetQueryParam(url, "g");
         bool gpu = g == "1" ? true : g == "0" ? false : current.GpuPreviewEnabled;
-        return new PermalinkSettings(entryPoint, warpX, warpY, groupOffsetX, groupOffsetY, gpu);
+        var m = GetQueryParam(url, "m");
+        ShaderRenderMode mode = m == "vf" ? ShaderRenderMode.VertFrag : m == "p" ? ShaderRenderMode.Pixel : current.ShaderRenderMode;
+        var evp = GetQueryParam(url, "ev");
+        string vertEntry = !string.IsNullOrEmpty(evp) ? evp : current.VertexEntryPoint;
+        return new PermalinkSettings(entryPoint, warpX, warpY, groupOffsetX, groupOffsetY, gpu, mode, vertEntry);
     }
 }

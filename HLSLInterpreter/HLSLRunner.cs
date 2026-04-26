@@ -416,6 +416,12 @@ namespace HLSL
         public HLSLValue GetVariable(string name) => interpreter.GetVariable(name);
         public HLSLValue CallFunction(string name, params HLSLValue[] args) => interpreter.CallFunction(name, args);
 
+        // Reflection API
+        public FunctionDefinitionNode GetFunction(string name, HLSLValue[] args) => interpreter.GetFunction(name, args);
+        public FunctionDefinitionNode GetFunction(string name) => interpreter.GetFunction(name);
+        public StructTypeNode GetStructType(string name) => interpreter.GetStructType(name);
+        public TypeNode ResolveType(TypeNode type) => interpreter.ResolveType(type);
+
         // Debug API
         public Action<HLSLSyntaxNode> DebugHook
         {

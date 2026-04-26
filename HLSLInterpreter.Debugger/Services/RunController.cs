@@ -69,7 +69,7 @@ public sealed class RunController : INotifyPropertyChanged
             IsGpuMode = true;
             GpuPaused = false;
             if (beforeGpuRender != null) await beforeGpuRender();
-            await RunGpuInternal(getCode, dotNetRef);
+            await RunGpuInternal(getCode, makeParserConfig, dotNetRef);
         }
         else
         {
@@ -124,7 +124,10 @@ public sealed class RunController : INotifyPropertyChanged
         Output = sw.ToString();
     }
 
-    private async Task RunGpuInternal(Func<Task<string>> getCode, object? dotNetRef)
+    private async Task RunGpuInternal(
+        Func<Task<string>> getCode,
+        Func<HLSLParserConfig> makeParserConfig,
+        object? dotNetRef)
     {
         bool hasGpu = false;
         try { hasGpu = await _js.InvokeAsync<bool>("gpuIsAvailable"); }
@@ -138,11 +141,18 @@ public sealed class RunController : INotifyPropertyChanged
 
         try
         {
-            string code = await getCode();
+            string userCode = await getCode();
             int wx = Math.Max(1, _state.WarpX);
             int wy = Math.Max(1, _state.WarpY);
-            await _js.InvokeVoidAsync("gpuRender", "color-canvas-gpu", code,
-                _state.EntryPoint, wx, wy, dotNetRef);
+            var assembled = ShaderAssembler.Assemble(
+                userCode,
+                _state.VertexEntryPoint,
+                _state.ShaderRenderMode,
+                makeParserConfig());
+            string mode = _state.ShaderRenderMode == ShaderRenderMode.VertFrag ? "vertfrag" : "pixel";
+            await _js.InvokeVoidAsync("gpuRender", "color-canvas-gpu", assembled.Source,
+                _state.EntryPoint, wx, wy, dotNetRef, mode, assembled.VertexEntry,
+                assembled.VertexInputs);
         }
         catch (Exception ex)
         {

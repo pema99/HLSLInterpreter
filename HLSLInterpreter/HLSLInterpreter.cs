@@ -47,8 +47,10 @@ namespace HLSL
 
         public HLSLValue CallFunction(string name, params HLSLValue[] args) => expressionEvaluator.CallFunction(name, args);
         public FunctionDefinitionNode GetFunction(string name, HLSLValue[] args) => context.GetFunction(expressionEvaluator, name, args);
-
+        public FunctionDefinitionNode GetFunction(string name) => context.GetFunction(name);
         public (string QualifiedName, FunctionDefinitionNode Func)[] GetFunctions() => context.GetFunctions();
+        public StructTypeNode GetStructType(string name) => context.GetStructType(name);
+        public TypeNode ResolveType(TypeNode type) => context.ResolveType(type);
 
         public HLSLValue EvaluateExpression(ExpressionNode node) => expressionEvaluator.Visit(node);
 

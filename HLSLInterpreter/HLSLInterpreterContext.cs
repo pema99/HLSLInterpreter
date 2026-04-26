@@ -303,6 +303,21 @@ namespace HLSL
             return null;
         }
 
+        public FunctionDefinitionNode GetFunction(string name)
+        {
+            foreach (var scope in environment)
+            {
+                foreach (string candidate in CandidateNames(name))
+                {
+                    if (scope.Functions.TryGetValue(candidate, out var funcs) && funcs.Count > 0)
+                    {
+                        return funcs[0];
+                    }
+                }
+            }
+            return null;
+        }
+
         public (string QualifiedName, FunctionDefinitionNode Func)[] GetFunctions()
         {
             return environment
