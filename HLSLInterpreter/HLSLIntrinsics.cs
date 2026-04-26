@@ -735,7 +735,7 @@ namespace HLSL
 
         public static NumericValue Firstbithigh(NumericValue x)
         {
-            // Per DXC: uint<> firstbithigh(in any_int<> x) — returns uint regardless of signed/unsigned input.
+            // Per DXC: uint<> firstbithigh(in any_int<> x), returns uint regardless of signed/unsigned input.
             // Gets the location of the first set bit starting from the highest order bit and working downward, per component.
             NumericValue result;
             if (HLSLTypeUtils.IsInt(x.Type))
