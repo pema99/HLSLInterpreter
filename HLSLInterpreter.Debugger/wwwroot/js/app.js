@@ -356,41 +356,10 @@ window.initMonaco = function (containerId, initialCode, dotNetRef) {
                     if (info == null) return null;
                     var contents = [{ value: '```\n' + word.word + ' = ' + info.value + '\n```' }];
                     if (info.rgba && info.width > 0 && info.height > 0) {
-                        var bytes = info.rgba;
-                        // Blazor delivers byte[] as a base64 string over JS interop.
-                        if (typeof bytes === 'string') {
-                            var bin = atob(bytes);
-                            var arr = new Uint8ClampedArray(bin.length);
-                            for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-                            bytes = arr;
-                        }
-                        var src = document.createElement('canvas');
-                        src.width = info.width;
-                        src.height = info.height;
-                        src.getContext('2d').putImageData(
-                            new ImageData(new Uint8ClampedArray(bytes), info.width, info.height), 0, 0);
-                        var pxScale = Math.max(8, Math.floor(192 / Math.max(info.width, info.height)));
                         var dst = document.createElement('canvas');
-                        dst.width = info.width * pxScale;
-                        dst.height = info.height * pxScale;
-                        var dctx = dst.getContext('2d');
-                        dctx.imageSmoothingEnabled = false;
-                        dctx.drawImage(src, 0, 0, dst.width, dst.height);
-                        var ix = info.inspectedX * pxScale;
-                        var iy = info.inspectedY * pxScale;
-                        var ringDraw = function (x, y, w, h, color) {
-                            dctx.fillStyle = color;
-                            dctx.fillRect(x, y, w, 1);
-                            dctx.fillRect(x, y + h - 1, w, 1);
-                            dctx.fillRect(x, y, 1, h);
-                            dctx.fillRect(x + w - 1, y, 1, h);
-                        };
-                        ringDraw(ix - 1, iy - 1, pxScale + 2, pxScale + 2, '#000');
-                        ringDraw(ix - 2, iy - 2, pxScale + 4, pxScale + 4, '#f00');
-                        ringDraw(ix - 3, iy - 3, pxScale + 6, pxScale + 6, '#000');
-                        var dataUrl = dst.toDataURL('image/png');
+                        paintScaledRgbaToCanvas(dst, info.rgba, info.width, info.height, info.inspectedX, info.inspectedY);
                         contents.push({
-                            value: `<img src="${dataUrl}" width="${dst.width}" height="${dst.height}" />`,
+                            value: `<img src="${dst.toDataURL('image/png')}" width="${dst.width}" height="${dst.height}" />`,
                             supportHtml: true,
                             isTrusted: true,
                         });
@@ -602,6 +571,52 @@ window.highlightDebugLine = function (lineNumber) {
         window._debugLineDecorationIds || [], decorations
     );
     if (lineNumber > 0) window._monacoEditor.revealLineInCenter(lineNumber);
+};
+
+// Paints a per-thread rgba grid onto `canvas`, upscaled with no smoothing,
+// with a black-red-black ring around the inspected thread. Shared by the
+// hover provider and the Immediate window's per-entry image. sizeScale
+// shrinks both the target output size and the per-cell minimum together,
+// so the ring stays at a proportionally crisp pixel width.
+function paintScaledRgbaToCanvas(canvas, rgbaBytes, width, height, inspectedX, inspectedY, sizeScale) {
+    var s = sizeScale || 1;
+    var bytes = rgbaBytes;
+    // Blazor delivers byte[] as a base64 string over JS interop.
+    if (typeof bytes === 'string') {
+        var bin = atob(bytes);
+        var arr = new Uint8ClampedArray(bin.length);
+        for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+        bytes = arr;
+    }
+    var src = document.createElement('canvas');
+    src.width = width;
+    src.height = height;
+    src.getContext('2d').putImageData(
+        new ImageData(new Uint8ClampedArray(bytes), width, height), 0, 0);
+    var pxScale = Math.max(Math.round(8 * s), Math.floor(192 * s / Math.max(width, height)));
+    canvas.width = width * pxScale;
+    canvas.height = height * pxScale;
+    var dctx = canvas.getContext('2d');
+    dctx.imageSmoothingEnabled = false;
+    dctx.drawImage(src, 0, 0, canvas.width, canvas.height);
+    var ix = inspectedX * pxScale;
+    var iy = inspectedY * pxScale;
+    var ringDraw = function (x, y, w, h, color) {
+        dctx.fillStyle = color;
+        dctx.fillRect(x, y, w, 1);
+        dctx.fillRect(x, y + h - 1, w, 1);
+        dctx.fillRect(x, y, 1, h);
+        dctx.fillRect(x + w - 1, y, 1, h);
+    };
+    ringDraw(ix - 1, iy - 1, pxScale + 2, pxScale + 2, '#000');
+    ringDraw(ix - 2, iy - 2, pxScale + 4, pxScale + 4, '#f00');
+    ringDraw(ix - 3, iy - 3, pxScale + 6, pxScale + 6, '#000');
+}
+
+window.rgbaToDataUrl = function (rgbaBytes, width, height, inspectedX, inspectedY, sizeScale) {
+    var dst = document.createElement('canvas');
+    paintScaledRgbaToCanvas(dst, rgbaBytes, width, height, inspectedX, inspectedY, sizeScale);
+    return dst.toDataURL('image/png');
 };
 
 window.restoreImageSectionHeight = function () {

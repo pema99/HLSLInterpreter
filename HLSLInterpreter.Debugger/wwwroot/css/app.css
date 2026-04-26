@@ -1019,6 +1019,12 @@
     padding-left: 14px;
 }
 
+.imm-image {
+    display: block;
+    margin: 4px 0 4px 14px;
+    image-rendering: pixelated;
+}
+
 .imm-error {
     color: #f44747;
 }
@@ -1159,10 +1165,12 @@
     justify-content: center;
     padding: 6px;
 }
-/* When the pane hosts the image-container, let it fill the content box. */
+/* When the pane hosts the image-container, let it fill the content box and
+   drop the padding so the panel background doesn't frame the image. */
 .exec-state-body:has(.image-container) {
     align-items: stretch;
     justify-content: stretch;
+    padding: 0;
 }
 
 .bottom-mode-row {

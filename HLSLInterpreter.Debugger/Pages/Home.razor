@@ -237,7 +237,7 @@
                             <span class="collapse-icon @(callStackCollapsed ? "" : "expanded")">&#x203A;</span>
                             <span>Call Stack</span>
                         </div>
-                        @if (!callStackCollapsed && threadStates.Length > 0)
+                        @if (!callStackCollapsed && threadStates.Length > 0 && debugBottomMode == "ThreadStates")
                         {
                             <span class="thread-legend">
                                 <span class="tl-dot tc-active"></span>Active thread
@@ -348,6 +348,10 @@
                                         <div class="imm-entry">
                                             <div class="imm-expr"><span class="imm-prompt">&gt;</span> @entry.Expression</div>
                                             <div class="imm-result @(entry.IsError ? "imm-error" : "")">@entry.Result</div>
+                                            @if (entry.ImageDataUrl != null)
+                                            {
+                                                <img class="imm-image" src="@entry.ImageDataUrl" />
+                                            }
                                         </div>
                                     }
                                 </div>
@@ -704,6 +708,7 @@ float4 main(float4 position : SV_Position) : SV_Target
         public string Expression { get; init; } = "";
         public string Result { get; init; } = "";
         public bool IsError { get; init; }
+        public string? ImageDataUrl { get; init; }
     }
 
     private int inspectedThread
@@ -762,6 +767,7 @@ float4 main(float4 position : SV_Position) : SV_Target
                 try { initialCode = DecompressCode(param); }
                 catch { }
             }
+            ApplyPermalinkSettings();
 
             if (TabbedEditorConfig.Enabled && editorTabs.Count > 0)
                 editorTabs[0].Code = initialCode;
@@ -1532,13 +1538,13 @@ float4 main(float4 position : SV_Position) : SV_Target
 
         string resultStr;
         bool isError = false;
+        HLSLValue evalResult = null;
 
         try
         {
             var evalRunner = new HLSLRunner(wx, wy);
             SetSharedGlobals(evalRunner, wx, wy);
 
-            HLSLValue evalResult = null;
             Exception evalError = null;
             int stepCount = 0;
             int targetStep = debugStepIndex;
@@ -1581,7 +1587,22 @@ float4 main(float4 position : SV_Position) : SV_Target
             isError = true;
         }
 
-        immediateHistory.Add(new ImmediateEntry { Expression = expr, Result = resultStr, IsError = isError });
+        string? imageDataUrl = null;
+        if (!isError && evalResult != null)
+        {
+            byte[]? rgba = null;
+            try { rgba = RenderVariableImage(evalResult is ReferenceValue rv ? rv.Get() : evalResult, wx, wy); }
+            catch { }
+            if (rgba != null)
+            {
+                int ix = warpX > 0 ? inspectedThread % warpX : 0;
+                int iy = warpX > 0 ? inspectedThread / warpX : 0;
+                try { imageDataUrl = await JS.InvokeAsync<string>("rgbaToDataUrl", rgba, wx, wy, ix, iy, 0.7); }
+                catch { }
+            }
+        }
+
+        immediateHistory.Add(new ImmediateEntry { Expression = expr, Result = resultStr, IsError = isError, ImageDataUrl = imageDataUrl });
         StateHasChanged();
         await Task.Yield();
         await JS.InvokeVoidAsync("scrollImmediateToBottom");
@@ -1671,8 +1692,25 @@ float4 main(float4 position : SV_Position) : SV_Target
         string code = await JS.InvokeAsync<string>("getMonacoValue");
         string encoded = CompressCode(code);
         string baseUrl = PermalinkBase.Url ?? new Uri(Nav.Uri).GetLeftPart(UriPartial.Path);
-        string permalink = $"{baseUrl.TrimEnd('/')}/?c={encoded}";
+        string permalink = $"{baseUrl.TrimEnd('/')}/?c={encoded}"
+            + $"&e={Uri.EscapeDataString(entryPoint)}"
+            + $"&wx={warpX}&wy={warpY}"
+            + $"&gx={groupOffsetX}&gy={groupOffsetY}"
+            + $"&g={(gpuPreviewEnabled ? 1 : 0)}";
         await JS.InvokeVoidAsync("copyToClipboard", permalink);
+    }
+
+    private void ApplyPermalinkSettings()
+    {
+        var e = GetQueryParam(Nav.Uri, "e");
+        if (!string.IsNullOrEmpty(e)) entryPoint = e;
+        if (int.TryParse(GetQueryParam(Nav.Uri, "wx"), out var wx) && wx > 0) warpX = wx;
+        if (int.TryParse(GetQueryParam(Nav.Uri, "wy"), out var wy) && wy > 0) warpY = wy;
+        if (int.TryParse(GetQueryParam(Nav.Uri, "gx"), out var gx) && gx >= 0) groupOffsetX = gx;
+        if (int.TryParse(GetQueryParam(Nav.Uri, "gy"), out var gy) && gy >= 0) groupOffsetY = gy;
+        var g = GetQueryParam(Nav.Uri, "g");
+        if (g == "1") gpuPreviewEnabled = true;
+        else if (g == "0") gpuPreviewEnabled = false;
     }
 
     public async ValueTask DisposeAsync()
