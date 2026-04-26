@@ -1,0 +1,199 @@
+@using HLSL
+@using HLSLInterpreter.Debugger.Core
+@inject IJSRuntime JS
+@inject FileDialogService FileDialogs
+@inject TabbedEditorOptions TabbedEditorConfig
+@inject DebuggerAppState State
+@inject DebugController DebugCtl
+
+<div class="editor-panel">
+    <div class="panel-header">
+        @if (TabbedEditorConfig.Enabled)
+        {
+            <div class="editor-toolbar-group">
+                <button class="btn-editor-toolbar" @onclick="OpenFileDialog" title="Open file">Open</button>
+                <button class="btn-editor-toolbar" @onclick="SaveFileDialog" title="Save">Save</button>
+                <button class="btn-editor-toolbar" @onclick="SaveFileAsDialog" title="Save As">Save As</button>
+            </div>
+        }
+        else
+        {
+            <span>Input</span>
+        }
+        <select class="footer-select" title="Font size" @onchange="OnFontSizeChanged">
+            @foreach (var size in fontSizes)
+            {
+                <option value="@size" selected="@(size == fontSize)">@size</option>
+            }
+        </select>
+    </div>
+    @if (TabbedEditorConfig.Enabled)
+    {
+        <div class="editor-tabs">
+            @for (int i = 0; i < tabs.Count; i++)
+            {
+                var idx = i;
+                <div class="editor-tab @(idx == activeTabIndex ? "active" : "")"
+                     @onclick="() => SwitchTab(idx)">
+                    @tabs[idx].Name
+                    <span class="editor-tab-close" @onclick="() => CloseTab(idx)" @onclick:stopPropagation>&#x2715;</span>
+                </div>
+            }
+        </div>
+    }
+    <div id="monaco-container" class="editor-container"></div>
+</div>
+
+@code {
+    [Parameter] public string InitialCode { get; set; } = "";
+    [Parameter] public string InitialCodeName { get; set; } = "new.hlsl";
+    [Parameter] public string? InitialCodePath { get; set; }
+    // Typed as object? because the concrete DotNetObjectReference<Home> would force Razor's
+    // generated code in Home to resolve `HLSLInterpreter.Debugger.Pages.Home`, which clashes
+    // with the parser library's HLSL.HLSLInterpreter class brought in via @using HLSL.
+    [Parameter] public object? DotNetRef { get; set; }
+    [Parameter] public EventCallback<int> OnTabSwitched { get; set; }
+    [Parameter] public EventCallback OnReady { get; set; }
+
+    private static readonly int[] fontSizes = { 12, 13, 14, 15, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36 };
+    private int fontSize = 16;
+
+    private sealed class EditorTab { public string Name = ""; public string Code = ""; public string? Path; }
+    private List<EditorTab> tabs = new();
+    private int activeTabIndex;
+
+    public int ActiveTabIndex => activeTabIndex;
+    public string? ActiveTabPath =>
+        TabbedEditorConfig.Enabled && tabs.Count > 0 ? tabs[activeTabIndex].Path : null;
+
+    public ValueTask<string> GetCode() => JS.InvokeAsync<string>("getMonacoValue");
+    public ValueTask SetReadOnly(bool readOnly) => JS.InvokeVoidAsync("setMonacoReadOnly", readOnly);
+    public ValueTask HighlightLine(int line) => JS.InvokeVoidAsync("highlightDebugLine", line);
+
+    public HoverInfo? BuildHoverInfo(string identifier)
+    {
+        if (!DebugCtl.IsDebugging || DebugCtl.CurrentSession?.Current is not { } step)
+            return null;
+        HLSLValue? val = null;
+        if (step.FrameVariables.Length > 0 && step.FrameVariables[0].TryGetValue(identifier, out var lv))
+            val = lv;
+        else if (step.GlobalVariables.TryGetValue(identifier, out var gv))
+            val = gv;
+        if (val == null) return null;
+
+        byte[]? rgba = null;
+        try { rgba = ValueImageRenderer.RenderVariableImage(val is ReferenceValue rv ? rv.Get() : val, State.WarpX, State.WarpY); }
+        catch (Exception ex) { Console.WriteLine($"[hover] image render failed for '{identifier}': {ex.Message}"); }
+        return new HoverInfo
+        {
+            Value = HLSLValueFormatter.Format(val, State.InspectedThread),
+            Width = State.WarpX,
+            Height = State.WarpY,
+            Rgba = rgba,
+            InspectedX = State.WarpX > 0 ? State.InspectedThread % State.WarpX : 0,
+            InspectedY = State.WarpX > 0 ? State.InspectedThread / State.WarpX : 0,
+        };
+    }
+
+    protected override void OnInitialized()
+    {
+        if (TabbedEditorConfig.Enabled)
+            tabs.Add(new EditorTab { Name = InitialCodeName, Code = InitialCode, Path = InitialCodePath });
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("initMonaco", "monaco-container", InitialCode, DotNetRef);
+            if (TabbedEditorConfig.Enabled)
+                FileDialogs.FileDropped = async (name, content, path) => await OpenFileInTab(name, content, path);
+            await OnReady.InvokeAsync();
+        }
+    }
+
+    private async Task OnFontSizeChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int size))
+        {
+            fontSize = size;
+            await JS.InvokeVoidAsync("setMonacoFontSize", size);
+        }
+    }
+
+    public async Task SwitchTab(int index)
+    {
+        if (index == activeTabIndex) return;
+        tabs[activeTabIndex].Code = await JS.InvokeAsync<string>("getMonacoValue");
+        activeTabIndex = index;
+        await JS.InvokeVoidAsync("setMonacoValue", tabs[activeTabIndex].Code);
+        await OnTabSwitched.InvokeAsync(activeTabIndex);
+    }
+
+    private async Task CloseTab(int index)
+    {
+        if (tabs.Count <= 1) return;
+        if (index == activeTabIndex)
+        {
+            int newActive = index > 0 ? index - 1 : 1;
+            activeTabIndex = newActive;
+            await JS.InvokeVoidAsync("setMonacoValue", tabs[newActive].Code);
+        }
+        tabs.RemoveAt(index);
+        if (activeTabIndex > index) activeTabIndex--;
+    }
+
+    private async Task OpenFileDialog()
+    {
+        var (path, content) = await FileDialogs.OpenFile();
+        if (path == null || content == null) return;
+        var existing = tabs.FindIndex(t => t.Path == path);
+        if (existing >= 0) { await SwitchTab(existing); return; }
+        tabs[activeTabIndex].Code = await JS.InvokeAsync<string>("getMonacoValue");
+        string name = System.IO.Path.GetFileName(path);
+        tabs.Add(new EditorTab { Name = name, Code = content, Path = path });
+        activeTabIndex = tabs.Count - 1;
+        await JS.InvokeVoidAsync("setMonacoValue", content);
+        StateHasChanged();
+    }
+
+    private async Task SaveFileDialog()
+    {
+        string code = await JS.InvokeAsync<string>("getMonacoValue");
+        string? savedPath = await FileDialogs.SaveFile(code, tabs[activeTabIndex].Path);
+        if (savedPath == null) return;
+        tabs[activeTabIndex].Path = savedPath;
+        tabs[activeTabIndex].Name = System.IO.Path.GetFileName(savedPath);
+        tabs[activeTabIndex].Code = code;
+        StateHasChanged();
+    }
+
+    private async Task SaveFileAsDialog()
+    {
+        string code = await JS.InvokeAsync<string>("getMonacoValue");
+        string? savedPath = await FileDialogs.SaveFileAs(code);
+        if (savedPath == null) return;
+        tabs[activeTabIndex].Path = savedPath;
+        tabs[activeTabIndex].Name = System.IO.Path.GetFileName(savedPath);
+        tabs[activeTabIndex].Code = code;
+        StateHasChanged();
+    }
+
+    public async Task OpenFileInTab(string name, string content, string? path = null)
+    {
+        if (!TabbedEditorConfig.Enabled) return;
+        var existing = tabs.FindIndex(t => t.Name == name);
+        if (existing >= 0)
+        {
+            await SwitchTab(existing);
+        }
+        else
+        {
+            tabs[activeTabIndex].Code = await JS.InvokeAsync<string>("getMonacoValue");
+            tabs.Add(new EditorTab { Name = name, Code = content, Path = string.IsNullOrEmpty(path) ? null : path });
+            activeTabIndex = tabs.Count - 1;
+            await JS.InvokeVoidAsync("setMonacoValue", content);
+        }
+        StateHasChanged();
+    }
+}

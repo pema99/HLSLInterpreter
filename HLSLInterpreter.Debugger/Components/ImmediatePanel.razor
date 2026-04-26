@@ -1,0 +1,154 @@
+@using HLSL
+@using HLSLInterpreter.Debugger.Core
+@using UnityShaderParser.HLSL
+@inherits StateAwareComponent
+@inject IJSRuntime JS
+
+<div class="debug-section debug-section-immediate @(collapsed ? "section-collapsed" : "")">
+    <div class="panel-header collapsible-header" @onclick="() => collapsed = !collapsed">
+        <div class="panel-header-left">
+            <span class="collapse-icon @(collapsed ? "" : "expanded")">&#x203A;</span>
+            <span>Immediate</span>
+        </div>
+    </div>
+    @if (!collapsed)
+    {
+        <div class="output-body imm-body">
+            @if (history.Count == 0)
+            {
+                <div class="hint">Evaluate expressions in the current scope.</div>
+            }
+            else
+            {
+                <div class="imm-history">
+                    @foreach (var entry in history)
+                    {
+                        <div class="imm-entry">
+                            <div class="imm-expr"><span class="imm-prompt">&gt;</span> @entry.Expression</div>
+                            <div class="imm-result @(entry.IsError ? "imm-error" : "")">@entry.Result</div>
+                            @if (entry.ImageDataUrl != null)
+                            {
+                                <img class="imm-image" src="@entry.ImageDataUrl" />
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+        <div class="imm-input-row">
+            <span class="imm-prompt-inline">&gt;</span>
+            <input class="imm-input" type="text" placeholder="Expression..."
+                   @bind="immediateInput" @bind:event="oninput"
+                   @onkeydown="OnImmediateKeyDown" />
+            <button class="imm-eval-btn" @onclick="Evaluate" disabled="@(Session == null || Session.StepIndex < 0)">Eval</button>
+        </div>
+        <div class="resize-v-handle" title="Drag to resize"></div>
+    }
+</div>
+
+@code {
+    [Parameter] public DebuggerSession? Session { get; set; }
+    [Parameter] public string DebugCode { get; set; } = "";
+    [Parameter] public Action<HLSLRunner>? ConfigureGlobals { get; set; }
+    [Parameter] public Func<HLSLParserConfig>? ParserConfigFactory { get; set; }
+
+    private bool collapsed;
+    private string immediateInput = "";
+    private List<ImmediateEntry> history = new();
+
+    private sealed class ImmediateEntry
+    {
+        public string Expression { get; init; } = "";
+        public string Result { get; init; } = "";
+        public bool IsError { get; init; }
+        public string? ImageDataUrl { get; init; }
+    }
+
+    private async Task OnImmediateKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await Evaluate();
+    }
+
+    private async Task Evaluate()
+    {
+        string expr = immediateInput.Trim();
+        if (string.IsNullOrEmpty(expr) || Session == null || Session.StepIndex < 0 || string.IsNullOrEmpty(DebugCode)) return;
+        immediateInput = "";
+
+        int wx = Math.Max(1, State.WarpX);
+        int wy = Math.Max(1, State.WarpY);
+        int threadCount = wx * wy;
+
+        string resultStr;
+        bool isError = false;
+        HLSLValue? evalResult = null;
+
+        try
+        {
+            var evalRunner = new HLSLRunner(wx, wy);
+            ConfigureGlobals?.Invoke(evalRunner);
+
+            Exception? evalError = null;
+            int stepCount = 0;
+            int targetStep = Session.StepIndex;
+
+            evalRunner.DebugHook = _ =>
+            {
+                if (stepCount == targetStep)
+                {
+                    try { evalResult = evalRunner.EvaluateExpression(expr); }
+                    catch (Exception ex) { evalError = ex; }
+                    throw new OperationCanceledException();
+                }
+                stepCount++;
+            };
+
+            var sw = new System.IO.StringWriter();
+            var oldOut = Console.Out;
+            Console.SetOut(sw);
+            try
+            {
+                var parserConfig = ParserConfigFactory?.Invoke() ?? new HLSLParserConfig();
+                bool cancelledInProcessCode = false;
+                try { evalRunner.ProcessCode(DebugCode, parserConfig); }
+                catch (OperationCanceledException) { cancelledInProcessCode = true; }
+                if (!cancelledInProcessCode)
+                {
+                    var threadArg = DebuggerSession.BuildThreadArg(wx, wy, threadCount, State.GroupOffsetX, State.GroupOffsetY);
+                    try { DebuggerSession.CallEntryPoint(evalRunner, threadArg, State.EntryPoint); }
+                    catch (OperationCanceledException) { }
+                }
+            }
+            finally { Console.SetOut(oldOut); }
+
+            if (evalError != null) { resultStr = evalError.Message; isError = true; }
+            else if (evalResult != null) resultStr = HLSLValueFormatter.Format(evalResult, State.InspectedThread);
+            else { resultStr = "(step not reached - expression may be after this point)"; isError = true; }
+        }
+        catch (Exception ex)
+        {
+            resultStr = ex.Message;
+            isError = true;
+        }
+
+        string? imageDataUrl = null;
+        if (!isError && evalResult != null)
+        {
+            byte[]? rgba = null;
+            try { rgba = ValueImageRenderer.RenderVariableImage(evalResult is ReferenceValue rv ? rv.Get() : evalResult, wx, wy); }
+            catch { }
+            if (rgba != null)
+            {
+                int ix = State.WarpX > 0 ? State.InspectedThread % State.WarpX : 0;
+                int iy = State.WarpX > 0 ? State.InspectedThread / State.WarpX : 0;
+                try { imageDataUrl = await JS.InvokeAsync<string>("rgbaToDataUrl", rgba, wx, wy, ix, iy, 0.7); }
+                catch { }
+            }
+        }
+
+        history.Add(new ImmediateEntry { Expression = expr, Result = resultStr, IsError = isError, ImageDataUrl = imageDataUrl });
+        StateHasChanged();
+        await Task.Yield();
+        await JS.InvokeVoidAsync("scrollImmediateToBottom");
+    }
+}

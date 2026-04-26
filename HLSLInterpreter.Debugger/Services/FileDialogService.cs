@@ -1,4 +1,4 @@
-namespace HLSLInterpreter.Debugger;
+namespace HLSLInterpreter.Debugger.Services;
 
 public class FileDialogService
 {

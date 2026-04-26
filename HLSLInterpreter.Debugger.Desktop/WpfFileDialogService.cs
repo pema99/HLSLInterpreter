@@ -3,7 +3,7 @@ using System.Windows;
 using System.Windows.Media;
 using Microsoft.Win32;
 using Microsoft.Web.WebView2.Core;
-using HLSLInterpreter.Debugger;
+using HLSLInterpreter.Debugger.Services;
 
 namespace HLSLInterpreter.Debugger.Desktop;
 
