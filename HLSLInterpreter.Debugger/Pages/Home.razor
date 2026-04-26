@@ -1118,8 +1118,7 @@ float4 main(float4 position : SV_Position) : SV_Target
         await JS.InvokeVoidAsync("setMonacoReadOnly", true);
         debugTabIndex = activeTabIndex;
         immediateCollapsed = false;
-        // Keep console open when failing so the error is visible
-        consoleCollapsed = !hasError;
+        consoleCollapsed = false;
         imageCollapsed = true;
 
         // When failing, start at the last recorded step so the failing statement is highlighted
