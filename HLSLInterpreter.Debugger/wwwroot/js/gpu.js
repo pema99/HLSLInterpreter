@@ -407,9 +407,6 @@ function ensureCubeBuffers(device) {
     return { vb, ib };
 }
 
-// Middle-button drag orbits the camera. Wheel is intentionally left to
-// viewport.js (image-level zoom for pixel inspection). Single attach per page
-// (gated on `active` for vert+frag mode at event time).
 function attachCameraInput() {
     const container = document.getElementById('image-container');
     if (!container || container.__dbgCameraInput) return;
@@ -423,17 +420,15 @@ function attachCameraInput() {
         if (active && !active.running) drawFrame(active, performance.now());
     };
 
-    // Middle-button drag rotates the camera. We claim the event here so
-    // viewport.js's middle-button image-pan doesn't also fire.
+    // Right click to rotate
     container.addEventListener('mousedown', (e) => {
-        if (!isVertFrag() || e.button !== 1) return;
+        if (!isVertFrag() || e.button !== 2) return;
         e.preventDefault();
         e.stopPropagation();
         dragging = true;
         lastX = e.clientX;
         lastY = e.clientY;
     }, true);
-
     window.addEventListener('mousemove', (e) => {
         if (!dragging || !isVertFrag()) return;
         const dx = e.clientX - lastX;
@@ -445,9 +440,24 @@ function attachCameraInput() {
         redrawIfPaused();
     });
 
+    // Stop rotate
     window.addEventListener('mouseup', (e) => {
-        if (e.button === 1) dragging = false;
+        if (e.button === 2) dragging = false;
     });
+    // Prevent right click menu
+    container.addEventListener('contextmenu', (e) => {
+        if (isVertFrag()) e.preventDefault();
+    });
+
+    // Scroll + right click to zoom camera
+    container.addEventListener('wheel', (e) => {
+        if (!dragging || !isVertFrag()) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const k = Math.exp(e.deltaY * 0.0015);
+        active.cameraDistance = Math.max(0.5, Math.min(100, active.cameraDistance * k));
+        redrawIfPaused();
+    }, { capture: true, passive: false });
 }
 
 // Cube vertex buffer is laid out as pos(3f) + normal(3f) + uv(2f) = 32 bytes.
