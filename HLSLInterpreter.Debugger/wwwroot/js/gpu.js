@@ -26,7 +26,6 @@ function findTargetValue(slang, name) {
 // Vertex buffer layout for vert+frag mode: pos3 + normal3 + uv2 = 32 bytes.
 const MESH_VERTEX_STRIDE = 32;
 
-// Row-major matrix math. Transposed to column-major at upload time.
 function matIdentity() {
     return [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
 }
@@ -41,7 +40,7 @@ function matMul(A, B) {
     }
     return C;
 }
-// Right-handed perspective with depth [0,1] (D3D/WebGPU clip space). Camera looks down -Z.
+// Right-handed perspective with depth [0,1], Camera looks down -Z.
 function matPerspective(fovY, aspect, near, far) {
     const f = 1 / Math.tan(fovY / 2);
     const a = far / (near - far);
@@ -72,8 +71,6 @@ function matLookAt(ex, ey, ez, tx, ty, tz, ux, uy, uz) {
          0,   0,   0,   1,
     ];
 }
-// Slang's default for HLSL→WGSL uses row-major cbuffer matrix storage, so we
-// upload our row-major math arrays as-is.
 function writeMat4(out, offset, m) {
     for (let i = 0; i < 16; i++) out[offset + i] = m[i];
 }
