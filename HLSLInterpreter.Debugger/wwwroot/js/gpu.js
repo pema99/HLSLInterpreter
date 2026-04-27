@@ -511,6 +511,15 @@ window.gpuRender = async function (canvasId, hlslSource, entryPoint, warpX, warp
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
+    const bindGroupLayout = device.createBindGroupLayout({
+        entries: [{
+            binding: 0,
+            visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+            buffer: { type: 'uniform' },
+        }],
+    });
+    const pipelineLayout = device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] });
+
     let pipeline, meshVB = null, meshIB = null, meshIndexCount = 0;
     if (mode === 'vertfrag') {
         if (!meshVertices || !meshIndices)
@@ -521,7 +530,7 @@ window.gpuRender = async function (canvasId, hlslSource, entryPoint, warpX, warp
         meshIndexCount = buffers.indexCount;
         const meshAttributes = buildMeshAttributes(vertexInputs);
         pipeline = device.createRenderPipeline({
-            layout: 'auto',
+            layout: pipelineLayout,
             vertex: {
                 module: shaderModule,
                 entryPoint: vsEntry,
@@ -536,7 +545,7 @@ window.gpuRender = async function (canvasId, hlslSource, entryPoint, warpX, warp
         });
     } else {
         pipeline = device.createRenderPipeline({
-            layout: 'auto',
+            layout: pipelineLayout,
             vertex: { module: shaderModule, entryPoint: vsEntry },
             fragment: { module: shaderModule, entryPoint: fsEntry, targets: [{ format }] },
             primitive: { topology: 'triangle-list' },
@@ -544,7 +553,7 @@ window.gpuRender = async function (canvasId, hlslSource, entryPoint, warpX, warp
     }
 
     const bindGroup = device.createBindGroup({
-        layout: pipeline.getBindGroupLayout(0),
+        layout: bindGroupLayout,
         entries: [{ binding: 0, resource: { buffer: uniformBuffer } }],
     });
 
