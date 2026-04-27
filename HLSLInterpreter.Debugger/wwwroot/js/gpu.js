@@ -23,11 +23,6 @@ function findTargetValue(slang, name) {
     throw new Error(`Slang: compile target '${name}' not found in getCompileTargets()`);
 }
 
-// The HLSL preamble (debugger globals + dbgVertex + DbgMeshVertex) is owned by
-// C# (ShaderAssembler) so the wrapper-generation pass can parse the same source
-// the GPU compiles. JS just compiles whatever it gets, prepending only the
-// fetched HLSLTest macros that ASSERT/PRINTF expand to.
-
 // Vertex buffer layout for vert+frag mode: pos3 + normal3 + uv2 = 32 bytes.
 const MESH_VERTEX_STRIDE = 32;
 
@@ -138,14 +133,12 @@ function extractEntryPoints(wgsl) {
     return { vsEntry: vs ? vs[1] : null, fsEntry: fs ? fs[1] : null };
 }
 
-// Camera state lives at module scope so it persists across debug mode toggles
-// (which unmount and remount the canvas, replacing `active`).
+// Camera state
 let cameraYaw = 0.6;
 let cameraPitch = 0.3;
 let cameraDistance = 4.0;
 
-// globalSession is heavy, so we cache it. The per-target session caches modules
-// by name internally, so we recreate it per compile to avoid unbounded growth.
+// globalSession is heavy, so we cache it
 let slangGlobalPromise = null;
 async function getSlangGlobal() {
     if (!slangGlobalPromise) {
@@ -239,8 +232,6 @@ function drawFrame(r, now) {
     const t = (now - r.startTimeMs) / 1000;
     r.lastTime = t;
 
-    // Cbuffer layout: scalars in floats 0..4, padding 5..7 (mat4 needs 16-byte
-    // alignment), 4x4 matrix in floats 8..23. Total 96 bytes.
     const u = new Float32Array(24);
     u[0] = r.warpX;
     u[1] = r.warpY;
