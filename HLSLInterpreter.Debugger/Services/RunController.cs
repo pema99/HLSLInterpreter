@@ -60,6 +60,7 @@ public sealed class RunController : INotifyPropertyChanged
         object? dotNetRef,
         Func<Task>? beforeGpuRender = null)
     {
+        float initialTime = GpuCaptured?.Time ?? 0f;
         BeginRun();
         try { await _js.InvokeVoidAsync("gpuStop"); } catch { }
 
@@ -67,9 +68,12 @@ public sealed class RunController : INotifyPropertyChanged
         {
             HasImage = true;
             IsGpuMode = true;
-            GpuPaused = false;
             if (beforeGpuRender != null) await beforeGpuRender();
-            await RunGpuInternal(getCode, parserConfig, dotNetRef);
+            await RunGpuInternal(getCode, parserConfig, dotNetRef, initialTime);
+            if (GpuPaused)
+            {
+                try { await _js.InvokeVoidAsync("gpuPause"); } catch { }
+            }
         }
         else
         {
@@ -126,7 +130,8 @@ public sealed class RunController : INotifyPropertyChanged
     private async Task RunGpuInternal(
         Func<Task<string>> getCode,
         HLSLParserConfig parserConfig,
-        object? dotNetRef)
+        object? dotNetRef,
+        float initialTime)
     {
         bool hasGpu = false;
         try { hasGpu = await _js.InvokeAsync<bool>("gpuIsAvailable"); }
@@ -159,7 +164,7 @@ public sealed class RunController : INotifyPropertyChanged
             }
             await _js.InvokeVoidAsync("gpuRender", "color-canvas-gpu", assembled.Source,
                 _state.EntryPoint, wx, wy, dotNetRef, mode, assembled.VertexEntry,
-                assembled.VertexInputs, meshVertices, meshIndices);
+                assembled.VertexInputs, meshVertices, meshIndices, initialTime);
         }
         catch (Exception ex)
         {

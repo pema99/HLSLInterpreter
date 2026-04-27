@@ -335,7 +335,7 @@ window.gpuRestart = function () {
     active.lastTime = 0;
     // If paused, draw one frame at t=0 so the user sees the reset without
     // changing the pause state.
-    if (!active.running) drawFrame(active, performance.now());
+    if (!active.running) drawFrame(active, active.startTimeMs);
 };
 
 // Live canvas size, time, and camera state so a Debug-button entry can
@@ -379,7 +379,9 @@ function attachCameraInput() {
 
     const isVertFrag = () => active && active.renderMode === 'vertfrag';
     const redrawIfPaused = () => {
-        if (active && !active.running) drawFrame(active, performance.now());
+        if (!active || active.running) return;
+        const fakeNow = active.startTimeMs + (active.lastTime || 0) * 1000;
+        drawFrame(active, fakeNow);
     };
 
     // Right click to rotate
@@ -450,7 +452,7 @@ function buildMeshAttributes(vertexInputs) {
     });
 }
 
-window.gpuRender = async function (canvasId, hlslSource, entryPoint, warpX, warpY, dotNetRef, renderMode, vertexEntryName, vertexInputs, meshVertices, meshIndices) {
+window.gpuRender = async function (canvasId, hlslSource, entryPoint, warpX, warpY, dotNetRef, renderMode, vertexEntryName, vertexInputs, meshVertices, meshIndices, initialTime) {
     if (!('gpu' in navigator)) throw new Error('WebGPU is not supported in this browser.');
 
     const canvas = document.getElementById(canvasId);
@@ -560,8 +562,8 @@ window.gpuRender = async function (canvasId, hlslSource, entryPoint, warpX, warp
         renderMode: mode,
         meshVB, meshIB, meshIndexCount,
         depthTexture: null,
-        startTimeMs: performance.now(),
-        lastTime: 0,
+        startTimeMs: performance.now() - (initialTime || 0) * 1000,
+        lastTime: initialTime || 0,
         running: true,
         animFrameId: null,
     };

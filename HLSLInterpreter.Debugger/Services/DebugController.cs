@@ -100,7 +100,6 @@ public sealed class DebugController : INotifyPropertyChanged
         IsDebugging = false;
         DebugTabIndex = -1;
         CurrentSession = null;
-        _run.GpuCaptured = null;
         _run.IsGpuMode = false;
         if (_savedGroupOffsets.HasValue)
         {
