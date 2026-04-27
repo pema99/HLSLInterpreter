@@ -138,6 +138,12 @@ function extractEntryPoints(wgsl) {
     return { vsEntry: vs ? vs[1] : null, fsEntry: fs ? fs[1] : null };
 }
 
+// Camera state lives at module scope so it persists across debug mode toggles
+// (which unmount and remount the canvas, replacing `active`).
+let cameraYaw = 0.6;
+let cameraPitch = 0.3;
+let cameraDistance = 4.0;
+
 // globalSession is heavy, so we cache it. The per-target session caches modules
 // by name internally, so we recreate it per compile to avoid unbounded growth.
 let slangGlobalPromise = null;
@@ -245,11 +251,11 @@ function drawFrame(r, now) {
     let viewProj;
     if (r.renderMode === 'vertfrag') {
         const aspect = Math.max(1e-4, r.canvas.width / r.canvas.height);
-        const cp = Math.cos(r.cameraPitch), sp = Math.sin(r.cameraPitch);
-        const cy = Math.cos(r.cameraYaw),   sy = Math.sin(r.cameraYaw);
-        const ex = sy * cp * r.cameraDistance;
-        const ey = sp * r.cameraDistance;
-        const ez = cy * cp * r.cameraDistance;
+        const cp = Math.cos(cameraPitch), sp = Math.sin(cameraPitch);
+        const cy = Math.cos(cameraYaw),   sy = Math.sin(cameraYaw);
+        const ex = sy * cp * cameraDistance;
+        const ey = sp * cameraDistance;
+        const ez = cy * cp * cameraDistance;
         const proj = matPerspective(60 * Math.PI / 180, aspect, 0.1, 100);
         const view = matLookAt(ex, ey, ez, 0, 0, 0, 0, 1, 0);
         viewProj = matMul(proj, view);
@@ -351,9 +357,9 @@ window.gpuSnapshot = function () {
         active.lastTime || 0,
         active.canvas.width,
         active.canvas.height,
-        active.cameraYaw,
-        active.cameraPitch,
-        active.cameraDistance,
+        cameraYaw,
+        cameraPitch,
+        cameraDistance,
     ];
 };
 
@@ -405,8 +411,8 @@ function attachCameraInput() {
         const dy = e.clientY - lastY;
         lastX = e.clientX;
         lastY = e.clientY;
-        active.cameraYaw -= dx * 0.01;
-        active.cameraPitch = Math.max(-1.4, Math.min(1.4, active.cameraPitch + dy * 0.01));
+        cameraYaw -= dx * 0.01;
+        cameraPitch = Math.max(-1.4, Math.min(1.4, cameraPitch + dy * 0.01));
         redrawIfPaused();
     });
 
@@ -425,7 +431,7 @@ function attachCameraInput() {
         e.preventDefault();
         e.stopPropagation();
         const k = Math.exp(e.deltaY * 0.0015);
-        active.cameraDistance = Math.max(0.5, Math.min(100, active.cameraDistance * k));
+        cameraDistance = Math.max(0.5, Math.min(100, cameraDistance * k));
         redrawIfPaused();
     }, { capture: true, passive: false });
 }
@@ -466,11 +472,6 @@ window.gpuRender = async function (canvasId, hlslSource, entryPoint, warpX, warp
 
     const mode = renderMode === 'vertfrag' ? 'vertfrag' : 'pixel';
     const vsName = mode === 'vertfrag' ? (vertexEntryName || 'vert') : 'dbgVertex';
-
-    // Carry over camera state across reruns so reruns don't snap the mesh back.
-    const prevCamera = (active && active.canvas === canvas)
-        ? { yaw: active.cameraYaw, pitch: active.cameraPitch, distance: active.cameraDistance }
-        : null;
 
     window.gpuStop();
     if (active && active.canvas === canvas) {
@@ -564,9 +565,6 @@ window.gpuRender = async function (canvasId, hlslSource, entryPoint, warpX, warp
         renderMode: mode,
         meshVB, meshIB, meshIndexCount,
         depthTexture: null,
-        cameraYaw:      prevCamera ? prevCamera.yaw      : 0.6,
-        cameraPitch:    prevCamera ? prevCamera.pitch    : 0.3,
-        cameraDistance: prevCamera ? prevCamera.distance : 4.0,
         startTimeMs: performance.now(),
         lastTime: 0,
         running: true,
