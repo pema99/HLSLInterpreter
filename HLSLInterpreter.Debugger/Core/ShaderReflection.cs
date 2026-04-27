@@ -43,7 +43,7 @@ public static class ShaderReflection
             ?? throw new InvalidOperationException($"Vertex function '{vertEntry}' not found in shader.");
 
         var inputs = new List<VertexInput>();
-        WalkParameters(runner, vertFunc, (type, semantic, dim) =>
+        WalkParameters(runner, vertFunc, (type, semantic, dim, modifiers) =>
         {
             // System values come from pipeline state (@builtin in WGSL), not
             // the vertex buffer. Skip them in the layout enumeration.
@@ -138,7 +138,7 @@ public static class ShaderReflection
     {
         int cursor = 0;
         int found = -1;
-        WalkReturn(runner, vertFunc, (type, otherSemantic, dim) =>
+        WalkReturn(runner, vertFunc, (type, otherSemantic, dim, modifiers) =>
         {
             if (found < 0 && otherSemantic.Base == semantic)
                 found = cursor;
@@ -197,12 +197,12 @@ public static class ShaderReflection
     #endregion
 
     #region Visitor
-    public delegate void LeafVisitor(TypeNode type, (string Base, int Index) semantic, int dim);
+    public delegate void LeafVisitor(TypeNode type, (string Base, int Index) semantic, int dim, IList<BindingModifier> modifiers);
 
     public static void WalkParameters(HLSLRunner runner, FunctionNode func, LeafVisitor visitor)
     {
         foreach (var param in func.Parameters)
-            WalkType(runner, param.ParamType, param.Declarator, visitor);
+            WalkType(runner, param.ParamType, param.Declarator, param.Modifiers, visitor);
     }
 
     public static void WalkReturn(HLSLRunner runner, FunctionNode func, LeafVisitor visitor)
@@ -216,10 +216,10 @@ public static class ShaderReflection
         TryGetSemantic(func, out var semantic);
         if (!TryGetDimensions(resolved, out int dim))
             throw new InvalidOperationException("Function return must be a scalar, vector, or struct.");
-        visitor(resolved, semantic, dim);
+        visitor(resolved, semantic, dim, Array.Empty<BindingModifier>());
     }
 
-    private static void WalkType(HLSLRunner runner, TypeNode type, VariableDeclaratorNode declarator, LeafVisitor visitor)
+    private static void WalkType(HLSLRunner runner, TypeNode type, VariableDeclaratorNode declarator, IList<BindingModifier> modifiers, LeafVisitor visitor)
     {
         var resolved = runner.ResolveType(type);
         if (TryAsStruct(resolved, runner, out var structType))
@@ -231,19 +231,19 @@ public static class ShaderReflection
         if (!TryGetDimensions(resolved, out int dim))
             throw new InvalidOperationException(
                 $"Unsupported leaf type for '{declarator.Name.Identifier}'. Only scalar and vector types are supported.");
-        visitor(resolved, semantic, dim);
+        visitor(resolved, semantic, dim, modifiers);
     }
 
     private static void WalkStruct(HLSLRunner runner, StructTypeNode structType, LeafVisitor visitor)
     {
         foreach (var field in structType.Fields)
             foreach (var decl in field.Declarators)
-                WalkType(runner, field.Kind, decl, visitor);
+                WalkType(runner, field.Kind, decl, field.Modifiers, visitor);
     }
     #endregion
 
     #region Visit producing HLSLValue
-    public delegate HLSLValue LeafFactory(TypeNode type, (string Base, int Index) semantic, int dim);
+    public delegate HLSLValue LeafFactory(TypeNode type, (string Base, int Index) semantic, int dim, IList<BindingModifier> modifiers);
 
     public static HLSLValue[] BuildArgs(HLSLRunner runner, FunctionNode func, LeafFactory leafFactory)
     {
@@ -251,12 +251,12 @@ public static class ShaderReflection
         for (int p = 0; p < func.Parameters.Count; p++)
         {
             var param = func.Parameters[p];
-            args[p] = BuildArg(runner, param.ParamType, param.Declarator, leafFactory);
+            args[p] = BuildArg(runner, param.ParamType, param.Declarator, param.Modifiers, leafFactory);
         }
         return args;
     }
 
-    private static HLSLValue BuildArg(HLSLRunner runner, TypeNode type, VariableDeclaratorNode declarator, LeafFactory leafFactory)
+    private static HLSLValue BuildArg(HLSLRunner runner, TypeNode type, VariableDeclaratorNode declarator, IList<BindingModifier> modifiers, LeafFactory leafFactory)
     {
         var resolved = runner.ResolveType(type);
         if (TryAsStruct(resolved, runner, out var structType))
@@ -266,7 +266,7 @@ public static class ShaderReflection
         if (!TryGetDimensions(resolved, out int dim))
             throw new InvalidOperationException(
                 $"Unsupported parameter type for '{declarator.Name.Identifier}'. Only scalar and vector types are supported.");
-        return leafFactory(resolved, semantic, dim);
+        return leafFactory(resolved, semantic, dim, modifiers);
     }
 
     private static HLSLValue BuildStructArg(HLSLRunner runner, StructTypeNode structType, LeafFactory leafFactory)
@@ -289,7 +289,7 @@ public static class ShaderReflection
                     if (!TryGetDimensions(resolvedField, out int dim))
                         throw new InvalidOperationException(
                             $"Unsupported struct member type for '{name}'.");
-                    val = leafFactory(resolvedField, semantic, dim);
+                    val = leafFactory(resolvedField, semantic, dim, field.Modifiers);
                 }
                 members[name] = val;
             }

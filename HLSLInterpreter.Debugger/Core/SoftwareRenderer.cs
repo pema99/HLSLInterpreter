@@ -107,7 +107,7 @@ public static class SoftwareRenderer
         int batchStart,
         int threadsPerWarp)
     {
-        return ShaderReflection.BuildArgs(runner, vertFunc, (type, semantic, dim) =>
+        return ShaderReflection.BuildArgs(runner, vertFunc, (type, semantic, dim, interp) =>
         {
             if (semantic.Base == "SV_VERTEXID")
             {
@@ -172,12 +172,16 @@ public static class SoftwareRenderer
         }
 
         int cursor = 0;
-        return ShaderReflection.BuildArgs(runner, fragFunc, (type, semantic, dim) =>
+        return ShaderReflection.BuildArgs(runner, fragFunc, (type, semantic, dim, modifiers) =>
         {
             int slot = cursor;
             cursor += dim;
             bool isPosition = semantic.Base == "SV_POSITION";
             ScalarType scalarType = ShaderReflection.GetScalarType(type);
+
+            bool noInterpolation = !HLSLTypeUtils.IsFloat(scalarType)
+                || modifiers.Contains(BindingModifier.Nointerpolation);
+            bool noPerspective = modifiers.Contains(BindingModifier.Noperspective);
 
             var perThread = new RawValue[threadsPerWarp][];
             for (int threadIdx = 0; threadIdx < threadsPerWarp; threadIdx++)
@@ -195,15 +199,23 @@ public static class SoftwareRenderer
                     if (dim > 2) row[2] = frag.Depth;
                     if (dim > 3) row[3] = 1f;
                 }
-                else if (HLSLTypeUtils.IsFloat(scalarType))
+                else if (!noInterpolation)
                 {
-                    var (pc0, pc1, pc2) = PerspectiveWeights(frag, screenVerts);
+                    float w0, w1, w2;
+                    if (noPerspective)
+                    {
+                        w0 = frag.Bary0; w1 = frag.Bary1; w2 = frag.Bary2;
+                    }
+                    else
+                    {
+                        (w0, w1, w2) = PerspectiveWeights(frag, screenVerts);
+                    }
                     var f0 = flatVerts[frag.Index0];
                     var f1 = flatVerts[frag.Index1];
                     var f2 = flatVerts[frag.Index2];
                     for (int i = 0; i < dim; i++)
                     {
-                        row[i] = pc0 * f0[slot + i].Float + pc1 * f1[slot + i].Float + pc2 * f2[slot + i].Float;
+                        row[i] = w0 * f0[slot + i].Float + w1 * f1[slot + i].Float + w2 * f2[slot + i].Float;
                     }
                 }
                 else
