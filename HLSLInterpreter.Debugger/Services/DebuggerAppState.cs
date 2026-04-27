@@ -10,6 +10,13 @@ public sealed class DebuggerAppState : INotifyPropertyChanged
 {
     public event PropertyChangedEventHandler? PropertyChanged;
 
+    private Mesh _currentMesh = Mesh.CreateCube();
+    public Mesh CurrentMesh
+    {
+        get => _currentMesh;
+        set => Set(ref _currentMesh, value);
+    }
+
     private string _entryPoint = "main";
     public string EntryPoint
     {

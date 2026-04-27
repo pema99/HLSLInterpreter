@@ -308,6 +308,24 @@ float4 main(VSOut i) : SV_Target
     }
 
     [JSInvokable]
+    public async Task LoadObjMesh(string objText)
+    {
+        if (string.IsNullOrWhiteSpace(objText)) return;
+        try
+        {
+            State.CurrentMesh = Mesh.ParseObj(objText);
+        }
+        catch (Exception ex)
+        {
+            RunCtl.HasError = true;
+            RunCtl.ErrorMessage = "Failed to load OBJ: " + ex.Message;
+            StateHasChanged();
+            return;
+        }
+        await Run();
+    }
+
+    [JSInvokable]
     public void SetInspectedPixel(int px, int py)
     {
         if (State.WarpX <= 0) return;

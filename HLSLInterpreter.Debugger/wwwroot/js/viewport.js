@@ -234,6 +234,23 @@
 
         container.addEventListener('wheel', e => onWheel(container, s, e), { passive: false });
         container.addEventListener('mousedown', e => onMouseDown(container, s, e));
+
+        // Drop an OBJ file onto the viewport to load it as the current mesh.
+        container.addEventListener('dragover', e => {
+            if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+            e.preventDefault();
+        });
+        container.addEventListener('drop', e => {
+            const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+            if (!file) return;
+            e.preventDefault();
+            const reader = new FileReader();
+            reader.onload = ev => {
+                if (!window._dotNetDebugRef) return;
+                window._dotNetDebugRef.invokeMethodAsync('LoadObjMesh', ev.target.result);
+            };
+            reader.readAsText(file);
+        });
         window.addEventListener('mousemove', e => {
             if (!container.isConnected) return;
             onMouseMove(container, s, e);

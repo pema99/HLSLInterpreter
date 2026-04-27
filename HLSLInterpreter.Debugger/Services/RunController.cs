@@ -150,9 +150,17 @@ public sealed class RunController : INotifyPropertyChanged
                 _state.ShaderRenderMode,
                 makeParserConfig());
             string mode = _state.ShaderRenderMode == ShaderRenderMode.VertFrag ? "vertfrag" : "pixel";
+            float[]? meshVertices = null;
+            ushort[]? meshIndices = null;
+            if (_state.ShaderRenderMode == ShaderRenderMode.VertFrag)
+            {
+                var mesh = _state.CurrentMesh;
+                meshVertices = mesh.GetInterleavedVertices();
+                meshIndices = mesh.Indices;
+            }
             await _js.InvokeVoidAsync("gpuRender", "color-canvas-gpu", assembled.Source,
                 _state.EntryPoint, wx, wy, dotNetRef, mode, assembled.VertexEntry,
-                assembled.VertexInputs);
+                assembled.VertexInputs, meshVertices, meshIndices);
         }
         catch (Exception ex)
         {

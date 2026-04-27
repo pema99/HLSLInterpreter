@@ -28,46 +28,8 @@ function findTargetValue(slang, name) {
 // the GPU compiles. JS just compiles whatever it gets, prepending only the
 // fetched HLSLTest macros that ASSERT/PRINTF expand to.
 
-// Unit cube: 24 verts (4 per face for distinct normals + UVs), 32-byte stride
-// (pos3 + normal3 + uv2). 36 indices, uint16. Built once and uploaded lazily.
-const CUBE_VERTICES = (() => {
-    const corners = [
-        [-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],
-        [-1,-1, 1],[1,-1, 1],[1,1, 1],[-1,1, 1],
-    ];
-    // [BL_idx, BR_idx, TR_idx, TL_idx, nx, ny, nz] — BL/BR/TR/TL viewed from outside,
-    // CCW so cullMode='back' culls the inside. Verified by cross-product of edges.
-    const faces = [
-        [4,5,6,7,  0, 0, 1], // +Z front
-        [1,0,3,2,  0, 0,-1], // -Z back
-        [5,1,2,6,  1, 0, 0], // +X right
-        [0,4,7,3, -1, 0, 0], // -X left
-        [3,7,6,2,  0, 1, 0], // +Y top
-        [0,1,5,4,  0,-1, 0], // -Y bottom
-    ];
-    const uvs = [[0,0],[1,0],[1,1],[0,1]];
-    const out = new Float32Array(24 * 8);
-    let o = 0;
-    for (const f of faces) {
-        const corns = [corners[f[0]], corners[f[1]], corners[f[2]], corners[f[3]]];
-        for (let i = 0; i < 4; i++) {
-            out[o++] = corns[i][0]; out[o++] = corns[i][1]; out[o++] = corns[i][2];
-            out[o++] = f[4];        out[o++] = f[5];        out[o++] = f[6];
-            out[o++] = uvs[i][0];   out[o++] = uvs[i][1];
-        }
-    }
-    return out;
-})();
-
-const CUBE_INDICES = (() => {
-    const out = new Uint16Array(36);
-    for (let f = 0; f < 6; f++) {
-        const b = f * 4, o = f * 6;
-        out[o] = b; out[o+1] = b+1; out[o+2] = b+2;
-        out[o+3] = b; out[o+4] = b+2; out[o+5] = b+3;
-    }
-    return out;
-})();
+// Vertex buffer layout for vert+frag mode: pos3 + normal3 + uv2 = 32 bytes.
+const MESH_VERTEX_STRIDE = 32;
 
 // Row-major matrix math. Transposed to column-major at upload time.
 function matIdentity() {
@@ -325,9 +287,9 @@ function drawFrame(r, now) {
     pass.setPipeline(r.pipeline);
     pass.setBindGroup(0, r.bindGroup);
     if (r.renderMode === 'vertfrag') {
-        pass.setVertexBuffer(0, r.cubeVB);
-        pass.setIndexBuffer(r.cubeIB, 'uint16');
-        pass.drawIndexed(36);
+        pass.setVertexBuffer(0, r.meshVB);
+        pass.setIndexBuffer(r.meshIB, 'uint16');
+        pass.drawIndexed(r.meshIndexCount);
     } else {
         pass.draw(3);
     }
@@ -388,23 +350,24 @@ window.gpuSnapshot = function () {
     return [active.lastTime || 0, active.canvas.width, active.canvas.height];
 };
 
-function ensureCubeBuffers(device) {
-    if (device.__dbgCubeVB && device.__dbgCubeIB) {
-        return { vb: device.__dbgCubeVB, ib: device.__dbgCubeIB };
-    }
+function createMeshBuffers(device, meshVertices, meshIndices) {
+    const verts = meshVertices instanceof Float32Array
+        ? meshVertices : new Float32Array(meshVertices);
+    const idx = meshIndices instanceof Uint16Array
+        ? meshIndices : new Uint16Array(meshIndices);
+    // WebGPU requires index buffer size to be a multiple of 4.
+    const ibSize = (idx.byteLength + 3) & ~3;
     const vb = device.createBuffer({
-        size: CUBE_VERTICES.byteLength,
+        size: verts.byteLength,
         usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
     });
-    device.queue.writeBuffer(vb, 0, CUBE_VERTICES);
+    device.queue.writeBuffer(vb, 0, verts);
     const ib = device.createBuffer({
-        size: CUBE_INDICES.byteLength,
+        size: ibSize,
         usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
     });
-    device.queue.writeBuffer(ib, 0, CUBE_INDICES);
-    device.__dbgCubeVB = vb;
-    device.__dbgCubeIB = ib;
-    return { vb, ib };
+    device.queue.writeBuffer(ib, 0, idx);
+    return { vb, ib, indexCount: idx.length };
 }
 
 function attachCameraInput() {
@@ -460,9 +423,9 @@ function attachCameraInput() {
     }, { capture: true, passive: false });
 }
 
-// Cube vertex buffer is laid out as pos(3f) + normal(3f) + uv(2f) = 32 bytes.
-// Map (semanticBase, semanticIndex) → byte offset of that attribute.
-const CUBE_OFFSET_BY_SEMANTIC = {
+// Map (semanticBase, semanticIndex) → byte offset within the interleaved
+// vertex (matches Mesh.GetInterleavedVertices: pos3 + normal3 + uv2).
+const MESH_OFFSET_BY_SEMANTIC = {
     'POSITION_0': 0,
     'NORMAL_0':   12,
     'TEXCOORD_0': 24,
@@ -470,14 +433,14 @@ const CUBE_OFFSET_BY_SEMANTIC = {
 
 const VERTEX_FORMAT_BY_DIM = ['float32', 'float32x2', 'float32x3', 'float32x4'];
 
-function buildCubeAttributes(vertexInputs) {
+function buildMeshAttributes(vertexInputs) {
     if (!Array.isArray(vertexInputs)) return [];
     return vertexInputs.map((input, i) => {
         const key = `${input.semanticBase}_${input.semanticIndex}`;
-        const offset = CUBE_OFFSET_BY_SEMANTIC[key];
+        const offset = MESH_OFFSET_BY_SEMANTIC[key];
         if (offset === undefined) {
             throw new Error(
-                `Vertex input '${key}' is not provided by the debugger cube. ` +
+                `Vertex input '${key}' is not provided by the mesh. ` +
                 `Available: POSITION, NORMAL, TEXCOORD0.`);
         }
         const format = VERTEX_FORMAT_BY_DIM[input.dimensions - 1];
@@ -488,7 +451,7 @@ function buildCubeAttributes(vertexInputs) {
     });
 }
 
-window.gpuRender = async function (canvasId, hlslSource, entryPoint, warpX, warpY, dotNetRef, renderMode, vertexEntryName, vertexInputs) {
+window.gpuRender = async function (canvasId, hlslSource, entryPoint, warpX, warpY, dotNetRef, renderMode, vertexEntryName, vertexInputs, meshVertices, meshIndices) {
     if (!('gpu' in navigator)) throw new Error('WebGPU is not supported in this browser.');
 
     const canvas = document.getElementById(canvasId);
@@ -497,17 +460,17 @@ window.gpuRender = async function (canvasId, hlslSource, entryPoint, warpX, warp
     const mode = renderMode === 'vertfrag' ? 'vertfrag' : 'pixel';
     const vsName = mode === 'vertfrag' ? (vertexEntryName || 'vert') : 'dbgVertex';
 
-    // Carry over camera state across reruns so reruns don't snap the cube back.
+    // Carry over camera state across reruns so reruns don't snap the mesh back.
     const prevCamera = (active && active.canvas === canvas)
         ? { yaw: active.cameraYaw, pitch: active.cameraPitch, distance: active.cameraDistance }
         : null;
 
     window.gpuStop();
-    // Drop GPU resources from the prior run (cube buffers are cached on the
-    // device and intentionally retained).
     if (active && active.canvas === canvas) {
         try { active.uniformBuffer?.destroy?.(); } catch (_) {}
         try { active.depthTexture?.destroy?.(); } catch (_) {}
+        try { active.meshVB?.destroy?.(); } catch (_) {}
+        try { active.meshIB?.destroy?.(); } catch (_) {}
     }
 
     const wgsl = await compileToWgsl(hlslSource, vsName, entryPoint);
@@ -551,20 +514,23 @@ window.gpuRender = async function (canvasId, hlslSource, entryPoint, warpX, warp
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
-    let pipeline, cubeVB = null, cubeIB = null;
+    let pipeline, meshVB = null, meshIB = null, meshIndexCount = 0;
     if (mode === 'vertfrag') {
-        const buffers = ensureCubeBuffers(device);
-        cubeVB = buffers.vb;
-        cubeIB = buffers.ib;
-        const cubeAttributes = buildCubeAttributes(vertexInputs);
+        if (!meshVertices || !meshIndices)
+            throw new Error('vert+frag mode requires mesh vertex/index data.');
+        const buffers = createMeshBuffers(device, meshVertices, meshIndices);
+        meshVB = buffers.vb;
+        meshIB = buffers.ib;
+        meshIndexCount = buffers.indexCount;
+        const meshAttributes = buildMeshAttributes(vertexInputs);
         pipeline = device.createRenderPipeline({
             layout: 'auto',
             vertex: {
                 module: shaderModule,
                 entryPoint: vsEntry,
-                buffers: cubeAttributes.length === 0 ? [] : [{
-                    arrayStride: 32,
-                    attributes: cubeAttributes,
+                buffers: meshAttributes.length === 0 ? [] : [{
+                    arrayStride: MESH_VERTEX_STRIDE,
+                    attributes: meshAttributes,
                 }],
             },
             fragment: { module: shaderModule, entryPoint: fsEntry, targets: [{ format }] },
@@ -589,7 +555,7 @@ window.gpuRender = async function (canvasId, hlslSource, entryPoint, warpX, warp
         canvas, context, device, pipeline, bindGroup, uniformBuffer,
         warpX, warpY, dotNetRef,
         renderMode: mode,
-        cubeVB, cubeIB,
+        meshVB, meshIB, meshIndexCount,
         depthTexture: null,
         cameraYaw:      prevCamera ? prevCamera.yaw      : 0.6,
         cameraPitch:    prevCamera ? prevCamera.pitch    : 0.3,

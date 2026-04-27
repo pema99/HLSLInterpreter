@@ -12,7 +12,7 @@
                     <select class="settings-text-input"
                             value="@State.ShaderRenderMode"
                             @onchange="@(e => SetShaderRenderMode(e.Value?.ToString()))"
-                            disabled="@IsLocked" title="Pixel: fullscreen quad fragment shader. Vert+Frag: cube mesh through user vertex+fragment shaders.">
+                            disabled="@IsLocked" title="Pixel: fullscreen quad fragment shader. Vert+Frag: mesh through user vertex+fragment shaders.">
                         <option value="@ShaderRenderMode.Pixel">Pixel</option>
                         <option value="@ShaderRenderMode.VertFrag">Vert+Frag</option>
                     </select>
