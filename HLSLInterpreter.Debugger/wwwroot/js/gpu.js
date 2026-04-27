@@ -135,6 +135,31 @@ let cameraYaw = 0.6;
 let cameraPitch = 0.3;
 let cameraDistance = 4.0;
 
+let mouseX = 0;
+let mouseY = 0;
+let mouseLeft = 0;
+let mouseRight = 0;
+
+window.addEventListener('mousemove', e => {
+    if (!active) return;
+    const rect = active.canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+    mouseX = (e.clientX - rect.left) * (active.canvas.width / rect.width);
+    mouseY = active.canvas.height - (e.clientY - rect.top) * (active.canvas.height / rect.height);
+});
+window.addEventListener('mousedown', e => {
+    if (e.button === 0) mouseLeft = 1;
+    if (e.button === 2) mouseRight = 1;
+});
+window.addEventListener('mouseup', e => {
+    if (e.button === 0) mouseLeft = 0;
+    if (e.button === 2) mouseRight = 0;
+});
+
+window.gpuMouse = function () {
+    return [mouseX, mouseY, mouseLeft, mouseRight];
+};
+
 window.gpuViewProjection = function (canvasW, canvasH) {
     const aspect = Math.max(1e-4, canvasW / Math.max(1, canvasH));
     const cp = Math.cos(cameraPitch), sp = Math.sin(cameraPitch);
@@ -241,7 +266,7 @@ function drawFrame(r, now) {
     const t = (now - r.startTimeMs) / 1000;
     r.lastTime = t;
 
-    const u = new Float32Array(24);
+    const u = new Float32Array(28);
     u[0] = r.warpX;
     u[1] = r.warpY;
     u[2] = r.canvas.width;
@@ -252,6 +277,10 @@ function drawFrame(r, now) {
         ? window.gpuViewProjection(r.canvas.width, r.canvas.height)
         : matIdentity();
     writeMat4(u, 8, viewProj);
+    u[24] = mouseX;
+    u[25] = mouseY;
+    u[26] = mouseLeft;
+    u[27] = mouseRight;
     r.device.queue.writeBuffer(r.uniformBuffer, 0, u);
 
     let view;
@@ -506,7 +535,7 @@ window.gpuRender = async function (canvasId, hlslSource, entryPoint, warpX, warp
     }
 
     const uniformBuffer = device.createBuffer({
-        size: 96,
+        size: 112,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 

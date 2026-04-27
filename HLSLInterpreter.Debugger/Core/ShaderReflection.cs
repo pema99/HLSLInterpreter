@@ -22,6 +22,7 @@ public static class ShaderReflection
                 float2 _Resolution;
                 float _Time;
                 float4x4 _ViewProjection;
+                float4 _Mouse;
             };
 
             // Default vertex shader for GPU path when rendering fullscreen (pixel) mode.

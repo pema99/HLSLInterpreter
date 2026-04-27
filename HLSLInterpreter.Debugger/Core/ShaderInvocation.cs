@@ -16,13 +16,15 @@ public sealed record ShaderInvocation(
     int CanvasW,
     int CanvasH,
     float Time,
-    float[] ViewProjection)
+    float[] ViewProjection,
+    float[] Mouse)
 {
     public void SetUniforms(HLSLRunner runner)
     {
         runner.SetVariable("_WarpSize", new VectorValue(ScalarType.Float, new HLSLRegister<RawValue[]>([(float)WarpX, (float)WarpY])));
         runner.SetVariable("_Resolution", new VectorValue(ScalarType.Float, new HLSLRegister<RawValue[]>([(float)CanvasW, (float)CanvasH])));
         runner.SetVariable("_Time", new ScalarValue(ScalarType.Float, new HLSLRegister<RawValue>(Time)));
+        runner.SetVariable("_Mouse", new VectorValue(ScalarType.Float, new HLSLRegister<RawValue[]>([Mouse[0], Mouse[1], Mouse[2], Mouse[3]])));
         if (Mode == ShaderRenderMode.VertFrag && ViewProjection != null)
         {
             var raws = new RawValue[16];

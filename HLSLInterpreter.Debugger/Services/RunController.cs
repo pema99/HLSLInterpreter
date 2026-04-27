@@ -183,6 +183,9 @@ public sealed class RunController : INotifyPropertyChanged
         float[] viewProjection = null;
         if (_state.ShaderRenderMode == ShaderRenderMode.VertFrag)
             viewProjection = await _js.InvokeAsync<float[]>("gpuViewProjection", canvasW, canvasH);
+        float[] mouse;
+        try { mouse = await _js.InvokeAsync<float[]>("gpuMouse"); }
+        catch { mouse = new float[] { 0f, 0f, 0f, 0f }; }
 
         return new ShaderInvocation(
             Mode: _state.ShaderRenderMode,
@@ -196,7 +199,8 @@ public sealed class RunController : INotifyPropertyChanged
             CanvasW: canvasW,
             CanvasH: canvasH,
             Time: GpuCaptured?.Time ?? 0f,
-            ViewProjection: viewProjection);
+            ViewProjection: viewProjection,
+            Mouse: mouse);
     }
 
     public bool TryExtractImage(HLSLValue result, int wx, int wy)
