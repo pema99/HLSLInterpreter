@@ -43,7 +43,7 @@ public sealed class RunController : INotifyPropertyChanged
     private bool _gpuPaused;
     public bool GpuPaused { get => _gpuPaused; set => Set(ref _gpuPaused, value); }
 
-    public (float Time, int CanvasW, int CanvasH, float Yaw, float Pitch, float Distance)? GpuCaptured { get; set; }
+    public (float Time, int CanvasW, int CanvasH)? GpuCaptured { get; set; }
 
     private byte[]? _imagePixels;
     public byte[]? ImagePixels { get => _imagePixels; set => Set(ref _imagePixels, value); }
@@ -103,7 +103,7 @@ public sealed class RunController : INotifyPropertyChanged
             int wx = Math.Max(1, _state.WarpX);
             int wy = Math.Max(1, _state.WarpY);
 
-            var invocation = BuildShaderInvocation();
+            var invocation = await BuildShaderInvocationAsync();
             Runner.DebugHook = null;
             Runner.Reset();
             Runner.SetWarpSize(wx, wy);
@@ -169,10 +169,16 @@ public sealed class RunController : INotifyPropertyChanged
         }
     }
 
-    public ShaderInvocation BuildShaderInvocation()
+    public async Task<ShaderInvocation> BuildShaderInvocationAsync()
     {
         int wx = Math.Max(1, _state.WarpX);
         int wy = Math.Max(1, _state.WarpY);
+        int canvasW = GpuCaptured?.CanvasW ?? wx;
+        int canvasH = GpuCaptured?.CanvasH ?? wy;
+        float[] viewProjection = null;
+        if (_state.ShaderRenderMode == ShaderRenderMode.VertFrag)
+            viewProjection = await _js.InvokeAsync<float[]>("gpuViewProjection", canvasW, canvasH);
+
         return new ShaderInvocation(
             Mode: _state.ShaderRenderMode,
             EntryPoint: _state.EntryPoint,
@@ -182,12 +188,10 @@ public sealed class RunController : INotifyPropertyChanged
             WarpY: wy,
             GroupOffsetX: _state.GroupOffsetX,
             GroupOffsetY: _state.GroupOffsetY,
-            CanvasW: GpuCaptured?.CanvasW ?? wx,
-            CanvasH: GpuCaptured?.CanvasH ?? wy,
+            CanvasW: canvasW,
+            CanvasH: canvasH,
             Time: GpuCaptured?.Time ?? 0f,
-            CameraYaw: GpuCaptured?.Yaw ?? SoftwareRenderer.DefaultCameraYaw,
-            CameraPitch: GpuCaptured?.Pitch ?? SoftwareRenderer.DefaultCameraPitch,
-            CameraDistance: GpuCaptured?.Distance ?? SoftwareRenderer.DefaultCameraDistance);
+            ViewProjection: viewProjection);
     }
 
     public bool TryExtractImage(HLSLValue result, int wx, int wy)
@@ -231,8 +235,8 @@ public sealed class RunController : INotifyPropertyChanged
         try
         {
             var snap = await _js.InvokeAsync<float[]>("gpuSnapshot");
-            if (snap != null && snap.Length >= 6 && snap[1] > 0 && snap[2] > 0)
-                GpuCaptured = (snap[0], (int)snap[1], (int)snap[2], snap[3], snap[4], snap[5]);
+            if (snap != null && snap.Length >= 3 && snap[1] > 0 && snap[2] > 0)
+                GpuCaptured = (snap[0], (int)snap[1], (int)snap[2]);
         }
         catch { }
     }

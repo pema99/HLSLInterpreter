@@ -333,7 +333,7 @@ float4 main(VSOut i) : SV_Target
     }
 
     [JSInvokable]
-    public async Task StartDebugAtPixel(int px, int py, float time, int canvasW, int canvasH, float cameraYaw, float cameraPitch, float cameraDistance)
+    public async Task StartDebugAtPixel(int px, int py, float time, int canvasW, int canvasH)
     {
         int wx = Math.Max(1, State.WarpX);
         int wy = Math.Max(1, State.WarpY);
@@ -341,7 +341,7 @@ float4 main(VSOut i) : SV_Target
         State.GroupOffsetX = px / wx;
         State.GroupOffsetY = py / wy;
         State.InspectedThread = (py % wy) * wx + (px % wx);
-        RunCtl.GpuCaptured = (time, canvasW, canvasH, cameraYaw, cameraPitch, cameraDistance);
+        RunCtl.GpuCaptured = (time, canvasW, canvasH);
 
         await StartDebug();
     }

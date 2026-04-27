@@ -138,6 +138,18 @@ let cameraYaw = 0.6;
 let cameraPitch = 0.3;
 let cameraDistance = 4.0;
 
+window.gpuViewProjection = function (canvasW, canvasH) {
+    const aspect = Math.max(1e-4, canvasW / Math.max(1, canvasH));
+    const cp = Math.cos(cameraPitch), sp = Math.sin(cameraPitch);
+    const cy = Math.cos(cameraYaw),   sy = Math.sin(cameraYaw);
+    const ex = sy * cp * cameraDistance;
+    const ey = sp * cameraDistance;
+    const ez = cy * cp * cameraDistance;
+    const proj = matPerspective(60 * Math.PI / 180, aspect, 0.1, 100);
+    const view = matLookAt(ex, ey, ez, 0, 0, 0, 0, 1, 0);
+    return matMul(proj, view);
+};
+
 // globalSession is heavy, so we cache it
 let slangGlobalPromise = null;
 async function getSlangGlobal() {
@@ -239,20 +251,9 @@ function drawFrame(r, now) {
     u[3] = r.canvas.height;
     u[4] = t;
 
-    let viewProj;
-    if (r.renderMode === 'vertfrag') {
-        const aspect = Math.max(1e-4, r.canvas.width / r.canvas.height);
-        const cp = Math.cos(cameraPitch), sp = Math.sin(cameraPitch);
-        const cy = Math.cos(cameraYaw),   sy = Math.sin(cameraYaw);
-        const ex = sy * cp * cameraDistance;
-        const ey = sp * cameraDistance;
-        const ez = cy * cp * cameraDistance;
-        const proj = matPerspective(60 * Math.PI / 180, aspect, 0.1, 100);
-        const view = matLookAt(ex, ey, ez, 0, 0, 0, 0, 1, 0);
-        viewProj = matMul(proj, view);
-    } else {
-        viewProj = matIdentity();
-    }
+    const viewProj = r.renderMode === 'vertfrag'
+        ? window.gpuViewProjection(r.canvas.width, r.canvas.height)
+        : matIdentity();
     writeMat4(u, 8, viewProj);
     r.device.queue.writeBuffer(r.uniformBuffer, 0, u);
 
@@ -348,9 +349,6 @@ window.gpuSnapshot = function () {
         active.lastTime || 0,
         active.canvas.width,
         active.canvas.height,
-        cameraYaw,
-        cameraPitch,
-        cameraDistance,
     ];
 };
 

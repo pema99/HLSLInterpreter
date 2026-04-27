@@ -5,10 +5,6 @@ namespace HLSLInterpreter.Debugger.Core;
 
 public static class SoftwareRenderer
 {
-    public const float DefaultCameraYaw = 0.6f;
-    public const float DefaultCameraPitch = 0.3f;
-    public const float DefaultCameraDistance = 4.0f;
-
     #region Execution and input building
     public static HLSLValue Render(
         HLSLRunner runner,
@@ -20,10 +16,7 @@ public static class SoftwareRenderer
         int canvasW,
         int canvasH,
         int groupOffsetX,
-        int groupOffsetY,
-        float cameraYaw,
-        float cameraPitch,
-        float cameraDistance)
+        int groupOffsetY)
     {
         int threadsPerWarp = warpX * warpY;
         int tileX0 = groupOffsetX * warpX;
@@ -33,9 +26,9 @@ public static class SoftwareRenderer
         var savedHook = runner.DebugHook;
         runner.DebugHook = null;
 
-        // Run vertex function in batches.
+        // Run vertex function in batches. _ViewProjection is already set by the
+        // caller's ShaderInvocation.SetUniforms.
         var vertFunc = runner.GetFunction(vertEntry) ?? throw new InvalidOperationException($"Vertex function '{vertEntry}' not found.");
-        runner.SetVariable("_ViewProjection", BuildViewProjection(canvasW, canvasH, cameraYaw, cameraPitch, cameraDistance));
         var vertOutputs = new HLSLValue[mesh.VertexCount];
         for (int vertIdx = 0; vertIdx < mesh.VertexCount; vertIdx += threadsPerWarp)
         {
@@ -390,80 +383,4 @@ public static class SoftwareRenderer
     }
     #endregion
 
-    #region Math helpers
-    private static MatrixValue BuildViewProjection(int canvasW, int canvasH, float yaw, float pitch, float distance)
-    {
-        const float fovY = 60f * MathF.PI / 180f, near = 0.1f, far = 100f;
-        float aspect = MathF.Max(1e-4f, (float)canvasW / MathF.Max(1, canvasH));
-
-        float cp = MathF.Cos(pitch), sp = MathF.Sin(pitch);
-        float cy = MathF.Cos(yaw),   sy = MathF.Sin(yaw);
-        float ex = sy * cp * distance;
-        float ey = sp * distance;
-        float ez = cy * cp * distance;
-
-        float[] proj = MatPerspective(fovY, aspect, near, far);
-        float[] view = MatLookAt(ex, ey, ez, 0, 0, 0, 0, 1, 0);
-        float[] vp = MatMul(proj, view);
-
-        var raw = new RawValue[16];
-        for (int i = 0; i < 16; i++)
-        {
-            raw[i] = vp[i];
-        }
-        return new MatrixValue(ScalarType.Float, 4, 4, new HLSLRegister<RawValue[]>(raw));
-    }
-
-    private static float[] MatPerspective(float fovY, float aspect, float near, float far)
-    {
-        float f = 1f / MathF.Tan(fovY / 2f);
-        float a = far / (near - far);
-        float b = (near * far) / (near - far);
-        return [
-            f / aspect, 0, 0, 0,
-            0,          f, 0, 0,
-            0,          0, a, b,
-            0,          0,-1, 0,
-        ];
-    }
-
-    private static float[] MatLookAt(float ex, float ey, float ez, float tx, float ty, float tz, float ux, float uy, float uz)
-    {
-        float fx = tx - ex, fy = ty - ey, fz = tz - ez;
-        float fl = MathF.Sqrt(fx*fx + fy*fy + fz*fz);
-        if (fl == 0) fl = 1;
-        fx /= fl; fy /= fl; fz /= fl;
-        float rx = fy * uz - fz * uy;
-        float ry = fz * ux - fx * uz;
-        float rz = fx * uy - fy * ux;
-        float rl = MathF.Sqrt(rx*rx + ry*ry + rz*rz);
-        if (rl == 0) rl = 1;
-        rx /= rl; ry /= rl; rz /= rl;
-        float u2x = ry * fz - rz * fy;
-        float u2y = rz * fx - rx * fz;
-        float u2z = rx * fy - ry * fx;
-        return [
-             rx,  ry,  rz, -(rx*ex + ry*ey + rz*ez),
-            u2x, u2y, u2z, -(u2x*ex + u2y*ey + u2z*ez),
-            -fx, -fy, -fz,  (fx*ex + fy*ey + fz*ez),
-              0,   0,   0,  1,
-        ];
-    }
-
-    private static float[] MatMul(float[] A, float[] B)
-    {
-        var C = new float[16];
-        for (int r = 0; r < 4; r++)
-        {
-            for (int c = 0; c < 4; c++)
-            {
-                float s = 0;
-                for (int k = 0; k < 4; k++)
-                    s += A[r * 4 + k] * B[k * 4 + c];
-                C[r * 4 + c] = s;
-            }
-        }
-        return C;
-    }
-    #endregion
 }

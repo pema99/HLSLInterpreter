@@ -85,7 +85,7 @@
 
         try
         {
-            var invocation = RunCtl.BuildShaderInvocation();
+            var invocation = await RunCtl.BuildShaderInvocationAsync();
             var evalRunner = new HLSLRunner(wx, wy);
             invocation.SetUniforms(evalRunner);
 

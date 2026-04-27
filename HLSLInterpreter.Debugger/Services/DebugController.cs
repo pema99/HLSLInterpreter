@@ -69,7 +69,7 @@ public sealed class DebugController : INotifyPropertyChanged
         int wy = Math.Max(1, _state.WarpY);
 
         var newSession = DebuggerSession.Record(
-            code, wx, wy, _run.BuildShaderInvocation(), parserConfig);
+            code, wx, wy, await _run.BuildShaderInvocationAsync(), parserConfig);
 
         CurrentSession = newSession;
         _run.HasError = newSession.HasError;

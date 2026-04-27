@@ -60,14 +60,14 @@
                     if (!snap || !window._dotNetDebugRef) return;
                     window.gpuStop?.();
                     window._dotNetDebugRef.invokeMethodAsync('StartDebugAtPixel',
-                        px, py, snap[0], snap[1], snap[2], snap[3], snap[4], snap[5]);
+                        px, py, snap[0], snap[1], snap[2]);
                 });
             } else if (target === 'regular' && state.cpuClickWarp) {
                 const [wx, wy] = state.cpuClickWarp;
                 window.dbgSetClickHandler(id, (px, py) => {
                     if (!window._dotNetDebugRef) return;
                     window._dotNetDebugRef.invokeMethodAsync('StartDebugAtPixel',
-                        px, py, 0, wx, wy, 0.6, 0.3, 4.0);
+                        px, py, 0, wx, wy);
                 });
             } else if (target === 'debug' && state.debugClickActive) {
                 window.dbgSetClickHandler(id, (px, py) => {

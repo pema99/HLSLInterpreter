@@ -16,15 +16,22 @@ public sealed record ShaderInvocation(
     int CanvasW,
     int CanvasH,
     float Time,
-    float CameraYaw,
-    float CameraPitch,
-    float CameraDistance)
+    float[] ViewProjection)
 {
     public void SetUniforms(HLSLRunner runner)
     {
         runner.SetVariable("_WarpSize", new VectorValue(ScalarType.Float, new HLSLRegister<RawValue[]>([(float)WarpX, (float)WarpY])));
         runner.SetVariable("_Resolution", new VectorValue(ScalarType.Float, new HLSLRegister<RawValue[]>([(float)CanvasW, (float)CanvasH])));
         runner.SetVariable("_Time", new ScalarValue(ScalarType.Float, new HLSLRegister<RawValue>(Time)));
+        if (Mode == ShaderRenderMode.VertFrag && ViewProjection != null)
+        {
+            var raws = new RawValue[16];
+            for (int i = 0; i < 16; i++)
+            {
+                raws[i] = ViewProjection[i];
+            }
+            runner.SetVariable("_ViewProjection", new MatrixValue(ScalarType.Float, 4, 4, new HLSLRegister<RawValue[]>(raws)));
+        }
     }
 
     public HLSLValue Execute(HLSLRunner runner)
@@ -34,8 +41,7 @@ public sealed record ShaderInvocation(
             return SoftwareRenderer.Render(
                 runner, Mesh, VertexEntryPoint, EntryPoint,
                 WarpX, WarpY, CanvasW, CanvasH,
-                GroupOffsetX, GroupOffsetY,
-                CameraYaw, CameraPitch, CameraDistance);
+                GroupOffsetX, GroupOffsetY);
         }
         else
         {
