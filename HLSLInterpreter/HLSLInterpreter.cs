@@ -28,7 +28,10 @@ namespace HLSL
             foreach (var kvp in oldCallbacks)
                 expressionEvaluator.AddCallback(kvp.Key, kvp.Value);
         }
-
+        public void EnableThread(int threadIndex) => executionState.EnableThread(threadIndex);
+        public void DisableThread(int threadIndex) => executionState.DisableThread(threadIndex);
+        public bool IsThreadActive(int threadIndex) => executionState.IsThreadActive(threadIndex);
+        public int GetThreadIndex(int threadX, int threadY) => executionState.GetThreadIndex(threadX, threadY);
         public void SetVariable(string name, HLSLValue value) => context.SetVariable(name, value);
         public HLSLValue GetVariable(string name) => context.GetVariable(name);
 

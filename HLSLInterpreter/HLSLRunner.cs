@@ -411,10 +411,15 @@ namespace HLSL
 
         public void Reset() => interpreter.Reset();
 
-        public void SetWarpSize(int threadsX, int threadsY) => interpreter.SetWarpSize(threadsX, threadsY);
         public void SetVariable(string name, HLSLValue value) => interpreter.SetVariable(name, value);
         public HLSLValue GetVariable(string name) => interpreter.GetVariable(name);
         public HLSLValue CallFunction(string name, params HLSLValue[] args) => interpreter.CallFunction(name, args);
+
+        public void SetWarpSize(int threadsX, int threadsY) => interpreter.SetWarpSize(threadsX, threadsY);
+        public void EnableThread(int threadIndex) => interpreter.EnableThread(threadIndex);
+        public void DisableThread(int threadIndex) => interpreter.DisableThread(threadIndex);
+        public bool IsThreadActive(int threadIndex) => interpreter.IsThreadActive(threadIndex);
+        public int GetThreadIndex(int threadX, int threadY) => interpreter.GetThreadIndex(threadX, threadY);
 
         // Reflection API
         public FunctionDefinitionNode GetFunction(string name, HLSLValue[] args) => interpreter.GetFunction(name, args);

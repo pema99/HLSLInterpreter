@@ -51,7 +51,7 @@ public sealed class DebugController : INotifyPropertyChanged
 
     public async Task<bool> StartSessionAsync(
         Func<Task<string>> getCode,
-        Func<HLSLParserConfig> makeParserConfig)
+        HLSLParserConfig parserConfig)
     {
         _run.IsRunning = true;
         _run.HasError = false;
@@ -69,9 +69,7 @@ public sealed class DebugController : INotifyPropertyChanged
         int wy = Math.Max(1, _state.WarpY);
 
         var newSession = DebuggerSession.Record(
-            code, wx, wy, _state.GroupOffsetX, _state.GroupOffsetY, _state.EntryPoint,
-            configureGlobals: _run.SetSharedGlobals,
-            parserConfig: makeParserConfig());
+            code, wx, wy, _run.BuildShaderInvocation(), parserConfig);
 
         CurrentSession = newSession;
         _run.HasError = newSession.HasError;

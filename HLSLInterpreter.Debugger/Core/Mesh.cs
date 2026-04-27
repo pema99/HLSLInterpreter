@@ -15,6 +15,37 @@ public sealed class Mesh
 
     public const int VertexStrideFloats = 8;
 
+    public static readonly IReadOnlyDictionary<(string Base, int Index), int> AttributeDimensions
+        = new Dictionary<(string, int), int>
+        {
+            { ("POSITION", 0), 3 },
+            { ("NORMAL",   0), 3 },
+            { ("TEXCOORD", 0), 2 },
+        };
+
+    public void ReadAttribute(int vertexIndex, (string Base, int Index) semantic, Span<float> outBuffer)
+    {
+        switch (semantic.Base)
+        {
+            case "POSITION":
+                outBuffer[0] = Positions[vertexIndex * 3 + 0];
+                outBuffer[1] = Positions[vertexIndex * 3 + 1];
+                outBuffer[2] = Positions[vertexIndex * 3 + 2];
+                break;
+            case "NORMAL":
+                outBuffer[0] = Normals[vertexIndex * 3 + 0];
+                outBuffer[1] = Normals[vertexIndex * 3 + 1];
+                outBuffer[2] = Normals[vertexIndex * 3 + 2];
+                break;
+            case "TEXCOORD":
+                outBuffer[0] = Uvs[vertexIndex * 2 + 0];
+                outBuffer[1] = Uvs[vertexIndex * 2 + 1];
+                break;
+            default:
+                throw new ArgumentException($"Semantic '{semantic.Base}' not supported.");
+        }
+    }
+
     public float[] GetInterleavedVertices()
     {
         var result = new float[VertexCount * VertexStrideFloats];

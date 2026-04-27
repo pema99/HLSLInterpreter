@@ -43,7 +43,7 @@ public sealed class RunController : INotifyPropertyChanged
     private bool _gpuPaused;
     public bool GpuPaused { get => _gpuPaused; set => Set(ref _gpuPaused, value); }
 
-    public (float Time, int CanvasW, int CanvasH)? GpuCaptured { get; set; }
+    public (float Time, int CanvasW, int CanvasH, float Yaw, float Pitch, float Distance)? GpuCaptured { get; set; }
 
     private byte[]? _imagePixels;
     public byte[]? ImagePixels { get => _imagePixels; set => Set(ref _imagePixels, value); }
@@ -56,7 +56,7 @@ public sealed class RunController : INotifyPropertyChanged
 
     public async Task RunAsync(
         Func<Task<string>> getCode,
-        Func<HLSLParserConfig> makeParserConfig,
+        HLSLParserConfig parserConfig,
         object? dotNetRef,
         Func<Task>? beforeGpuRender = null)
     {
@@ -69,11 +69,11 @@ public sealed class RunController : INotifyPropertyChanged
             IsGpuMode = true;
             GpuPaused = false;
             if (beforeGpuRender != null) await beforeGpuRender();
-            await RunGpuInternal(getCode, makeParserConfig, dotNetRef);
+            await RunGpuInternal(getCode, parserConfig, dotNetRef);
         }
         else
         {
-            await RunCpuInternal(getCode, makeParserConfig);
+            await RunCpuInternal(getCode, parserConfig);
         }
 
         IsRunning = false;
@@ -92,7 +92,7 @@ public sealed class RunController : INotifyPropertyChanged
         IsGpuMode = false;
     }
 
-    private async Task RunCpuInternal(Func<Task<string>> getCode, Func<HLSLParserConfig> makeParserConfig)
+    private async Task RunCpuInternal(Func<Task<string>> getCode, HLSLParserConfig parserConfig)
     {
         var sw = new System.IO.StringWriter();
         var oldOut = Console.Out;
@@ -102,16 +102,15 @@ public sealed class RunController : INotifyPropertyChanged
             string code = await getCode();
             int wx = Math.Max(1, _state.WarpX);
             int wy = Math.Max(1, _state.WarpY);
-            int threadCount = wx * wy;
 
+            var invocation = BuildShaderInvocation();
             Runner.DebugHook = null;
             Runner.Reset();
             Runner.SetWarpSize(wx, wy);
-            SetSharedGlobals(Runner);
-            Runner.ProcessCode(code, makeParserConfig());
+            invocation.SetUniforms(Runner);
+            Runner.ProcessCode(code, parserConfig);
 
-            var threadArg = DebuggerSession.BuildThreadArg(wx, wy, threadCount, _state.GroupOffsetX, _state.GroupOffsetY);
-            HLSLValue result = DebuggerSession.CallEntryPoint(Runner, threadArg, _state.EntryPoint);
+            HLSLValue result = invocation.Execute(Runner);
             TryExtractImage(result, wx, wy);
         }
         catch (Exception ex)
@@ -126,7 +125,7 @@ public sealed class RunController : INotifyPropertyChanged
 
     private async Task RunGpuInternal(
         Func<Task<string>> getCode,
-        Func<HLSLParserConfig> makeParserConfig,
+        HLSLParserConfig parserConfig,
         object? dotNetRef)
     {
         bool hasGpu = false;
@@ -144,11 +143,11 @@ public sealed class RunController : INotifyPropertyChanged
             string userCode = await getCode();
             int wx = Math.Max(1, _state.WarpX);
             int wy = Math.Max(1, _state.WarpY);
-            var assembled = ShaderAssembler.Assemble(
+            var assembled = ShaderReflection.AssembleVertexShader(
                 userCode,
                 _state.VertexEntryPoint,
                 _state.ShaderRenderMode,
-                makeParserConfig());
+                parserConfig);
             string mode = _state.ShaderRenderMode == ShaderRenderMode.VertFrag ? "vertfrag" : "pixel";
             float[]? meshVertices = null;
             ushort[]? meshIndices = null;
@@ -170,19 +169,25 @@ public sealed class RunController : INotifyPropertyChanged
         }
     }
 
-    public void SetSharedGlobals(HLSLRunner runner)
+    public ShaderInvocation BuildShaderInvocation()
     {
         int wx = Math.Max(1, _state.WarpX);
         int wy = Math.Max(1, _state.WarpY);
-        runner.SetVariable("_WarpSize", new VectorValue(ScalarType.Float,
-            new HLSLRegister<RawValue[]>(new RawValue[] { (float)wx, (float)wy })));
-        bool useCapture = _state.GpuPreviewEnabled && GpuCaptured.HasValue;
-        float resW = useCapture ? GpuCaptured!.Value.CanvasW : wx;
-        float resH = useCapture ? GpuCaptured!.Value.CanvasH : wy;
-        float t = useCapture ? GpuCaptured!.Value.Time : 0f;
-        runner.SetVariable("_Resolution", new VectorValue(ScalarType.Float,
-            new HLSLRegister<RawValue[]>(new RawValue[] { resW, resH })));
-        runner.SetVariable("_Time", new ScalarValue(ScalarType.Float, new HLSLRegister<RawValue>(t)));
+        return new ShaderInvocation(
+            Mode: _state.ShaderRenderMode,
+            EntryPoint: _state.EntryPoint,
+            VertexEntryPoint: _state.VertexEntryPoint,
+            Mesh: _state.CurrentMesh,
+            WarpX: wx,
+            WarpY: wy,
+            GroupOffsetX: _state.GroupOffsetX,
+            GroupOffsetY: _state.GroupOffsetY,
+            CanvasW: GpuCaptured?.CanvasW ?? wx,
+            CanvasH: GpuCaptured?.CanvasH ?? wy,
+            Time: GpuCaptured?.Time ?? 0f,
+            CameraYaw: GpuCaptured?.Yaw ?? SoftwareRenderer.DefaultCameraYaw,
+            CameraPitch: GpuCaptured?.Pitch ?? SoftwareRenderer.DefaultCameraPitch,
+            CameraDistance: GpuCaptured?.Distance ?? SoftwareRenderer.DefaultCameraDistance);
     }
 
     public bool TryExtractImage(HLSLValue result, int wx, int wy)
@@ -226,8 +231,8 @@ public sealed class RunController : INotifyPropertyChanged
         try
         {
             var snap = await _js.InvokeAsync<float[]>("gpuSnapshot");
-            if (snap != null && snap.Length == 3 && snap[1] > 0 && snap[2] > 0)
-                GpuCaptured = (snap[0], (int)snap[1], (int)snap[2]);
+            if (snap != null && snap.Length >= 6 && snap[1] > 0 && snap[2] > 0)
+                GpuCaptured = (snap[0], (int)snap[1], (int)snap[2], snap[3], snap[4], snap[5]);
         }
         catch { }
     }

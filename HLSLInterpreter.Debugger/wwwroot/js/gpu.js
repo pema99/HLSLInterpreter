@@ -343,11 +343,18 @@ window.gpuRestart = function () {
     if (!active.running) drawFrame(active, performance.now());
 };
 
-// Live canvas size + elapsed time, so a Debug-button entry can reproduce the
-// _Resolution and _Time the GPU saw.
+// Live canvas size, time, and camera state so a Debug-button entry can
+// reproduce the _Resolution, _Time, and view-projection matrix the GPU saw.
 window.gpuSnapshot = function () {
     if (!active) return null;
-    return [active.lastTime || 0, active.canvas.width, active.canvas.height];
+    return [
+        active.lastTime || 0,
+        active.canvas.width,
+        active.canvas.height,
+        active.cameraYaw,
+        active.cameraPitch,
+        active.cameraDistance,
+    ];
 };
 
 function createMeshBuffers(device, meshVertices, meshIndices) {

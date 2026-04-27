@@ -104,8 +104,7 @@
 
                 <ImmediatePanel Session="@DebugCtl.CurrentSession"
                                 DebugCode="@DebugCtl.DebugCode"
-                                ConfigureGlobals="@RunCtl.SetSharedGlobals"
-                                ParserConfigFactory="@MakeParserConfig" />
+                                ParserConfig="@MakeParserConfig()" />
 
                 <ConsolePanel Variant="ConsolePanel.ConsoleVariant.Debug"
                               HasError="@RunCtl.HasError" ErrorMessage="@RunCtl.ErrorMessage"
@@ -296,7 +295,7 @@ float4 main(VSOut i) : SV_Target
         if (editorPanel == null) return;
         await RunCtl.RunAsync(
             getCode: () => editorPanel.GetCode().AsTask(),
-            makeParserConfig: MakeParserConfig,
+            parserConfig: MakeParserConfig(),
             dotNetRef: dotNetRef,
             beforeGpuRender: async () =>
             {
@@ -334,7 +333,7 @@ float4 main(VSOut i) : SV_Target
     }
 
     [JSInvokable]
-    public async Task StartDebugAtPixel(int px, int py, float time, int canvasW, int canvasH)
+    public async Task StartDebugAtPixel(int px, int py, float time, int canvasW, int canvasH, float cameraYaw, float cameraPitch, float cameraDistance)
     {
         int wx = Math.Max(1, State.WarpX);
         int wy = Math.Max(1, State.WarpY);
@@ -342,7 +341,7 @@ float4 main(VSOut i) : SV_Target
         State.GroupOffsetX = px / wx;
         State.GroupOffsetY = py / wy;
         State.InspectedThread = (py % wy) * wx + (px % wx);
-        RunCtl.GpuCaptured = (time, canvasW, canvasH);
+        RunCtl.GpuCaptured = (time, canvasW, canvasH, cameraYaw, cameraPitch, cameraDistance);
 
         await StartDebug();
     }
@@ -354,7 +353,7 @@ float4 main(VSOut i) : SV_Target
 
         bool entered = await DebugCtl.StartSessionAsync(
             getCode: () => editorPanel.GetCode().AsTask(),
-            makeParserConfig: MakeParserConfig);
+            parserConfig: MakeParserConfig());
         needsImageRender = RunCtl.HasImage;
 
         if (!entered)
