@@ -17,14 +17,11 @@ cbuffer DebuggerGlobals : register(b0) {
     float4x4 _ViewProjection;
 };
 
-struct DbgVSOut { float4 pos : SV_Position; };
-
+// Default vertex shader for GPU path when rendering fullscreen (pixel) mode.
 [shader(""vertex"")]
-DbgVSOut dbgVertex(uint vid : SV_VertexID) {
+float4 dbgVertex(uint vid : SV_VertexID) : SV_Position {
     float2 p = float2(float((vid << 1u) & 2u), float(vid & 2u));
-    DbgVSOut o;
-    o.pos = float4(p * 2.0 - 1.0, 0.0, 1.0);
-    return o;
+    return float4(p * 2.0 - 1.0, 0.0, 1.0);
 }
 ";
 
@@ -68,7 +65,7 @@ DbgVSOut dbgVertex(uint vid : SV_VertexID) {
 
         if (hasSemantic && !isStruct)
         {
-            AddLeaf(resolvedType, semantic, label, outList);
+            AddLeafInput(resolvedType, semantic, label, outList);
             return;
         }
 
@@ -98,7 +95,7 @@ DbgVSOut dbgVertex(uint vid : SV_VertexID) {
 
                 if (hasSemantic && !isStruct)
                 {
-                    AddLeaf(resolvedFieldType, semantic, label, outList);
+                    AddLeafInput(resolvedFieldType, semantic, label, outList);
                     continue;
                 }
 
@@ -113,7 +110,7 @@ DbgVSOut dbgVertex(uint vid : SV_VertexID) {
         }
     }
 
-    private static void AddLeaf(
+    private static void AddLeafInput(
         TypeNode type,
         (string Base, int Index) semantic,
         string label,
@@ -131,7 +128,7 @@ DbgVSOut dbgVertex(uint vid : SV_VertexID) {
         outList.Add(new VertexInput(semantic.Base, semantic.Index, dim));
     }
 
-    private static bool TryAsStruct(TypeNode type, HLSLRunner runner, out StructTypeNode? structType)
+    public static bool TryAsStruct(TypeNode type, HLSLRunner runner, out StructTypeNode? structType)
     {
         if (type is StructTypeNode inline && inline.Name != null)
         {
@@ -147,7 +144,7 @@ DbgVSOut dbgVertex(uint vid : SV_VertexID) {
         return false;
     }
 
-    private static bool TryGetDimensions(TypeNode type, out int dimensions)
+    public static bool TryGetDimensions(TypeNode type, out int dimensions)
     {
         switch (type)
         {
@@ -163,7 +160,7 @@ DbgVSOut dbgVertex(uint vid : SV_VertexID) {
         }
     }
 
-    private static bool TryGetSemantic(VariableDeclaratorNode declarator, out (string Base, int Index) semantic)
+    public static bool TryGetSemantic(VariableDeclaratorNode declarator, out (string Base, int Index) semantic)
     {
         foreach (var q in declarator.Qualifiers)
         {
