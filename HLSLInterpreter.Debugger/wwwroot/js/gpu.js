@@ -139,21 +139,56 @@ let mouseX = 0;
 let mouseY = 0;
 let mouseLeft = 0;
 let mouseRight = 0;
+let mouseRightHeld = false;
 
-window.addEventListener('mousemove', e => {
-    if (!active) return;
+function redrawIfPaused() {
+    if (!active || active.running) return;
+    const fakeNow = active.startTimeMs + (active.lastTime || 0) * 1000;
+    drawFrame(active, fakeNow);
+}
+
+function mouseEventInsideCanvas(e) {
+    if (!active) return null;
     const rect = active.canvas.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) return;
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    if (e.clientX < rect.left || e.clientX > rect.right) return null;
+    if (e.clientY < rect.top || e.clientY > rect.bottom) return null;
+    return rect;
+}
+
+function updateMousePosFromEvent(e, rect) {
     mouseX = (e.clientX - rect.left) * (active.canvas.width / rect.width);
     mouseY = active.canvas.height - (e.clientY - rect.top) * (active.canvas.height / rect.height);
+}
+
+window.addEventListener('mousemove', e => {
+    if (!mouseRightHeld) return;
+    const rect = mouseEventInsideCanvas(e);
+    if (!rect) return;
+    updateMousePosFromEvent(e, rect);
+    redrawIfPaused();
 });
 window.addEventListener('mousedown', e => {
+    if (e.button === 2) mouseRightHeld = true;
+    if (!mouseRightHeld) return;
+    const rect = mouseEventInsideCanvas(e);
+    if (!rect) return;
+    updateMousePosFromEvent(e, rect);
     if (e.button === 0) mouseLeft = 1;
     if (e.button === 2) mouseRight = 1;
+    redrawIfPaused();
 });
 window.addEventListener('mouseup', e => {
-    if (e.button === 0) mouseLeft = 0;
-    if (e.button === 2) mouseRight = 0;
+    if (mouseRightHeld) {
+        const rect = mouseEventInsideCanvas(e);
+        if (rect) {
+            updateMousePosFromEvent(e, rect);
+            if (e.button === 0) mouseLeft = 0;
+            if (e.button === 2) mouseRight = 0;
+            redrawIfPaused();
+        }
+    }
+    if (e.button === 2) mouseRightHeld = false;
 });
 
 window.gpuMouse = function () {
@@ -230,11 +265,13 @@ function attachResizeObserver(canvas) {
     const ro = new ResizeObserver(() => {
         // Skip when stopped, otherwise stale GPU dimensions would clobber the
         // CPU canvas's image size and stretch its displayed pixels on resize.
-        if (!active || !active.running || active.canvas !== canvas) return;
+        if (!active || active.canvas !== canvas) return;
+        if (!active.running && !active.paused) return;
         fitCanvas(canvas);
         if (typeof window.dbgSetViewportImageSize === 'function') {
             window.dbgSetViewportImageSize('image-container', canvas.width, canvas.height);
         }
+        if (active.paused) redrawIfPaused();
     });
     ro.observe(canvas.parentElement || canvas);
 }
@@ -339,6 +376,7 @@ window.gpuIsAvailable = function () {
 window.gpuStop = function () {
     if (!active) return;
     active.running = false;
+    active.paused = false;
     if (active.animFrameId) cancelAnimationFrame(active.animFrameId);
     active.animFrameId = null;
 };
@@ -346,6 +384,7 @@ window.gpuStop = function () {
 window.gpuPause = function () {
     if (!active || !active.running) return;
     active.running = false;
+    active.paused = true;
     if (active.animFrameId) cancelAnimationFrame(active.animFrameId);
     active.animFrameId = null;
 };
@@ -355,6 +394,7 @@ window.gpuResume = function () {
     // Rebase startTimeMs so _Time picks up where it left off.
     active.startTimeMs = performance.now() - (active.lastTime || 0) * 1000;
     active.running = true;
+    active.paused = false;
     scheduleFrame();
 };
 
@@ -407,11 +447,6 @@ function attachCameraInput() {
     let lastX = 0, lastY = 0;
 
     const isVertFrag = () => active && active.renderMode === 'vertfrag';
-    const redrawIfPaused = () => {
-        if (!active || active.running) return;
-        const fakeNow = active.startTimeMs + (active.lastTime || 0) * 1000;
-        drawFrame(active, fakeNow);
-    };
 
     // Right click to rotate
     container.addEventListener('mousedown', (e) => {
