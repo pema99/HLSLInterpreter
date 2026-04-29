@@ -58,7 +58,7 @@
                 window.dbgSetClickHandler(id, (px, py) => {
                     const snap = window.gpuSnapshot?.();
                     if (!snap || !window._dotNetDebugRef) return;
-                    window.gpuStop?.();
+                    window.gpuPause?.();
                     window._dotNetDebugRef.invokeMethodAsync('StartDebugAtPixel',
                         px, py, snap[0], snap[1], snap[2]);
                 });

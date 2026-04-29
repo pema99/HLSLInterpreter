@@ -238,6 +238,11 @@ public sealed class RunController : INotifyPropertyChanged
         ImagePixels = null;
     }
 
+    public async Task PauseGpuRendererAsync()
+    {
+        try { await _js.InvokeVoidAsync("gpuPause"); } catch { }
+    }
+
     public async Task SnapshotGpuIfNeededAsync()
     {
         if (!_state.GpuPreviewEnabled || GpuCaptured.HasValue) return;

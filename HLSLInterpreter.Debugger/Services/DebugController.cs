@@ -60,7 +60,7 @@ public sealed class DebugController : INotifyPropertyChanged
         _run.Output = null;
 
         await _run.SnapshotGpuIfNeededAsync();
-        await _run.StopGpuAsync();
+        await _run.PauseGpuRendererAsync();
         CurrentSession = null;
 
         string code = await getCode();
