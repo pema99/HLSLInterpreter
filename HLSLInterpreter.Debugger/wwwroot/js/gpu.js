@@ -349,7 +349,7 @@ function drawFrame(r, now) {
     pass.setBindGroup(0, r.bindGroup);
     if (r.renderMode === 'vertfrag') {
         pass.setVertexBuffer(0, r.meshVB);
-        pass.setIndexBuffer(r.meshIB, 'uint16');
+        pass.setIndexBuffer(r.meshIB, 'uint32');
         pass.drawIndexed(r.meshIndexCount);
     } else {
         pass.draw(3);
@@ -421,9 +421,8 @@ window.gpuSnapshot = function () {
 function createMeshBuffers(device, meshVertices, meshIndices) {
     const verts = meshVertices instanceof Float32Array
         ? meshVertices : new Float32Array(meshVertices);
-    const idx = meshIndices instanceof Uint16Array
-        ? meshIndices : new Uint16Array(meshIndices);
-    // WebGPU requires index buffer size to be a multiple of 4.
+    const idx = meshIndices instanceof Uint32Array
+        ? meshIndices : new Uint32Array(meshIndices);
     const ibSize = (idx.byteLength + 3) & ~3;
     const vb = device.createBuffer({
         size: verts.byteLength,

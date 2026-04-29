@@ -155,7 +155,7 @@ public sealed class RunController : INotifyPropertyChanged
                 parserConfig);
             string mode = _state.ShaderRenderMode == ShaderRenderMode.VertFrag ? "vertfrag" : "pixel";
             float[]? meshVertices = null;
-            ushort[]? meshIndices = null;
+            uint[]? meshIndices = null;
             if (_state.ShaderRenderMode == ShaderRenderMode.VertFrag)
             {
                 var mesh = _state.CurrentMesh;

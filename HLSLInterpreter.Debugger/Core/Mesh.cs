@@ -7,7 +7,7 @@ public sealed class Mesh
     public float[] Positions { get; init; } = Array.Empty<float>();
     public float[] Normals { get; init; } = Array.Empty<float>();
     public float[] Uvs { get; init; } = Array.Empty<float>();
-    public ushort[] Indices { get; init; } = Array.Empty<ushort>();
+    public uint[] Indices { get; init; } = Array.Empty<uint>();
 
     public int VertexCount => Positions.Length / 3;
     public int IndexCount => Indices.Length;
@@ -114,9 +114,9 @@ public sealed class Mesh
 
         for (int t = 0; t < Indices.Length; t += 3)
         {
-            int i0 = Indices[t + 0];
-            int i1 = Indices[t + 1];
-            int i2 = Indices[t + 2];
+            int i0 = (int)Indices[t + 0];
+            int i1 = (int)Indices[t + 1];
+            int i2 = (int)Indices[t + 2];
 
             float ax = Positions[i0 * 3], ay = Positions[i0 * 3 + 1], az = Positions[i0 * 3 + 2];
             float bx = Positions[i1 * 3], by = Positions[i1 * 3 + 1], bz = Positions[i1 * 3 + 2];
@@ -216,11 +216,11 @@ public sealed class Mesh
         bool hasNormals = normals.Count > 0;
         bool hasUvs = uvs.Count > 0;
 
-        var indexMap = new Dictionary<(int, int, int), ushort>();
+        var indexMap = new Dictionary<(int, int, int), uint>();
         var outPos = new List<float>();
         var outNrm = new List<float>();
         var outUv = new List<float>();
-        var outIdx = new List<ushort>();
+        var outIdx = new List<uint>();
 
         foreach (var key in faceCorners)
         {
@@ -229,7 +229,7 @@ public sealed class Mesh
                 if (key.Pos < 0 || key.Pos >= positions.Count)
                     throw new InvalidDataException($"OBJ references position index {key.Pos + 1} which doesn't exist.");
 
-                idx = (ushort)(outPos.Count / 3);
+                idx = (uint)(outPos.Count / 3);
                 indexMap[key] = idx;
 
                 var (px, py, pz) = positions[key.Pos];
@@ -315,16 +315,16 @@ public sealed class Mesh
             }
         }
 
-        var indices = new ushort[36];
+        var indices = new uint[36];
         for (int f = 0; f < 6; f++)
         {
             int b = f * 4, oi = f * 6;
-            indices[oi + 0] = (ushort)(b + 0);
-            indices[oi + 1] = (ushort)(b + 1);
-            indices[oi + 2] = (ushort)(b + 2);
-            indices[oi + 3] = (ushort)(b + 0);
-            indices[oi + 4] = (ushort)(b + 2);
-            indices[oi + 5] = (ushort)(b + 3);
+            indices[oi + 0] = (uint)(b + 0);
+            indices[oi + 1] = (uint)(b + 1);
+            indices[oi + 2] = (uint)(b + 2);
+            indices[oi + 3] = (uint)(b + 0);
+            indices[oi + 4] = (uint)(b + 2);
+            indices[oi + 5] = (uint)(b + 3);
         }
 
         return new Mesh { Positions = positions, Normals = normals, Uvs = uvBuf, Indices = indices };

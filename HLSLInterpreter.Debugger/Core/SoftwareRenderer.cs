@@ -65,9 +65,9 @@ public static class SoftwareRenderer
         Array.Fill(fragments, Fragment.InvalidFragment);
         for (int tri = 0; tri < mesh.TriangleCount; tri++)
         {
-            int i0 = mesh.Indices[tri * 3 + 0];
-            int i1 = mesh.Indices[tri * 3 + 1];
-            int i2 = mesh.Indices[tri * 3 + 2];
+            int i0 = (int)mesh.Indices[tri * 3 + 0];
+            int i1 = (int)mesh.Indices[tri * 3 + 1];
+            int i2 = (int)mesh.Indices[tri * 3 + 2];
             RasterizeTriangle(screenVerts[i0], screenVerts[i1], screenVerts[i2], i0, i1, i2, tileX0, tileY0, warpX, warpY, fragments);
         }
 
