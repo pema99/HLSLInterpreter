@@ -12,9 +12,9 @@
                     <select class="settings-text-input"
                             value="@State.ShaderRenderMode"
                             @onchange="@(e => SetShaderRenderMode(e.Value?.ToString()))"
-                            disabled="@IsLocked" title="Pixel: Fullscreen quad fragment shader. Vert+Frag: Custom vertex and fragment shader.">
-                        <option value="@ShaderRenderMode.Pixel">Pixel</option>
-                        <option value="@ShaderRenderMode.VertFrag">Vert+Frag</option>
+                            disabled="@IsLocked" title="Frag only: Fullscreen quad fragment shader. Vert/Frag: Custom vertex and fragment shader.">
+                        <option value="@ShaderRenderMode.Pixel">Frag only</option>
+                        <option value="@ShaderRenderMode.VertFrag">Vert/Frag</option>
                     </select>
                 </div>
                 @if (State.ShaderRenderMode == ShaderRenderMode.VertFrag)
@@ -28,10 +28,10 @@
                     </div>
                 }
                 <div class="settings-row">
-                    <label class="settings-label">@(State.ShaderRenderMode == ShaderRenderMode.VertFrag ? "Fragment entry" : "Entry point")</label>
+                    <label class="settings-label">@(State.ShaderRenderMode == ShaderRenderMode.VertFrag ? "Frag entry" : "Entry point")</label>
                     <input class="settings-text-input" type="text"
-                           value="@State.EntryPoint"
-                           @oninput="@(e => State.EntryPoint = e.Value?.ToString() ?? "")"
+                           value="@State.FragmentEntryPoint"
+                           @oninput="@(e => State.FragmentEntryPoint = e.Value?.ToString() ?? "")"
                            disabled="@IsLocked" title="Fragment shader function name" />
                 </div>
                 <div class="settings-row">

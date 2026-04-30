@@ -6,7 +6,7 @@ namespace HLSLInterpreter.Debugger.Core;
 
 public sealed record ShaderInvocation(
     ShaderRenderMode Mode,
-    string EntryPoint,
+    string FragmentEntryPoint,
     string VertexEntryPoint,
     Mesh Mesh,
     int WarpX,
@@ -41,27 +41,43 @@ public sealed record ShaderInvocation(
         if (Mode == ShaderRenderMode.VertFrag)
         {
             return SoftwareRenderer.Render(
-                runner, Mesh, VertexEntryPoint, EntryPoint,
+                runner, Mesh, VertexEntryPoint, FragmentEntryPoint,
                 WarpX, WarpY, CanvasW, CanvasH,
                 GroupOffsetX, GroupOffsetY);
         }
         else
         {
             int threadCount = WarpX * WarpY;
-            var threadIds = new RawValue[threadCount][];
-            for (int i = 0; i < threadCount; i++)
-                threadIds[i] = [
-                    (float)(i % WarpX + GroupOffsetX * WarpX) + 0.5f,
-                (float)(i / WarpX + GroupOffsetY * WarpY) + 0.5f,
-                0.0f,
-                1.0f,
-            ];
-            var threadArg = new VectorValue(ScalarType.Float, new HLSLRegister<RawValue[]>(threadIds).Converge());
-            try { return runner.CallFunction(EntryPoint, threadArg); }
-            catch (Exception ex) when (ex.Message.Contains($"Unknown function '{EntryPoint}' called."))
+            var fragFunc = runner.GetFunction(FragmentEntryPoint) ?? throw new InvalidOperationException($"Fragment function '{FragmentEntryPoint}' not found.");
+            var fragArgs = ShaderReflection.BuildArgs(runner, fragFunc, (type, semantic, dim, modifiers) =>
             {
-                return runner.CallFunction(EntryPoint);
-            }
+                ScalarType scalarType = ShaderReflection.GetScalarType(type);
+                bool isPosition = semantic.Base == "SV_POSITION";
+
+                var perThread = new RawValue[threadCount][];
+                for (int threadIdx = 0; threadIdx < threadCount; threadIdx++)
+                {
+                    var row = new RawValue[dim];
+                    if (isPosition)
+                    {
+                        if (dim > 0) row[0] = (float)(threadIdx % WarpX + GroupOffsetX * WarpX) + 0.5f;
+                        if (dim > 1) row[1] = (float)(threadIdx / WarpX + GroupOffsetY * WarpY) + 0.5f;
+                        if (dim > 2) row[2] = 0f;
+                        if (dim > 3) row[3] = 1f;
+                    }
+                    perThread[threadIdx] = row;
+                }
+
+                if (dim == 1)
+                {
+                    var scalars = new RawValue[threadCount];
+                    for (int threadIdx = 0; threadIdx < threadCount; threadIdx++)
+                        scalars[threadIdx] = perThread[threadIdx][0];
+                    return new ScalarValue(scalarType, HLSLValueUtils.MakeScalarVGPR(scalars));
+                }
+                return new VectorValue(scalarType, HLSLValueUtils.MakeVectorVGPR(perThread));
+            });
+            return runner.CallFunction(FragmentEntryPoint, fragArgs);
         }
     }
 }

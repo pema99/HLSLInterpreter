@@ -1,3 +1,4 @@
+using System.Text;
 using HLSL;
 using HLSLInterpreter.Debugger.Services;
 using UnityShaderParser.Common;
@@ -9,14 +10,15 @@ public sealed record VertexInput(string SemanticBase, int SemanticIndex, int Dim
 
 public static class ShaderReflection
 {
-    public sealed record AssembledShader(string Source, string VertexEntry, IReadOnlyList<VertexInput>? VertexInputs);
+    public sealed record AssembledShader(string Source, string VertexEntry, IReadOnlyList<VertexInput> VertexInputs);
     public static AssembledShader AssembleVertexShader(
         string userSource,
         string vertEntry,
+        string fragEntry,
         ShaderRenderMode mode,
         HLSLParserConfig config)
     {
-        string DebuggerPreamble = @"
+        string CBufferPreamble = @"
             cbuffer DebuggerGlobals : register(b0) {
                 float2 _WarpSize;
                 float2 _Resolution;
@@ -24,21 +26,40 @@ public static class ShaderReflection
                 float4x4 _ViewProjection;
                 float4 _Mouse;
             };
-
-            // Default vertex shader for GPU path when rendering fullscreen (pixel) mode.
-            [shader(""vertex"")]
-            float4 dbgVertex(uint vid : SV_VertexID) : SV_Position {
-                float2 p = float2(float((vid << 1u) & 2u), float(vid & 2u));
-                return float4(p * 2.0 - 1.0, 0.0, 1.0);
-            }
         ";
-        string source = DebuggerPreamble + "\n" + userSource;
-
-        if (mode == ShaderRenderMode.Pixel)
-            return new AssembledShader(source, "dbgVertex", null);
 
         var runner = new HLSLRunner();
-        runner.ProcessCode(source, config);
+        runner.ProcessCode(CBufferPreamble + "\n" + userSource, config);
+
+        if (mode == ShaderRenderMode.Pixel)
+        {
+            var fragFunc = runner.GetFunction(fragEntry)
+                ?? throw new InvalidOperationException($"Fragment function '{fragEntry}' not found in shader.");
+            var sb = new StringBuilder();
+            sb.AppendLine("struct _dbgVertexOut {");
+            int padIndex = 0;
+            WalkParameters(runner, fragFunc, (type, semantic, dim, modifiers) =>
+            {
+                if (semantic.Base == null || semantic.Base == "SV_POSITION")
+                    return;
+                string mods = GetInterpolationModifierString(modifiers, type);
+                string typeName = PrintingUtil.GetEnumName(GetScalarType(type));
+                sb.AppendLine($"    {mods}{typeName}{dim} _pad{padIndex} : TEXCOORD{padIndex};");
+                padIndex++;
+            });
+            sb.AppendLine("    float4 pos : SV_Position;");
+            sb.AppendLine("};");
+            sb.AppendLine("[shader(\"vertex\")]");
+            sb.AppendLine("_dbgVertexOut _dbgVertex(uint vid : SV_VertexID) {");
+            sb.AppendLine("    _dbgVertexOut v2f = (_dbgVertexOut)0;");
+            sb.AppendLine("    float2 p = float2(float((vid << 1u) & 2u), float(vid & 2u));");
+            sb.AppendLine("    v2f.pos = float4(p * 2.0 - 1.0, 0.0, 1.0);");
+            sb.AppendLine("    return v2f;");
+            sb.AppendLine("}");
+            return new AssembledShader(
+                CBufferPreamble + "\n" + sb + "\n" + userSource,
+                "_dbgVertex", null);
+        }
 
         var vertFunc = runner.GetFunction(vertEntry)
             ?? throw new InvalidOperationException($"Vertex function '{vertEntry}' not found in shader.");
@@ -53,10 +74,33 @@ public static class ShaderReflection
                 throw new InvalidOperationException("Vertex input leaf is missing a semantic.");
             inputs.Add(new VertexInput(semantic.Base, semantic.Index, dim));
         });
-        return new AssembledShader(source, vertEntry, inputs);
+        return new AssembledShader(CBufferPreamble + "\n" + userSource, vertEntry, inputs);
     }
 
     #region General reflection
+    private static string GetInterpolationModifierString(IList<BindingModifier> modifiers, TypeNode type)
+    {
+        var sb = new StringBuilder();
+        bool hasNointerp = false;
+        if (modifiers != null)
+        {
+            foreach (var m in modifiers)
+            {
+                switch (m)
+                {
+                    case BindingModifier.Nointerpolation: sb.Append("nointerpolation "); hasNointerp = true; break;
+                    case BindingModifier.Noperspective: sb.Append("noperspective "); break;
+                    case BindingModifier.Linear: sb.Append("linear "); break;
+                    case BindingModifier.Centroid: sb.Append("centroid "); break;
+                    case BindingModifier.Sample: sb.Append("sample "); break;
+                }
+            }
+        }
+        if (!hasNointerp && !HLSLTypeUtils.IsFloat(GetScalarType(type)))
+            sb.Append("nointerpolation ");
+        return sb.ToString();
+    }
+
     public static bool TryAsStruct(TypeNode type, HLSLRunner runner, out StructTypeNode structType)
     {
         if (type is StructTypeNode inline && inline.Name != null)

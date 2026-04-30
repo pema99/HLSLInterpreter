@@ -17,11 +17,11 @@ public sealed class DebuggerAppState : INotifyPropertyChanged
         set => Set(ref _currentMesh, value);
     }
 
-    private string _entryPoint = "main";
-    public string EntryPoint
+    private string _fragmentEntryPoint = "frag";
+    public string FragmentEntryPoint
     {
-        get => _entryPoint;
-        set => Set(ref _entryPoint, value);
+        get => _fragmentEntryPoint;
+        set => Set(ref _fragmentEntryPoint, value);
     }
 
     private string _vertexEntryPoint = "vert";
@@ -94,12 +94,12 @@ public sealed class DebuggerAppState : INotifyPropertyChanged
     }
 
     public PermalinkSettings ToPermalinkSettings() =>
-        new(EntryPoint, WarpX, WarpY, GroupOffsetX, GroupOffsetY, GpuPreviewEnabled, ShaderRenderMode, VertexEntryPoint);
+        new(FragmentEntryPoint, WarpX, WarpY, GroupOffsetX, GroupOffsetY, GpuPreviewEnabled, ShaderRenderMode, VertexEntryPoint);
 
     public void ApplyFromUrl(string url)
     {
         var s = PermalinkCodec.ApplyToSettings(url, ToPermalinkSettings());
-        EntryPoint = s.EntryPoint;
+        FragmentEntryPoint = s.EntryPoint;
         WarpX = s.WarpX;
         WarpY = s.WarpY;
         GroupOffsetX = s.GroupOffsetX;

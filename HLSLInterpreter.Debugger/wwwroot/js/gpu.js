@@ -522,7 +522,7 @@ window.gpuRender = async function (canvasId, hlslSource, entryPoint, warpX, warp
     if (!canvas) throw new Error('Canvas not found: ' + canvasId);
 
     const mode = renderMode === 'vertfrag' ? 'vertfrag' : 'pixel';
-    const vsName = mode === 'vertfrag' ? (vertexEntryName || 'vert') : 'dbgVertex';
+    const vsName = vertexEntryName || (mode === 'vertfrag' ? 'vert' : '_dbgVertex');
 
     window.gpuStop();
     if (active && active.canvas === canvas) {

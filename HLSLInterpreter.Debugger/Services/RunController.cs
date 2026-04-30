@@ -151,6 +151,7 @@ public sealed class RunController : INotifyPropertyChanged
             var assembled = ShaderReflection.AssembleVertexShader(
                 userCode,
                 _state.VertexEntryPoint,
+                _state.FragmentEntryPoint,
                 _state.ShaderRenderMode,
                 parserConfig);
             string mode = _state.ShaderRenderMode == ShaderRenderMode.VertFrag ? "vertfrag" : "pixel";
@@ -163,7 +164,7 @@ public sealed class RunController : INotifyPropertyChanged
                 meshIndices = mesh.Indices;
             }
             await _js.InvokeVoidAsync("gpuRender", "color-canvas-gpu", assembled.Source,
-                _state.EntryPoint, wx, wy, dotNetRef, mode, assembled.VertexEntry,
+                _state.FragmentEntryPoint, wx, wy, dotNetRef, mode, assembled.VertexEntry,
                 assembled.VertexInputs, meshVertices, meshIndices, initialTime);
         }
         catch (Exception ex)
@@ -189,7 +190,7 @@ public sealed class RunController : INotifyPropertyChanged
 
         return new ShaderInvocation(
             Mode: _state.ShaderRenderMode,
-            EntryPoint: _state.EntryPoint,
+            FragmentEntryPoint: _state.FragmentEntryPoint,
             VertexEntryPoint: _state.VertexEntryPoint,
             Mesh: _state.CurrentMesh,
             WarpX: wx,

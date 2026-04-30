@@ -151,7 +151,7 @@ VSOut vert(float3 pos : POSITION, float3 normal : NORMAL)
     return o;
 }
 
-float4 main(VSOut i) : SV_Target
+float4 frag(VSOut i) : SV_Target
 {
     float3 light = normalize(float3(0.4, 0.8, 0.6));
     float ndl = saturate(dot(normalize(i.normal), light));
