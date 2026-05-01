@@ -721,3 +721,115 @@ void Overload_ShadowSin_FloatArgCallsBuiltin()
     float result = sin(0.0);
     ASSERT(abs(result) < 0.001);
 }
+
+// ============================================================================
+// DEFAULT PARAMETER VALUES
+// ============================================================================
+
+int AddDefault(int a, int b = 10) { return a + b; }
+
+[Test]
+void DefaultArg_OmittedTrailingArgUsesDefault()
+{
+    ASSERT(AddDefault(5) == 15);
+}
+
+[Test]
+void DefaultArg_ExplicitArgOverridesDefault()
+{
+    ASSERT(AddDefault(5, 2) == 7);
+}
+
+int MixedDefaults(int a, int b = 1, int c = 2) { return a + b * 10 + c * 100; }
+
+[Test]
+void DefaultArg_MultipleDefaultsAllOmitted()
+{
+    ASSERT(MixedDefaults(7) == 207 + 10);
+}
+
+[Test]
+void DefaultArg_MultipleDefaultsOnePassed()
+{
+    ASSERT(MixedDefaults(7, 5) == 257);
+}
+
+float DefaultExpr(float x, float k = 0.5 * 4.0) { return x * k; }
+
+[Test]
+void DefaultArg_DefaultIsConstExpr()
+{
+    ASSERT(DefaultExpr(3.0) == 6.0);
+}
+
+int DefaultOverload(int a) { return 100 + a; }
+int DefaultOverload(int a, int b = 7) { return a * b; }
+
+[Test]
+void DefaultArg_OneArgPicksExactArityOverload()
+{
+    ASSERT(DefaultOverload(3) == 103);
+}
+
+[Test]
+void DefaultArg_TwoArgsPicksTwoParamOverload()
+{
+    ASSERT(DefaultOverload(3, 4) == 12);
+}
+
+static const float kDefaultK = 2.5;
+float ScaleByGlobal(float x, float k = kDefaultK) { return x * k; }
+
+[Test]
+void DefaultArg_GlobalConstantReference()
+{
+    ASSERT(ScaleByGlobal(4.0) == 10.0);
+}
+
+float3 OffsetVec(float3 v, float3 d = float3(1.0, 2.0, 3.0)) { return v + d; }
+
+[Test]
+void DefaultArg_VectorDefault()
+{
+    float3 r = OffsetVec(float3(10.0, 20.0, 30.0));
+    ASSERT(r.x == 11.0 && r.y == 22.0 && r.z == 33.0);
+}
+
+int Doubled() { return 42; }
+int UseFnCallDefault(int a, int b = Doubled()) { return a + b; }
+
+[Test]
+void DefaultArg_FunctionCallAsDefault()
+{
+    ASSERT(UseFnCallDefault(8) == 50);
+}
+
+int NarrowedDefault(int x, int y = 7.9) { return x + y; }
+
+[Test]
+void DefaultArg_FloatDefaultCastsToIntParam()
+{
+    ASSERT(NarrowedDefault(1) == 8);
+}
+
+struct DefaultArgHost
+{
+    int Add(int a, int b = 100) { return a + b; }
+};
+
+[Test]
+void DefaultArg_StructMethodWithDefault()
+{
+    DefaultArgHost h;
+    ASSERT(h.Add(5) == 105);
+    ASSERT(h.Add(5, 1) == 6);
+}
+
+int NoDefaultExtra(int a, int b) { return 2; }
+int NoDefaultExtra(int a) { return 1; }
+
+[Test]
+void DefaultArg_PrefersExactArityOverNoDefaultLonger()
+{
+    ASSERT(NoDefaultExtra(5) == 1);
+}

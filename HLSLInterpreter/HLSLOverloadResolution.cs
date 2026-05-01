@@ -170,9 +170,21 @@ namespace HLSL
         // Given a function and a list of parameters, evaluate how well the function matches the parameters
         public static int GetOverloadScore(HLSLExpressionEvaluator evaluator, HLSLInterpreterContext context, FunctionDefinitionNode candidate, IList<HLSLValue> parameters)
         {
-            if (parameters.Count != candidate.Parameters.Count)
+            // Too few args, unviable.
+            if (parameters.Count > candidate.Parameters.Count)
                 return -1;
 
+            // Account for default args.
+            if (parameters.Count < candidate.Parameters.Count)
+            {
+                for (int i = parameters.Count; i < candidate.Parameters.Count; i++)
+                {
+                    if (candidate.Parameters[i].Declarator.Initializer is not ValueInitializerNode)
+                        return -1;
+                }
+            }
+
+            // Rank overload.
             int score = 0;
             for (int i = 0; i < parameters.Count; i++)
             {

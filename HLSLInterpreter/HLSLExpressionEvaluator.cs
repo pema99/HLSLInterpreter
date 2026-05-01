@@ -48,8 +48,10 @@ namespace HLSL
             FunctionDefinitionNode func = context.GetFunction(this, name, args);
             if (func != null)
             {
-                if (args.Length != func.Parameters.Count)
+                if (args.Length > func.Parameters.Count)
                     throw Error($"Argument count mismatch in call to '{name}'.");
+
+                args = AppendDefaultParameterInitializers(func.Parameters, args, name);
 
                 // Call function
                 context.PushScope(isFunction: true, functionName: name);
@@ -162,6 +164,22 @@ namespace HLSL
             {
                 throw Error(node, $"Expected a scalar expression, but got a {value.GetType().Name}.");
             }
+        }
+
+        private HLSLValue[] AppendDefaultParameterInitializers(List<FormalParameterNode> parameters, HLSLValue[] args, string functionName)
+        {
+            if (args.Length == parameters.Count)
+                return args;
+
+            var filled = new HLSLValue[parameters.Count];
+            Array.Copy(args, filled, args.Length);
+            for (int i = args.Length; i < parameters.Count; i++)
+            {
+                if (parameters[i].Declarator.Initializer is not ValueInitializerNode init)
+                    throw Error($"Argument count mismatch in call to '{functionName}'.");
+                filled[i] = Visit(init.Expression);
+            }
+            return filled;
         }
 
         private ReferenceValue[] BindFunctionParameters(List<FormalParameterNode> parameters, HLSLValue[] args)
@@ -616,8 +634,10 @@ namespace HLSL
 
         private HLSLValue CallMethodNode(StructValue str, FunctionDefinitionNode method, HLSLValue[] args)
         {
-            if (args.Length != method.Parameters.Count)
+            if (args.Length > method.Parameters.Count)
                 throw Error($"Argument count mismatch in call to '{method.Name.GetName()}'.");
+
+            args = AppendDefaultParameterInitializers(method.Parameters, args, method.Name.GetName());
 
             context.PushScope(isFunction: true, functionName: method.Name.GetName());
             context.PushReturn();
