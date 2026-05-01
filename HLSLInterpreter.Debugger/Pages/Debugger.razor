@@ -138,26 +138,41 @@
 
 @code {
     private static readonly string DefaultCode =
-@"struct VSOut
-{
-    float4 pos    : SV_Position;
-    float3 normal : NORMAL;
-};
+@"static float TWIST = 12.0;
+static float PERIOD = 32.0;
+static float ARMS = 3.0;
 
-VSOut vert(float3 pos : POSITION, float3 normal : NORMAL)
+float3 hueShift (float3 color, float shift)
 {
-    VSOut o;
-    o.pos = mul(_ViewProjection, float4(pos, 1.0));
-    o.normal = normal;
-    return o;
+    float3 axis = 0.55735;
+    float3 grayscale = dot(0.55735, color);
+    float3 radial = color - axis;
+    float3 tangent = cross(axis, radial);
+    return radial * cos(shift * 6.2832) +
+        tangent * sin(shift * 6.2832) + axis;
 }
 
-float4 frag(VSOut i) : SV_Target
+float4 frag(float4 position : SV_Position) : SV_Target
 {
-    float3 light = normalize(float3(0.4, 0.8, 0.6));
-    float ndl = saturate(dot(normalize(i.normal), light));
-    float3 base = float3(0.25, 0.55, 0.95);
-    return float4(base * (0.2 + 0.8 * ndl), 1);
+    float2 uv = (position.xy / _Resolution) - 0.5;
+    uv.x *= _Resolution.x/_Resolution.y;
+    float dist = length(uv) + _Time*0.2;
+    float angle = atan2(uv.y, uv.x) + 0.4;
+    float wave = sin(dist * TWIST - angle * ARMS);
+    wave = wave * 0.5 + 0.5;
+    if (wave < 0.5)
+    {
+        PRINTF(""First branch taken due to %d wave value!"", wave);
+        float3 base = float3(1.0, 0.3, 0.1);
+        float3 color = hueShift(base, wave + dist);
+        return float4(color, 1);
+    }
+    else
+    {
+        float periodic = sin(dist*PERIOD);
+        float inverse = cos(dist*PERIOD);
+        return float4(periodic, 0, inverse, 1);
+    }
 }
 ";
 

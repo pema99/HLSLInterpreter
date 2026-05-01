@@ -32,7 +32,7 @@ public sealed class DebuggerAppState : INotifyPropertyChanged
         set => Set(ref _vertexEntryPoint, value);
     }
 
-    private ShaderRenderMode _renderMode = ShaderRenderMode.VertFrag;
+    private ShaderRenderMode _renderMode = ShaderRenderMode.Pixel;
     public ShaderRenderMode ShaderRenderMode
     {
         get => _renderMode;
