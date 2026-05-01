@@ -1,5 +1,6 @@
 @inherits StateAwareComponent
 @using HLSLInterpreter.Debugger.Services
+@inject IJSRuntime JS
 
 @if (IsOpen)
 {
@@ -19,6 +20,11 @@
                 </div>
                 @if (State.ShaderRenderMode == ShaderRenderMode.VertFrag)
                 {
+                    <div class="settings-row">
+                        <label class="settings-label">Mesh</label>
+                        <button class="settings-text-input" @onclick="PickMesh" disabled="@IsLocked"
+                                title="Pick a .obj file to use as the mesh">Pick .obj file...</button>
+                    </div>
                     <div class="settings-row">
                         <label class="settings-label">Vertex entry</label>
                         <input class="settings-text-input" type="text"
@@ -86,4 +92,6 @@
     {
         if (Enum.TryParse<ShaderRenderMode>(value, out var mode)) State.ShaderRenderMode = mode;
     }
+
+    private Task PickMesh() => JS.InvokeVoidAsync("dbgPickObj").AsTask();
 }

@@ -9,6 +9,23 @@ window.dbgFetchText = async function (url) {
     return await r.text();
 };
 
+window.dbgPickObj = function () {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.obj';
+    input.addEventListener('change', () => {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = ev => {
+            if (window._dotNetDebugRef)
+                window._dotNetDebugRef.invokeMethodAsync('LoadObjMesh', ev.target.result);
+        };
+        reader.readAsText(file);
+    });
+    input.click();
+};
+
 window.initMonaco = function (containerId, initialCode, editorRef) {
     if (editorRef) window._dotNetEditorRef = editorRef;
     require.config({
