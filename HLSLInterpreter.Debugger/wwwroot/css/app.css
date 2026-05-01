@@ -193,7 +193,7 @@
 .output-panel {
     display: flex;
     flex-direction: column;
-    width: 38vw;
+    width: 42vw;
     min-width: 160px;
     min-height: 0;
     flex-shrink: 0;
