@@ -45,8 +45,8 @@ public sealed class RunController : INotifyPropertyChanged
 
     public (float Time, int CanvasW, int CanvasH)? GpuCaptured { get; set; }
 
-    private byte[]? _imagePixels;
-    public byte[]? ImagePixels { get => _imagePixels; set => Set(ref _imagePixels, value); }
+    private byte[] _imagePixels;
+    public byte[] ImagePixels { get => _imagePixels; set => Set(ref _imagePixels, value); }
 
     public int ImageWidth { get; private set; }
     public int ImageHeight { get; private set; }
@@ -201,7 +201,8 @@ public sealed class RunController : INotifyPropertyChanged
             CanvasH: canvasH,
             Time: GpuCaptured?.Time ?? 0f,
             ViewProjection: viewProjection,
-            Mouse: mouse);
+            Mouse: mouse,
+            DebugVertexIndex: _state.DebugVertexIndex);
     }
 
     public bool TryExtractImage(HLSLValue result, int wx, int wy)

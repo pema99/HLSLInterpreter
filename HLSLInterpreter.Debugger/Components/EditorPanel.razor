@@ -6,6 +6,7 @@
 @inject TabbedEditorOptions TabbedEditorConfig
 @inject DebuggerAppState State
 @inject DebugController DebugCtl
+@inject RunController RunCtl
 
 <div class="editor-panel">
     <div class="panel-header">
@@ -90,15 +91,25 @@
             val = gv;
         if (val == null) return null;
 
+        bool vertexDebug = State.DebugVertexIndex >= 0;
+        var resolved = val is ReferenceValue rv2 ? rv2.Get() : val;
         byte[]? rgba = null;
-        try { rgba = ValueImageRenderer.RenderVariableImage(val is ReferenceValue rv ? rv.Get() : val, State.WarpX, State.WarpY); }
+        try { rgba = ValueImageRenderer.RenderVariableImage(resolved, State.WarpX, State.WarpY); }
         catch (Exception ex) { Console.WriteLine($"[hover] image render failed for '{identifier}': {ex.Message}"); }
+        string[]? perThread = null;
+        if (vertexDebug)
+        {
+            int threadCount = Math.Max(1, State.WarpX * State.WarpY);
+            perThread = Enumerable.Range(0, threadCount)
+                .Select(i => HLSLValueFormatter.Format(resolved, i)).ToArray();
+        }
         return new HoverInfo
         {
             Value = HLSLValueFormatter.Format(val, State.InspectedThread),
             Width = State.WarpX,
             Height = State.WarpY,
             Rgba = rgba,
+            PerThreadValues = perThread,
             InspectedX = State.WarpX > 0 ? State.InspectedThread % State.WarpX : 0,
             InspectedY = State.WarpX > 0 ? State.InspectedThread / State.WarpX : 0,
         };

@@ -8,4 +8,5 @@ public sealed class HoverInfo
     public byte[]? Rgba { get; set; }
     public int InspectedX { get; set; }
     public int InspectedY { get; set; }
+    public string[]? PerThreadValues { get; set; }
 }

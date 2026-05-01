@@ -14,6 +14,9 @@
         threadStates: null,
         cpuClickWarp: null,
         debugClickActive: false,
+        pickMode: 'pixel',  // 'pixel' or 'vertex'
+        meshPositions: null,
+        meshIndices: null,
     };
 
     function paint(canvas) {
@@ -46,6 +49,9 @@
         if (typeof window.dbgSetViewportMode === 'function')
             window.dbgSetViewportMode(id, mode);
 
+        if (typeof window.dbgSetViewportPickMode === 'function')
+            window.dbgSetViewportPickMode(id, state.pickMode, state.meshPositions, state.meshIndices);
+
         if (target === 'debug') {
             if (state.debugPixel && typeof window.dbgSetDebugPixel === 'function')
                 window.dbgSetDebugPixel(id, state.debugPixel.x, state.debugPixel.y);
@@ -54,7 +60,21 @@
         }
 
         if (typeof window.dbgSetClickHandler === 'function') {
-            if (target === 'regular' && mode === 'gpu') {
+            if (target === 'regular' && state.pickMode === 'vertex') {
+                window.dbgSetClickHandler(id, (px, py, vertexIndex) => {
+                    if (vertexIndex == null || !window._dotNetDebugRef) return;
+                    if (mode === 'gpu') {
+                        const snap = window.gpuSnapshot?.();
+                        if (!snap) return;
+                        window.gpuPause?.();
+                        window._dotNetDebugRef.invokeMethodAsync('StartDebugAtVertex',
+                            vertexIndex, snap[0], snap[1], snap[2]);
+                    } else {
+                        window._dotNetDebugRef.invokeMethodAsync('StartDebugAtVertex',
+                            vertexIndex, 0, state.width || 1, state.height || 1);
+                    }
+                });
+            } else if (target === 'regular' && mode === 'gpu') {
                 window.dbgSetClickHandler(id, (px, py) => {
                     const snap = window.gpuSnapshot?.();
                     if (!snap || !window._dotNetDebugRef) return;
@@ -137,6 +157,17 @@
 
     window.imgSetDebugClickHandler = function (active) {
         state.debugClickActive = !!active;
+        applyAll();
+    };
+
+    window.imgSetPickMode = function (mode) {
+        state.pickMode = (mode === 'vertex') ? 'vertex' : 'pixel';
+        applyAll();
+    };
+
+    window.imgSetMeshData = function (positions, indices) {
+        state.meshPositions = positions;
+        state.meshIndices = indices;
         applyAll();
     };
 })();

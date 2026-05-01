@@ -438,6 +438,7 @@
    we hide the system cursor on the canvas only. The letterboxed padding keeps
    the default cursor since it sits on the container. */
 .image-container .image-canvas { cursor: none; }
+.image-container.pick-vertex .image-canvas { cursor: default; }
 .exec-state-body .image-container .image-canvas { cursor: default; }
 .image-container.panning,
 .image-container.panning .image-canvas { cursor: grabbing; }
@@ -690,6 +691,40 @@
     color: #cccccc;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+}
+
+.segmented-toggle {
+    display: inline-flex;
+    align-items: stretch;
+    height: 16px;
+    padding: 1px;
+    background: #3c3c3c;
+    border: 1px solid #555;
+    border-radius: 9999px;
+    box-sizing: border-box;
+}
+.segmented-toggle-option {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: #cccccc;
+    font: inherit;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 0 8px;
+    border-radius: 9999px;
+    cursor: pointer;
+    transition: background 0.12s ease, color 0.12s ease;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.segmented-toggle-option:hover:not(.active) { color: #ffffff; }
+.segmented-toggle-option.active {
+    background: #d4d4d4;
+    color: #1c1c1c;
 }
 
 .btn-time-ctrl {

@@ -5,6 +5,7 @@ using HLSLInterpreter.Debugger.Core;
 namespace HLSLInterpreter.Debugger.Services;
 
 public enum ShaderRenderMode { Pixel, VertFrag }
+public enum DebugTarget { Pixel, Vertex }
 
 public sealed class DebuggerAppState : INotifyPropertyChanged
 {
@@ -70,6 +71,20 @@ public sealed class DebuggerAppState : INotifyPropertyChanged
     {
         get => _groupOffsetY;
         set => Set(ref _groupOffsetY, value);
+    }
+
+    private DebugTarget _debugTarget = DebugTarget.Pixel;
+    public DebugTarget DebugTarget
+    {
+        get => _debugTarget;
+        set => Set(ref _debugTarget, value);
+    }
+
+    private int _debugVertexIndex = -1;
+    public int DebugVertexIndex
+    {
+        get => _debugVertexIndex;
+        set => Set(ref _debugVertexIndex, value);
     }
 
     private bool _gpuPreviewEnabled = false;

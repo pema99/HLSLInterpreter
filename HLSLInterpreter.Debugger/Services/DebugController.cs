@@ -101,6 +101,7 @@ public sealed class DebugController : INotifyPropertyChanged
         DebugTabIndex = -1;
         CurrentSession = null;
         _run.IsGpuMode = false;
+        _state.DebugVertexIndex = -1;
         if (_savedGroupOffsets.HasValue)
         {
             _state.GroupOffsetX = _savedGroupOffsets.Value.X;

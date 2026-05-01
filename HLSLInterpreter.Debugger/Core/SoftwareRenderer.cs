@@ -6,7 +6,7 @@ namespace HLSLInterpreter.Debugger.Core;
 public static class SoftwareRenderer
 {
     #region Execution and input building
-    public static HLSLValue Render(
+    public static HLSLValue RunVertFrag(
         HLSLRunner runner,
         Mesh mesh,
         string vertEntry,
@@ -22,22 +22,14 @@ public static class SoftwareRenderer
         int tileX0 = groupOffsetX * warpX;
         int tileY0 = groupOffsetY * warpY;
 
-        // Don't debug vertex stage for now.
+        var vertFunc = runner.GetFunction(vertEntry) ?? throw new InvalidOperationException($"Vertex function '{vertEntry}' not found.");
+
+        // Don't debug vertex stage for fragment-debug runs.
         var savedHook = runner.DebugHook;
         runner.DebugHook = null;
 
-        // Run vertex function in batches. _ViewProjection is already set by the
-        // caller's ShaderInvocation.SetUniforms.
-        var vertFunc = runner.GetFunction(vertEntry) ?? throw new InvalidOperationException($"Vertex function '{vertEntry}' not found.");
-        var vertOutputs = new HLSLValue[mesh.VertexCount];
-        for (int vertIdx = 0; vertIdx < mesh.VertexCount; vertIdx += threadsPerWarp)
-        {
-            var args = BuildVertexArgs(runner, vertFunc, mesh, vertIdx, threadsPerWarp);
-            var batchOutput = runner.CallFunction(vertEntry, args);
-            int validInBatch = Math.Min(threadsPerWarp, mesh.VertexCount - vertIdx);
-            for (int threadIdx = 0; threadIdx < validInBatch; threadIdx++)
-                vertOutputs[vertIdx + threadIdx] = HLSLValueUtils.Scalarize(batchOutput, threadIdx);
-        }
+        // Run vertex function.
+        var vertOutputs = RunVertOnly(runner, mesh, vertEntry, warpX, warpY, 0, mesh.VertexCount);
 
         // Start debugging.
         runner.DebugHook = savedHook;
@@ -90,6 +82,33 @@ public static class SoftwareRenderer
                 color = color.SetThreadValue(threadIdx, [0f, 0f, 0f, 1f]);
         }
         return color;
+    }
+
+    public static HLSLValue[] RunVertOnly(
+        HLSLRunner runner,
+        Mesh mesh,
+        string vertEntry,
+        int warpX,
+        int warpY,
+        int vertexOffset,
+        int vertexCount)
+    {
+        int threadsPerWarp = warpX * warpY;
+        var vertFunc = runner.GetFunction(vertEntry) ?? throw new InvalidOperationException($"Vertex function '{vertEntry}' not found.");
+        var outs = new HLSLValue[vertexCount];
+        for (int batchStart = 0; batchStart < vertexCount; batchStart += threadsPerWarp)
+        {
+            int batchSize = Math.Min(threadsPerWarp, vertexCount - batchStart);
+            var args = BuildVertexArgs(runner, vertFunc, mesh, vertexOffset + batchStart, threadsPerWarp);
+            for (int t = batchSize; t < threadsPerWarp; t++)
+                runner.DisableThread(t);
+            var batchOutput = runner.CallFunction(vertEntry, args);
+            for (int t = batchSize; t < threadsPerWarp; t++)
+                runner.EnableThread(t);
+            for (int i = 0; i < batchSize; i++)
+                outs[batchStart + i] = HLSLValueUtils.Scalarize(batchOutput, i);
+        }
+        return outs;
     }
 
     // Build inputs to vertex stage.

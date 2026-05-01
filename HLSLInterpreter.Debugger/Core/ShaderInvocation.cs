@@ -17,7 +17,8 @@ public sealed record ShaderInvocation(
     int CanvasH,
     float Time,
     float[] ViewProjection,
-    float[] Mouse)
+    float[] Mouse,
+    int DebugVertexIndex)
 {
     public void SetUniforms(HLSLRunner runner)
     {
@@ -38,16 +39,25 @@ public sealed record ShaderInvocation(
 
     public HLSLValue Execute(HLSLRunner runner)
     {
+        int threadCount = WarpX * WarpY;
         if (Mode == ShaderRenderMode.VertFrag)
         {
-            return SoftwareRenderer.Render(
-                runner, Mesh, VertexEntryPoint, FragmentEntryPoint,
-                WarpX, WarpY, CanvasW, CanvasH,
-                GroupOffsetX, GroupOffsetY);
+            if (DebugVertexIndex >= 0)
+            {
+                int batchStart = (DebugVertexIndex / threadCount) * threadCount;
+                int batchSize = Math.Min(threadCount, Mesh.VertexCount - batchStart);
+                return SoftwareRenderer.RunVertOnly(runner, Mesh, VertexEntryPoint, WarpX, WarpY, batchStart, batchSize)[0];
+            }
+            else
+            {
+                return SoftwareRenderer.RunVertFrag(
+                    runner, Mesh, VertexEntryPoint, FragmentEntryPoint,
+                    WarpX, WarpY, CanvasW, CanvasH,
+                    GroupOffsetX, GroupOffsetY);
+            }
         }
         else
         {
-            int threadCount = WarpX * WarpY;
             var fragFunc = runner.GetFunction(FragmentEntryPoint) ?? throw new InvalidOperationException($"Fragment function '{FragmentEntryPoint}' not found.");
             var fragArgs = ShaderReflection.BuildArgs(runner, fragFunc, (type, semantic, dim, modifiers) =>
             {

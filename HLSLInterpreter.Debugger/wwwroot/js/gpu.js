@@ -131,6 +131,7 @@ function extractEntryPoints(wgsl) {
 }
 
 // Camera state
+const CAMERA_FOV_Y = 60 * Math.PI / 180;
 let cameraYaw = 0.6;
 let cameraPitch = 0.3;
 let cameraDistance = 4.0;
@@ -202,9 +203,39 @@ window.gpuViewProjection = function (canvasW, canvasH) {
     const ex = sy * cp * cameraDistance;
     const ey = sp * cameraDistance;
     const ez = cy * cp * cameraDistance;
-    const proj = matPerspective(60 * Math.PI / 180, aspect, 0.1, 100);
+    const proj = matPerspective(CAMERA_FOV_Y, aspect, 0.1, 100);
     const view = matLookAt(ex, ey, ez, 0, 0, 0, 0, 1, 0);
     return matMul(proj, view);
+};
+
+window.gpuPickRay = function (imgX, imgY, imgW, imgH) {
+    const cp = Math.cos(cameraPitch), sp = Math.sin(cameraPitch);
+    const cy = Math.cos(cameraYaw),   sy = Math.sin(cameraYaw);
+    const ox = sy * cp * cameraDistance;
+    const oy = sp * cameraDistance;
+    const oz = cy * cp * cameraDistance;
+    // forward = normalize(target - origin), target is origin (0,0,0)
+    let fx = -ox, fy = -oy, fz = -oz;
+    let fl = Math.hypot(fx, fy, fz) || 1;
+    fx /= fl; fy /= fl; fz /= fl;
+    // right = normalize(forward x worldUp), worldUp = (0,1,0)
+    let rx = -fz, ry = 0, rz = fx;
+    let rl = Math.hypot(rx, ry, rz) || 1;
+    rx /= rl; ry /= rl; rz /= rl;
+    // up = right x forward
+    const ux = ry * fz - rz * fy;
+    const uy = rz * fx - rx * fz;
+    const uz = rx * fy - ry * fx;
+    const halfH = Math.tan(CAMERA_FOV_Y / 2);
+    const halfW = halfH * Math.max(1e-4, imgW / Math.max(1, imgH));
+    const ndcX = (imgX / imgW) * 2 - 1;
+    const ndcY = 1 - (imgY / imgH) * 2;
+    let dx = fx + ndcX * halfW * rx + ndcY * halfH * ux;
+    let dy = fy + ndcX * halfW * ry + ndcY * halfH * uy;
+    let dz = fz + ndcX * halfW * rz + ndcY * halfH * uz;
+    const dl = Math.hypot(dx, dy, dz) || 1;
+    dx /= dl; dy /= dl; dz /= dl;
+    return [ox, oy, oz, dx, dy, dz];
 };
 
 // globalSession is heavy, so we cache it
@@ -465,6 +496,7 @@ function attachCameraInput() {
         cameraYaw -= dx * 0.01;
         cameraPitch = Math.max(-1.4, Math.min(1.4, cameraPitch + dy * 0.01));
         redrawIfPaused();
+        window.dbgRefreshViewportOverlay?.('image-container');
     });
 
     // Stop rotate
@@ -484,6 +516,7 @@ function attachCameraInput() {
         const k = Math.exp(e.deltaY * 0.0015);
         cameraDistance = Math.max(0.5, Math.min(100, cameraDistance * k));
         redrawIfPaused();
+        window.dbgRefreshViewportOverlay?.('image-container');
     }, { capture: true, passive: false });
 }
 
