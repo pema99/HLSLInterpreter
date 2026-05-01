@@ -3,6 +3,12 @@ window._monacoEditor = null;
 
 window.setDebuggerRef = function (ref) { window._dotNetDebugRef = ref; };
 
+window.dbgFetchText = async function (url) {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('fetch ' + url + ' -> ' + r.status);
+    return await r.text();
+};
+
 window.initMonaco = function (containerId, initialCode, editorRef) {
     if (editorRef) window._dotNetEditorRef = editorRef;
     require.config({

@@ -134,7 +134,7 @@ function extractEntryPoints(wgsl) {
 const CAMERA_FOV_Y = 60 * Math.PI / 180;
 let cameraYaw = 0.6;
 let cameraPitch = 0.3;
-let cameraDistance = 4.0;
+let cameraDistance = 2.5;
 
 let mouseX = 0;
 let mouseY = 0;

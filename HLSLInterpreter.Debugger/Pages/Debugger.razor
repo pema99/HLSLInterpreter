@@ -227,6 +227,16 @@ float4 frag(VSOut i) : SV_Target
         InvokeAsync(StateHasChanged);
     }
 
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            string objText = await JS.InvokeAsync<string>("dbgFetchText", "_content/HLSLInterpreter.Debugger/lib/monkey.obj");
+            State.CurrentMesh = Mesh.ParseObj(objText);
+        }
+        catch (Exception ex) { Console.WriteLine("[default-mesh] " + ex.Message); }
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
