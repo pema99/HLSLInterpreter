@@ -18,12 +18,12 @@ public sealed class RunController : INotifyPropertyChanged
         _state = state;
     }
 
-    public event PropertyChangedEventHandler? PropertyChanged;
+    public event PropertyChangedEventHandler PropertyChanged;
 
     public HLSLRunner Runner { get; } = new();
 
-    private string? _output;
-    public string? Output { get => _output; set => Set(ref _output, value); }
+    private string _output;
+    public string Output { get => _output; set => Set(ref _output, value); }
 
     private bool _isRunning;
     public bool IsRunning { get => _isRunning; set => Set(ref _isRunning, value); }
@@ -34,8 +34,8 @@ public sealed class RunController : INotifyPropertyChanged
     private string _errorMessage = "";
     public string ErrorMessage { get => _errorMessage; set => Set(ref _errorMessage, value ?? ""); }
 
-    private Exception? _lastException;
-    public Exception? LastException { get => _lastException; set => Set(ref _lastException, value); }
+    private Exception _lastException;
+    public Exception LastException { get => _lastException; set => Set(ref _lastException, value); }
 
     private bool _isGpuMode;
     public bool IsGpuMode { get => _isGpuMode; set => Set(ref _isGpuMode, value); }
@@ -57,8 +57,8 @@ public sealed class RunController : INotifyPropertyChanged
     public async Task RunAsync(
         Func<Task<string>> getCode,
         HLSLParserConfig parserConfig,
-        object? dotNetRef,
-        Func<Task>? beforeGpuRender = null)
+        object dotNetRef,
+        Func<Task> beforeGpuRender = null)
     {
         float initialTime = GpuCaptured?.Time ?? 0f;
         BeginRun();
@@ -130,7 +130,7 @@ public sealed class RunController : INotifyPropertyChanged
     private async Task RunGpuInternal(
         Func<Task<string>> getCode,
         HLSLParserConfig parserConfig,
-        object? dotNetRef,
+        object dotNetRef,
         float initialTime)
     {
         bool hasGpu = false;
@@ -155,8 +155,8 @@ public sealed class RunController : INotifyPropertyChanged
                 _state.ShaderRenderMode,
                 parserConfig);
             string mode = _state.ShaderRenderMode == ShaderRenderMode.VertFrag ? "vertfrag" : "pixel";
-            float[]? meshVertices = null;
-            uint[]? meshIndices = null;
+            float[] meshVertices = null;
+            uint[] meshIndices = null;
             if (_state.ShaderRenderMode == ShaderRenderMode.VertFrag)
             {
                 var mesh = _state.CurrentMesh;
@@ -257,7 +257,7 @@ public sealed class RunController : INotifyPropertyChanged
         catch { }
     }
 
-    private bool Set<T>(ref T field, T value, [CallerMemberName] string? name = null)
+    private bool Set<T>(ref T field, T value, [CallerMemberName] string name = null)
     {
         if (EqualityComparer<T>.Default.Equals(field, value)) return false;
         field = value;

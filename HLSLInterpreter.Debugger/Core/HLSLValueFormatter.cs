@@ -6,7 +6,7 @@ namespace HLSLInterpreter.Debugger.Core;
 
 public static class HLSLValueFormatter
 {
-    public static string Format(HLSLValue? value, int threadIndex)
+    public static string Format(HLSLValue value, int threadIndex)
     {
         if (value is ReferenceValue rv) value = rv.Get();
         if (value == null) return "null";

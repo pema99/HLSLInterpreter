@@ -2,5 +2,5 @@ namespace HLSLInterpreter.Debugger.Services;
 
 public class PermalinkOptions
 {
-    public string? Url { get; init; }
+    public string Url { get; init; }
 }

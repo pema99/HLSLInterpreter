@@ -176,7 +176,7 @@ float4 frag(float4 position : SV_Position) : SV_Target
 }
 ";
 
-    private EditorPanel? editorPanel;
+    private EditorPanel editorPanel;
     private string initialEditorCode = "";
 
     private async Task OnEditorTabSwitched(int newIndex)
@@ -210,7 +210,7 @@ float4 frag(float4 position : SV_Position) : SV_Target
     private bool showSettings = false;
     private bool needsImageRender = false;
 
-    private DotNetObjectReference<Debugger>? dotNetRef;
+    private DotNetObjectReference<Debugger> dotNetRef;
     private bool needsThreadGridInit = false;
     private bool needsSectionHeightRestore = false;
     private bool imageCollapsed = false;
@@ -234,7 +234,7 @@ float4 frag(float4 position : SV_Position) : SV_Target
         State.ApplyFromUrl(Nav.Uri);
     }
 
-    private void OnStateChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    private void OnStateChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         // Auto-expand the image section when GPU mode flips on so the canvas mounts before gpuRender.
         if (sender == RunCtl && e.PropertyName == nameof(RunController.IsGpuMode) && RunCtl.IsGpuMode)
@@ -301,7 +301,7 @@ float4 frag(float4 position : SV_Position) : SV_Target
         else
         {
             await JS.InvokeVoidAsync("imgSetDebugPixel", null, null);
-            await JS.InvokeVoidAsync("imgSetThreadStates", (int[]?)null);
+            await JS.InvokeVoidAsync("imgSetThreadStates", (int[])null);
             await JS.InvokeVoidAsync("imgSetDebugClickHandler", false);
             if (!RunCtl.IsGpuMode)
                 await JS.InvokeVoidAsync("imgSetCpuClickHandler", State.WarpX, State.WarpY);
@@ -476,7 +476,7 @@ float4 frag(float4 position : SV_Position) : SV_Target
 
     private HLSLParserConfig MakeParserConfig()
     {
-        string? filePath = editorPanel?.ActiveTabPath;
+        string filePath = editorPanel?.ActiveTabPath;
         return new HLSLParserConfig
         {
             BasePath = filePath != null ? System.IO.Path.GetDirectoryName(filePath) ?? "" : ""

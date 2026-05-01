@@ -43,7 +43,7 @@ public static class PermalinkCodec
         return Encoding.UTF8.GetString(output.ToArray());
     }
 
-    public static string? GetQueryParam(string url, string key)
+    public static string GetQueryParam(string url, string key)
     {
         var query = new Uri(url).Query.TrimStart('?');
         foreach (var part in query.Split('&'))

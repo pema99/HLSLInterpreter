@@ -49,7 +49,7 @@
 </div>
 
 @code {
-    [Parameter] public DebuggerSession? Session { get; set; }
+    [Parameter] public DebuggerSession Session { get; set; }
     [Parameter] public string DebugCode { get; set; } = "";
     [Parameter] public HLSLParserConfig ParserConfig { get; set; } = new();
 
@@ -62,7 +62,7 @@
         public string Expression { get; init; } = "";
         public string Result { get; init; } = "";
         public bool IsError { get; init; }
-        public string? ImageDataUrl { get; init; }
+        public string ImageDataUrl { get; init; }
     }
 
     private async Task OnImmediateKeyDown(KeyboardEventArgs e)
@@ -81,7 +81,7 @@
 
         string resultStr;
         bool isError = false;
-        HLSLValue? evalResult = null;
+        HLSLValue evalResult = null;
 
         try
         {
@@ -89,7 +89,7 @@
             var evalRunner = new HLSLRunner(wx, wy);
             invocation.SetUniforms(evalRunner);
 
-            Exception? evalError = null;
+            Exception evalError = null;
             int stepCount = 0;
             int targetStep = Session.StepIndex;
 
@@ -130,10 +130,10 @@
             isError = true;
         }
 
-        string? imageDataUrl = null;
+        string imageDataUrl = null;
         if (!isError && evalResult != null)
         {
-            byte[]? rgba = null;
+            byte[] rgba = null;
             try { rgba = ValueImageRenderer.RenderVariableImage(evalResult is ReferenceValue rv ? rv.Get() : evalResult, wx, wy); }
             catch { }
             if (rgba != null)

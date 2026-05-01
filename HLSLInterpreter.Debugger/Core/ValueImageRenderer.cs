@@ -7,7 +7,7 @@ public static class ValueImageRenderer
 {
     public static byte FloatToByte(float v) => (byte)(Math.Clamp(v, 0f, 1f) * 255f + 0.5f);
 
-    public static byte[]? RenderVariableImage(HLSLValue val, int wx, int wy)
+    public static byte[] RenderVariableImage(HLSLValue val, int wx, int wy)
     {
         int threadCount = wx * wy;
         if (val is VectorValue vv)
@@ -57,7 +57,7 @@ public static class ValueImageRenderer
         return null;
     }
 
-    public static byte[]? TryExtractImage(HLSLValue result, int wx, int wy)
+    public static byte[] TryExtractImage(HLSLValue result, int wx, int wy)
     {
         int threadCount = wx * wy;
 

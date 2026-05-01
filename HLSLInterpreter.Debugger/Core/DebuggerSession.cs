@@ -27,9 +27,9 @@ public sealed class DebuggerSession
     public IReadOnlyList<Step> Trace { get; }
     public string Output { get; }
     public bool HasError { get; }
-    public string? ErrorMessage { get; }
-    public Exception? LastException { get; }
-    public HLSLValue? Result { get; }
+    public string ErrorMessage { get; }
+    public Exception LastException { get; }
+    public HLSLValue Result { get; }
 
     private int _stepIndex = -1;
     public int StepIndex
@@ -38,7 +38,7 @@ public sealed class DebuggerSession
         set => _stepIndex = Trace.Count == 0 ? -1 : Math.Clamp(value, 0, Trace.Count - 1);
     }
 
-    public Step? Current => _stepIndex >= 0 && _stepIndex < Trace.Count ? Trace[_stepIndex] : null;
+    public Step Current => _stepIndex >= 0 && _stepIndex < Trace.Count ? Trace[_stepIndex] : null;
     public int CurrentLine => Current?.Line ?? 0;
 
     public string OutputThroughCurrentStep
@@ -53,7 +53,7 @@ public sealed class DebuggerSession
         }
     }
 
-    private DebuggerSession(List<Step> trace, string output, bool hasError, string? errorMessage, Exception? lastException, HLSLValue? result)
+    private DebuggerSession(List<Step> trace, string output, bool hasError, string errorMessage, Exception lastException, HLSLValue result)
     {
         Trace = trace;
         Output = output;
@@ -76,9 +76,9 @@ public sealed class DebuggerSession
         Console.SetOut(sw);
 
         bool hasError = false;
-        string? errorMessage = null;
-        Exception? lastException = null;
-        HLSLValue? result = null;
+        string errorMessage = null;
+        Exception lastException = null;
+        HLSLValue result = null;
 
         var runner = new HLSLRunner();
 

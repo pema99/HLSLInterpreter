@@ -49,21 +49,21 @@
 @code {
     [Parameter] public string InitialCode { get; set; } = "";
     [Parameter] public string InitialCodeName { get; set; } = "new.hlsl";
-    [Parameter] public string? InitialCodePath { get; set; }
+    [Parameter] public string InitialCodePath { get; set; }
     [Parameter] public EventCallback<int> OnTabSwitched { get; set; }
     [Parameter] public EventCallback OnReady { get; set; }
 
-    private DotNetObjectReference<EditorPanel>? _selfRef;
+    private DotNetObjectReference<EditorPanel> _selfRef;
 
     private static readonly int[] fontSizes = { 12, 13, 14, 15, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36 };
     private int fontSize = 16;
 
-    private sealed class EditorTab { public string Name = ""; public string Code = ""; public string? Path; }
+    private sealed class EditorTab { public string Name = ""; public string Code = ""; public string Path; }
     private List<EditorTab> tabs = new();
     private int activeTabIndex;
 
     public int ActiveTabIndex => activeTabIndex;
-    public string? ActiveTabPath =>
+    public string ActiveTabPath =>
         TabbedEditorConfig.Enabled && tabs.Count > 0 ? tabs[activeTabIndex].Path : null;
 
     public ValueTask<string> GetCode() => JS.InvokeAsync<string>("getMonacoValue");
@@ -71,7 +71,7 @@
     public ValueTask HighlightLine(int line) => JS.InvokeVoidAsync("highlightDebugLine", line);
 
     [JSInvokable]
-    public HoverInfo? GetHoverInfo(string identifier) => BuildHoverInfo(identifier);
+    public HoverInfo GetHoverInfo(string identifier) => BuildHoverInfo(identifier);
 
     [JSInvokable]
     public async Task ToggleBreakpoint(int line)
@@ -80,11 +80,11 @@
         await JS.InvokeVoidAsync("setBreakpoints", DebugCtl.Breakpoints.ToArray());
     }
 
-    public HoverInfo? BuildHoverInfo(string identifier)
+    public HoverInfo BuildHoverInfo(string identifier)
     {
         if (!DebugCtl.IsDebugging || DebugCtl.CurrentSession?.Current is not { } step)
             return null;
-        HLSLValue? val = null;
+        HLSLValue val = null;
         if (step.FrameVariables.Length > 0 && step.FrameVariables[0].TryGetValue(identifier, out var lv))
             val = lv;
         else if (step.GlobalVariables.TryGetValue(identifier, out var gv))
@@ -93,10 +93,10 @@
 
         bool vertexDebug = State.DebugVertexIndex >= 0;
         var resolved = val is ReferenceValue rv2 ? rv2.Get() : val;
-        byte[]? rgba = null;
+        byte[] rgba = null;
         try { rgba = ValueImageRenderer.RenderVariableImage(resolved, State.WarpX, State.WarpY); }
         catch (Exception ex) { Console.WriteLine($"[hover] image render failed for '{identifier}': {ex.Message}"); }
-        string[]? perThread = null;
+        string[] perThread = null;
         if (vertexDebug)
         {
             int threadCount = Math.Max(1, State.WarpX * State.WarpY);
@@ -183,7 +183,7 @@
     private async Task SaveFileDialog()
     {
         string code = await JS.InvokeAsync<string>("getMonacoValue");
-        string? savedPath = await FileDialogs.SaveFile(code, tabs[activeTabIndex].Path);
+        string savedPath = await FileDialogs.SaveFile(code, tabs[activeTabIndex].Path);
         if (savedPath == null) return;
         tabs[activeTabIndex].Path = savedPath;
         tabs[activeTabIndex].Name = System.IO.Path.GetFileName(savedPath);
@@ -194,7 +194,7 @@
     private async Task SaveFileAsDialog()
     {
         string code = await JS.InvokeAsync<string>("getMonacoValue");
-        string? savedPath = await FileDialogs.SaveFileAs(code);
+        string savedPath = await FileDialogs.SaveFileAs(code);
         if (savedPath == null) return;
         tabs[activeTabIndex].Path = savedPath;
         tabs[activeTabIndex].Name = System.IO.Path.GetFileName(savedPath);
@@ -203,7 +203,7 @@
     }
 
     [JSInvokable]
-    public async Task OpenFileInTab(string name, string content, string? path = null)
+    public async Task OpenFileInTab(string name, string content, string path = null)
     {
         if (!TabbedEditorConfig.Enabled) return;
         var existing = tabs.FindIndex(t => t.Name == name);

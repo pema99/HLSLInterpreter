@@ -18,7 +18,7 @@ public abstract class StateAwareComponent : ComponentBase, IDisposable
         State.PropertyChanged -= OnStateChanged;
     }
 
-    protected virtual void OnStateChanged(object? sender, PropertyChangedEventArgs e)
+    protected virtual void OnStateChanged(object sender, PropertyChangedEventArgs e)
     {
         InvokeAsync(StateHasChanged);
     }

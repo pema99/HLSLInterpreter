@@ -9,7 +9,7 @@ public enum DebugTarget { Pixel, Vertex }
 
 public sealed class DebuggerAppState : INotifyPropertyChanged
 {
-    public event PropertyChangedEventHandler? PropertyChanged;
+    public event PropertyChangedEventHandler PropertyChanged;
 
     private Mesh _currentMesh = Mesh.CreateCube();
     public Mesh CurrentMesh
@@ -124,7 +124,7 @@ public sealed class DebuggerAppState : INotifyPropertyChanged
         VertexEntryPoint = s.VertexEntryPoint;
     }
 
-    private bool Set<T>(ref T field, T value, [CallerMemberName] string? name = null)
+    private bool Set<T>(ref T field, T value, [CallerMemberName] string name = null)
     {
         if (EqualityComparer<T>.Default.Equals(field, value)) return false;
         field = value;

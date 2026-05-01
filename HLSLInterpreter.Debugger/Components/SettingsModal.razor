@@ -88,7 +88,7 @@
         if (int.TryParse(e.Value?.ToString(), out var v)) setter(v);
     }
 
-    private void SetShaderRenderMode(string? value)
+    private void SetShaderRenderMode(string value)
     {
         if (Enum.TryParse<ShaderRenderMode>(value, out var mode)) State.ShaderRenderMode = mode;
     }

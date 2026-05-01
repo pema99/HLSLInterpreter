@@ -170,7 +170,7 @@ public sealed class Mesh
             if (line.Length == 0)
                 continue;
 
-            var parts = line.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+            var parts = line.Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length == 0)
                 continue;
 

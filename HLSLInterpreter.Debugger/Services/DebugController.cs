@@ -17,10 +17,10 @@ public sealed class DebugController : INotifyPropertyChanged
         _run = run;
     }
 
-    public event PropertyChangedEventHandler? PropertyChanged;
+    public event PropertyChangedEventHandler PropertyChanged;
 
-    private DebuggerSession? _session;
-    public DebuggerSession? CurrentSession { get => _session; private set => Set(ref _session, value); }
+    private DebuggerSession _session;
+    public DebuggerSession CurrentSession { get => _session; private set => Set(ref _session, value); }
 
     private bool _isDebugging;
     public bool IsDebugging { get => _isDebugging; private set => Set(ref _isDebugging, value); }
@@ -129,7 +129,7 @@ public sealed class DebugController : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CurrentSession)));
     }
 
-    private bool Set<T>(ref T field, T value, [CallerMemberName] string? name = null)
+    private bool Set<T>(ref T field, T value, [CallerMemberName] string name = null)
     {
         if (EqualityComparer<T>.Default.Equals(field, value)) return false;
         field = value;
