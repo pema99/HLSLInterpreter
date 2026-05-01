@@ -1,8 +1,10 @@
 @using HLSL
 @using HLSLInterpreter.Debugger.Core
+@using HLSLInterpreter.Debugger.Services
 @using UnityShaderParser.HLSL
 @inherits StateAwareComponent
 @inject IJSRuntime JS
+@inject RunController RunCtl
 
 <div class="debug-section debug-section-immediate @(collapsed ? "section-collapsed" : "")">
     <div class="panel-header collapsible-header" @onclick="() => collapsed = !collapsed">
@@ -49,8 +51,7 @@
 @code {
     [Parameter] public DebuggerSession? Session { get; set; }
     [Parameter] public string DebugCode { get; set; } = "";
-    [Parameter] public Action<HLSLRunner>? ConfigureGlobals { get; set; }
-    [Parameter] public Func<HLSLParserConfig>? ParserConfigFactory { get; set; }
+    [Parameter] public HLSLParserConfig ParserConfig { get; set; } = new();
 
     private bool collapsed;
     private string immediateInput = "";
@@ -77,7 +78,6 @@
 
         int wx = Math.Max(1, State.WarpX);
         int wy = Math.Max(1, State.WarpY);
-        int threadCount = wx * wy;
 
         string resultStr;
         bool isError = false;
@@ -85,8 +85,9 @@
 
         try
         {
+            var invocation = await RunCtl.BuildShaderInvocationAsync();
             var evalRunner = new HLSLRunner(wx, wy);
-            ConfigureGlobals?.Invoke(evalRunner);
+            invocation.SetUniforms(evalRunner);
 
             Exception? evalError = null;
             int stepCount = 0;
@@ -108,14 +109,12 @@
             Console.SetOut(sw);
             try
             {
-                var parserConfig = ParserConfigFactory?.Invoke() ?? new HLSLParserConfig();
                 bool cancelledInProcessCode = false;
-                try { evalRunner.ProcessCode(DebugCode, parserConfig); }
+                try { evalRunner.ProcessCode(DebugCode, ParserConfig); }
                 catch (OperationCanceledException) { cancelledInProcessCode = true; }
                 if (!cancelledInProcessCode)
                 {
-                    var threadArg = DebuggerSession.BuildThreadArg(wx, wy, threadCount, State.GroupOffsetX, State.GroupOffsetY);
-                    try { DebuggerSession.CallEntryPoint(evalRunner, threadArg, State.EntryPoint); }
+                    try { invocation.Execute(evalRunner); }
                     catch (OperationCanceledException) { }
                 }
             }

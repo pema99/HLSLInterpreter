@@ -3,6 +3,29 @@ window._monacoEditor = null;
 
 window.setDebuggerRef = function (ref) { window._dotNetDebugRef = ref; };
 
+window.dbgFetchText = async function (url) {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('fetch ' + url + ' -> ' + r.status);
+    return await r.text();
+};
+
+window.dbgPickObj = function () {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.obj';
+    input.addEventListener('change', () => {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = ev => {
+            if (window._dotNetDebugRef)
+                window._dotNetDebugRef.invokeMethodAsync('LoadObjMesh', ev.target.result);
+        };
+        reader.readAsText(file);
+    });
+    input.click();
+};
+
 window.initMonaco = function (containerId, initialCode, editorRef) {
     if (editorRef) window._dotNetEditorRef = editorRef;
     require.config({
@@ -357,7 +380,25 @@ window.initMonaco = function (containerId, initialCode, editorRef) {
                     var info = await window._dotNetEditorRef.invokeMethodAsync('GetHoverInfo', word.word);
                     if (info == null) return null;
                     var contents = [{ value: '```\n' + word.word + ' = ' + info.value + '\n```' }];
-                    if (info.rgba && info.width > 0 && info.height > 0) {
+                    if (info.perThreadValues) {
+                        var rgba = info.rgba;
+                        var lines = info.perThreadValues.map(function (v, i) {
+                            var swatch = '   ';
+                            if (rgba && rgba.length >= (i + 1) * 4) {
+                                var r = rgba[i*4], g = rgba[i*4+1], b = rgba[i*4+2];
+                                var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">'
+                                    + '<rect width="10" height="10" fill="rgb(' + r + ',' + g + ',' + b + ')" stroke="#555"/></svg>';
+                                var url = 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+                                swatch = '<img src="' + url + '" width="10" height="10" />';
+                            }
+                            return swatch + ' [' + i + '] ' + v;
+                        }).join('<br/>');
+                        contents.push({
+                            value: lines,
+                            supportHtml: true,
+                            isTrusted: true,
+                        });
+                    } else if (info.rgba && info.width > 0 && info.height > 0) {
                         var dst = document.createElement('canvas');
                         paintScaledRgbaToCanvas(dst, info.rgba, info.width, info.height, info.inspectedX, info.inspectedY);
                         contents.push({

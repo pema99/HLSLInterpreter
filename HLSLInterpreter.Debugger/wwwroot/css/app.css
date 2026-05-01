@@ -14,7 +14,7 @@
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
     padding: 0 9px;
-    height: 48px;
+    min-height: 48px;
     background: #252526;
     border-bottom: 1px solid #3c3c3c;
     flex-shrink: 0;
@@ -24,6 +24,7 @@
 .topbar-left {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 9px;
 }
 
@@ -31,13 +32,30 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-wrap: wrap;
 }
 
 .topbar-right {
     display: flex;
     align-items: center;
     justify-content: flex-end;
+    flex-wrap: wrap;
     gap: 9px;
+}
+
+@media (max-width: 600px) {
+    .topbar {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        padding: 6px 9px;
+        gap: 6px;
+    }
+    .topbar-left,
+    .topbar-center,
+    .topbar-right {
+        justify-content: flex-start;
+    }
 }
 
 .logo {
@@ -175,7 +193,7 @@
 .output-panel {
     display: flex;
     flex-direction: column;
-    width: 38vw;
+    width: 42vw;
     min-width: 160px;
     min-height: 0;
     flex-shrink: 0;
@@ -420,6 +438,7 @@
    we hide the system cursor on the canvas only. The letterboxed padding keeps
    the default cursor since it sits on the container. */
 .image-container .image-canvas { cursor: none; }
+.image-container.pick-vertex .image-canvas { cursor: default; }
 .exec-state-body .image-container .image-canvas { cursor: default; }
 .image-container.panning,
 .image-container.panning .image-canvas { cursor: grabbing; }
@@ -672,6 +691,40 @@
     color: #cccccc;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+}
+
+.segmented-toggle {
+    display: inline-flex;
+    align-items: stretch;
+    height: 16px;
+    padding: 1px;
+    background: #3c3c3c;
+    border: 1px solid #555;
+    border-radius: 9999px;
+    box-sizing: border-box;
+}
+.segmented-toggle-option {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: #cccccc;
+    font: inherit;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 0 8px;
+    border-radius: 9999px;
+    cursor: pointer;
+    transition: background 0.12s ease, color 0.12s ease;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.segmented-toggle-option:hover:not(.active) { color: #ffffff; }
+.segmented-toggle-option.active {
+    background: #d4d4d4;
+    color: #1c1c1c;
 }
 
 .btn-time-ctrl {
@@ -1125,9 +1178,7 @@
 }
 
 .debug-section-image {
-    /* 0.65 of the output-panel's default 38vw. Pegged to the viewport so the
-       height is stable when the panel resizes. */
-    height: var(--section-h, 24.7vw);
+    height: var(--section-h, 480px);
     min-height: 0;
     flex-shrink: 0;
 }

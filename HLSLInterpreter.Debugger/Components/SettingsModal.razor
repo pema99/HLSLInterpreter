@@ -1,4 +1,6 @@
 @inherits StateAwareComponent
+@using HLSLInterpreter.Debugger.Services
+@inject IJSRuntime JS
 
 @if (IsOpen)
 {
@@ -7,11 +9,36 @@
             <div class="modal-header">Settings</div>
             <div class="modal-body">
                 <div class="settings-row">
-                    <label class="settings-label">Entry point</label>
+                    <label class="settings-label">Render mode</label>
+                    <select class="settings-text-input"
+                            value="@State.ShaderRenderMode"
+                            @onchange="@(e => SetShaderRenderMode(e.Value?.ToString()))"
+                            disabled="@IsLocked" title="Frag only: Fullscreen quad fragment shader. Vert/Frag: Custom vertex and fragment shader.">
+                        <option value="@ShaderRenderMode.Pixel">Frag only</option>
+                        <option value="@ShaderRenderMode.VertFrag">Vert/Frag</option>
+                    </select>
+                </div>
+                @if (State.ShaderRenderMode == ShaderRenderMode.VertFrag)
+                {
+                    <div class="settings-row">
+                        <label class="settings-label">Mesh</label>
+                        <button class="settings-text-input" @onclick="PickMesh" disabled="@IsLocked"
+                                title="Pick a .obj file to use as the mesh">Pick .obj file...</button>
+                    </div>
+                    <div class="settings-row">
+                        <label class="settings-label">Vertex entry</label>
+                        <input class="settings-text-input" type="text"
+                               value="@State.VertexEntryPoint"
+                               @oninput="@(e => State.VertexEntryPoint = e.Value?.ToString() ?? "")"
+                               disabled="@IsLocked" title="Vertex shader function name" />
+                    </div>
+                }
+                <div class="settings-row">
+                    <label class="settings-label">@(State.ShaderRenderMode == ShaderRenderMode.VertFrag ? "Frag entry" : "Entry point")</label>
                     <input class="settings-text-input" type="text"
-                           value="@State.EntryPoint"
-                           @oninput="@(e => State.EntryPoint = e.Value?.ToString() ?? "")"
-                           disabled="@IsLocked" title="Function name to call" />
+                           value="@State.FragmentEntryPoint"
+                           @oninput="@(e => State.FragmentEntryPoint = e.Value?.ToString() ?? "")"
+                           disabled="@IsLocked" title="Fragment shader function name" />
                 </div>
                 <div class="settings-row">
                     <label class="settings-label">Group offset</label>
@@ -60,4 +87,11 @@
     {
         if (int.TryParse(e.Value?.ToString(), out var v)) setter(v);
     }
+
+    private void SetShaderRenderMode(string? value)
+    {
+        if (Enum.TryParse<ShaderRenderMode>(value, out var mode)) State.ShaderRenderMode = mode;
+    }
+
+    private Task PickMesh() => JS.InvokeVoidAsync("dbgPickObj").AsTask();
 }

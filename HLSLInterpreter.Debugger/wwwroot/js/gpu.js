@@ -23,23 +23,57 @@ function findTargetValue(slang, name) {
     throw new Error(`Slang: compile target '${name}' not found in getCompileTargets()`);
 }
 
-const PREAMBLE = `
-cbuffer DebuggerGlobals : register(b0) {
-    float2 _WarpSize;
-    float2 _Resolution;
-    float _Time;
-};
+// Vertex buffer layout for vert+frag mode: pos3 + normal3 + uv2 = 32 bytes.
+const MESH_VERTEX_STRIDE = 32;
 
-struct DbgVSOut { float4 pos : SV_Position; };
-
-[shader("vertex")]
-DbgVSOut dbgVertex(uint vid : SV_VertexID) {
-    float2 p = float2(float((vid << 1u) & 2u), float(vid & 2u));
-    DbgVSOut o;
-    o.pos = float4(p * 2.0 - 1.0, 0.0, 1.0);
-    return o;
+function matIdentity() {
+    return [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
 }
-`;
+function matMul(A, B) {
+    const C = new Array(16);
+    for (let r = 0; r < 4; r++) {
+        for (let c = 0; c < 4; c++) {
+            let s = 0;
+            for (let k = 0; k < 4; k++) s += A[r*4+k] * B[k*4+c];
+            C[r*4+c] = s;
+        }
+    }
+    return C;
+}
+// Right-handed perspective with depth [0,1], Camera looks down -Z.
+function matPerspective(fovY, aspect, near, far) {
+    const f = 1 / Math.tan(fovY / 2);
+    const a = far / (near - far);
+    const b = (near * far) / (near - far);
+    return [
+        f / aspect, 0, 0, 0,
+        0,          f, 0, 0,
+        0,          0, a, b,
+        0,          0,-1, 0,
+    ];
+}
+function matLookAt(ex, ey, ez, tx, ty, tz, ux, uy, uz) {
+    let fx = tx - ex, fy = ty - ey, fz = tz - ez;
+    let fl = Math.hypot(fx, fy, fz) || 1;
+    fx /= fl; fy /= fl; fz /= fl;
+    let rx = fy * uz - fz * uy;
+    let ry = fz * ux - fx * uz;
+    let rz = fx * uy - fy * ux;
+    let rl = Math.hypot(rx, ry, rz) || 1;
+    rx /= rl; ry /= rl; rz /= rl;
+    const u2x = ry * fz - rz * fy;
+    const u2y = rz * fx - rx * fz;
+    const u2z = rx * fy - ry * fx;
+    return [
+         rx,  ry,  rz, -(rx*ex + ry*ey + rz*ez),
+        u2x, u2y, u2z, -(u2x*ex+ u2y*ey+ u2z*ez),
+        -fx, -fy, -fz,  (fx*ex + fy*ey + fz*ez),
+         0,   0,   0,   1,
+    ];
+}
+function writeMat4(out, offset, m) {
+    for (let i = 0; i < 16; i++) out[offset + i] = m[i];
+}
 
 let slangPromise = null;
 let webgpuPromise = null;
@@ -96,8 +130,115 @@ function extractEntryPoints(wgsl) {
     return { vsEntry: vs ? vs[1] : null, fsEntry: fs ? fs[1] : null };
 }
 
-// globalSession is heavy, so we cache it. The per-target session caches modules
-// by name internally, so we recreate it per compile to avoid unbounded growth.
+// Camera state
+const CAMERA_FOV_Y = 60 * Math.PI / 180;
+let cameraYaw = 0.6;
+let cameraPitch = 0.3;
+let cameraDistance = 2.5;
+
+let mouseX = 0;
+let mouseY = 0;
+let mouseLeft = 0;
+let mouseRight = 0;
+let mouseRightHeld = false;
+
+function redrawIfPaused() {
+    if (!active || active.running) return;
+    const fakeNow = active.startTimeMs + (active.lastTime || 0) * 1000;
+    drawFrame(active, fakeNow);
+}
+
+function mouseEventInsideCanvas(e) {
+    if (!active) return null;
+    const rect = active.canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    if (e.clientX < rect.left || e.clientX > rect.right) return null;
+    if (e.clientY < rect.top || e.clientY > rect.bottom) return null;
+    return rect;
+}
+
+function updateMousePosFromEvent(e, rect) {
+    mouseX = (e.clientX - rect.left) * (active.canvas.width / rect.width);
+    mouseY = active.canvas.height - (e.clientY - rect.top) * (active.canvas.height / rect.height);
+}
+
+window.addEventListener('mousemove', e => {
+    if (!mouseRightHeld) return;
+    const rect = mouseEventInsideCanvas(e);
+    if (!rect) return;
+    updateMousePosFromEvent(e, rect);
+    redrawIfPaused();
+});
+window.addEventListener('mousedown', e => {
+    if (e.button === 2) mouseRightHeld = true;
+    if (!mouseRightHeld) return;
+    const rect = mouseEventInsideCanvas(e);
+    if (!rect) return;
+    updateMousePosFromEvent(e, rect);
+    if (e.button === 0) mouseLeft = 1;
+    if (e.button === 2) mouseRight = 1;
+    redrawIfPaused();
+});
+window.addEventListener('mouseup', e => {
+    if (mouseRightHeld) {
+        const rect = mouseEventInsideCanvas(e);
+        if (rect) {
+            updateMousePosFromEvent(e, rect);
+            if (e.button === 0) mouseLeft = 0;
+            if (e.button === 2) mouseRight = 0;
+            redrawIfPaused();
+        }
+    }
+    if (e.button === 2) mouseRightHeld = false;
+});
+
+window.gpuMouse = function () {
+    return [mouseX, mouseY, mouseLeft, mouseRight];
+};
+
+window.gpuViewProjection = function (canvasW, canvasH) {
+    const aspect = Math.max(1e-4, canvasW / Math.max(1, canvasH));
+    const cp = Math.cos(cameraPitch), sp = Math.sin(cameraPitch);
+    const cy = Math.cos(cameraYaw),   sy = Math.sin(cameraYaw);
+    const ex = sy * cp * cameraDistance;
+    const ey = sp * cameraDistance;
+    const ez = cy * cp * cameraDistance;
+    const proj = matPerspective(CAMERA_FOV_Y, aspect, 0.1, 100);
+    const view = matLookAt(ex, ey, ez, 0, 0, 0, 0, 1, 0);
+    return matMul(proj, view);
+};
+
+window.gpuPickRay = function (imgX, imgY, imgW, imgH) {
+    const cp = Math.cos(cameraPitch), sp = Math.sin(cameraPitch);
+    const cy = Math.cos(cameraYaw),   sy = Math.sin(cameraYaw);
+    const ox = sy * cp * cameraDistance;
+    const oy = sp * cameraDistance;
+    const oz = cy * cp * cameraDistance;
+    // forward = normalize(target - origin), target is origin (0,0,0)
+    let fx = -ox, fy = -oy, fz = -oz;
+    let fl = Math.hypot(fx, fy, fz) || 1;
+    fx /= fl; fy /= fl; fz /= fl;
+    // right = normalize(forward x worldUp), worldUp = (0,1,0)
+    let rx = -fz, ry = 0, rz = fx;
+    let rl = Math.hypot(rx, ry, rz) || 1;
+    rx /= rl; ry /= rl; rz /= rl;
+    // up = right x forward
+    const ux = ry * fz - rz * fy;
+    const uy = rz * fx - rx * fz;
+    const uz = rx * fy - ry * fx;
+    const halfH = Math.tan(CAMERA_FOV_Y / 2);
+    const halfW = halfH * Math.max(1e-4, imgW / Math.max(1, imgH));
+    const ndcX = (imgX / imgW) * 2 - 1;
+    const ndcY = 1 - (imgY / imgH) * 2;
+    let dx = fx + ndcX * halfW * rx + ndcY * halfH * ux;
+    let dy = fy + ndcX * halfW * ry + ndcY * halfH * uy;
+    let dz = fz + ndcX * halfW * rz + ndcY * halfH * uz;
+    const dl = Math.hypot(dx, dy, dz) || 1;
+    dx /= dl; dy /= dl; dz /= dl;
+    return [ox, oy, oz, dx, dy, dz];
+};
+
+// globalSession is heavy, so we cache it
 let slangGlobalPromise = null;
 async function getSlangGlobal() {
     if (!slangGlobalPromise) {
@@ -112,14 +253,14 @@ async function getSlangGlobal() {
     return slangGlobalPromise;
 }
 
-async function compileToWgsl(hlslSource, fragEntryName) {
+async function compileToWgsl(hlslSource, vertEntryName, fragEntryName) {
     const [{ slang, globalSession, wgslTarget }, testPreamble] =
         await Promise.all([getSlangGlobal(), getTestPreamble()]);
 
     const session = globalSession.createSession(wgslTarget);
     if (!session) throw new Error('Slang: createSession(WGSL) failed: ' + (slang.getLastError()?.message || ''));
 
-    const fullSource = testPreamble + '\n' + PREAMBLE + '\n' + hlslSource;
+    const fullSource = testPreamble + '\n' + hlslSource;
     let userModule = null, vs = null, fs = null, composite = null, linked = null;
     try {
         userModule = session.loadModuleFromSource(fullSource, 'user', 'user.slang');
@@ -127,8 +268,8 @@ async function compileToWgsl(hlslSource, fragEntryName) {
             const e = slang.getLastError();
             throw new Error('Slang compile error:\n' + (e?.message || 'unknown'));
         }
-        vs = userModule.findAndCheckEntryPoint('dbgVertex', SLANG_STAGE_VERTEX);
-        if (!vs) throw new Error("Slang: vertex entry 'dbgVertex' not found: " + (slang.getLastError()?.message || ''));
+        vs = userModule.findAndCheckEntryPoint(vertEntryName, SLANG_STAGE_VERTEX);
+        if (!vs) throw new Error(`Slang: vertex entry '${vertEntryName}' not found: ` + (slang.getLastError()?.message || ''));
         fs = userModule.findAndCheckEntryPoint(fragEntryName, SLANG_STAGE_FRAGMENT);
         if (!fs) throw new Error(`Slang: fragment entry '${fragEntryName}' not found: ` + (slang.getLastError()?.message || ''));
         composite = session.createCompositeComponentType([userModule, vs, fs]);
@@ -155,11 +296,13 @@ function attachResizeObserver(canvas) {
     const ro = new ResizeObserver(() => {
         // Skip when stopped, otherwise stale GPU dimensions would clobber the
         // CPU canvas's image size and stretch its displayed pixels on resize.
-        if (!active || !active.running || active.canvas !== canvas) return;
+        if (!active || active.canvas !== canvas) return;
+        if (!active.running && !active.paused) return;
         fitCanvas(canvas);
         if (typeof window.dbgSetViewportImageSize === 'function') {
             window.dbgSetViewportImageSize('image-container', canvas.width, canvas.height);
         }
+        if (active.paused) redrawIfPaused();
     });
     ro.observe(canvas.parentElement || canvas);
 }
@@ -167,6 +310,17 @@ function attachResizeObserver(canvas) {
 function scheduleFrame() {
     if (!active || !active.running) return;
     active.animFrameId = requestAnimationFrame(renderFrame);
+}
+
+function ensureDepthTexture(r) {
+    const w = r.canvas.width, h = r.canvas.height;
+    if (r.depthTexture && r.depthTexture.width === w && r.depthTexture.height === h) return;
+    if (r.depthTexture) r.depthTexture.destroy?.();
+    r.depthTexture = r.device.createTexture({
+        size: [w, h],
+        format: 'depth24plus',
+        usage: GPUTextureUsage.RENDER_ATTACHMENT,
+    });
 }
 
 function drawFrame(r, now) {
@@ -180,31 +334,57 @@ function drawFrame(r, now) {
     const t = (now - r.startTimeMs) / 1000;
     r.lastTime = t;
 
-    // Layout matches the cbuffer, padded to 32 bytes for WebGPU.
-    const u = new Float32Array(8);
+    const u = new Float32Array(28);
     u[0] = r.warpX;
     u[1] = r.warpY;
     u[2] = r.canvas.width;
     u[3] = r.canvas.height;
     u[4] = t;
+
+    const viewProj = r.renderMode === 'vertfrag'
+        ? window.gpuViewProjection(r.canvas.width, r.canvas.height)
+        : matIdentity();
+    writeMat4(u, 8, viewProj);
+    u[24] = mouseX;
+    u[25] = mouseY;
+    u[26] = mouseLeft;
+    u[27] = mouseRight;
     r.device.queue.writeBuffer(r.uniformBuffer, 0, u);
 
     let view;
     try { view = r.context.getCurrentTexture().createView(); }
     catch (e) { return false; }
 
+    const colorAttachment = {
+        view,
+        clearValue: { r: 0, g: 0, b: 0, a: 1 },
+        loadOp: 'clear',
+        storeOp: 'store',
+    };
     const enc = r.device.createCommandEncoder();
+    let depthAttachment = undefined;
+    if (r.renderMode === 'vertfrag') {
+        ensureDepthTexture(r);
+        depthAttachment = {
+            view: r.depthTexture.createView(),
+            depthClearValue: 1.0,
+            depthLoadOp: 'clear',
+            depthStoreOp: 'store',
+        };
+    }
     const pass = enc.beginRenderPass({
-        colorAttachments: [{
-            view,
-            clearValue: { r: 0, g: 0, b: 0, a: 1 },
-            loadOp: 'clear',
-            storeOp: 'store',
-        }],
+        colorAttachments: [colorAttachment],
+        depthStencilAttachment: depthAttachment,
     });
     pass.setPipeline(r.pipeline);
     pass.setBindGroup(0, r.bindGroup);
-    pass.draw(3);
+    if (r.renderMode === 'vertfrag') {
+        pass.setVertexBuffer(0, r.meshVB);
+        pass.setIndexBuffer(r.meshIB, 'uint32');
+        pass.drawIndexed(r.meshIndexCount);
+    } else {
+        pass.draw(3);
+    }
     pass.end();
     r.device.queue.submit([enc.finish()]);
     return true;
@@ -227,6 +407,7 @@ window.gpuIsAvailable = function () {
 window.gpuStop = function () {
     if (!active) return;
     active.running = false;
+    active.paused = false;
     if (active.animFrameId) cancelAnimationFrame(active.animFrameId);
     active.animFrameId = null;
 };
@@ -234,6 +415,7 @@ window.gpuStop = function () {
 window.gpuPause = function () {
     if (!active || !active.running) return;
     active.running = false;
+    active.paused = true;
     if (active.animFrameId) cancelAnimationFrame(active.animFrameId);
     active.animFrameId = null;
 };
@@ -243,6 +425,7 @@ window.gpuResume = function () {
     // Rebase startTimeMs so _Time picks up where it left off.
     active.startTimeMs = performance.now() - (active.lastTime || 0) * 1000;
     active.running = true;
+    active.paused = false;
     scheduleFrame();
 };
 
@@ -252,25 +435,137 @@ window.gpuRestart = function () {
     active.lastTime = 0;
     // If paused, draw one frame at t=0 so the user sees the reset without
     // changing the pause state.
-    if (!active.running) drawFrame(active, performance.now());
+    if (!active.running) drawFrame(active, active.startTimeMs);
 };
 
-// Live canvas size + elapsed time, so a Debug-button entry can reproduce the
-// _Resolution and _Time the GPU saw.
+// Live canvas size, time, and camera state so a Debug-button entry can
+// reproduce the _Resolution, _Time, and view-projection matrix the GPU saw.
 window.gpuSnapshot = function () {
     if (!active) return null;
-    return [active.lastTime || 0, active.canvas.width, active.canvas.height];
+    return [
+        active.lastTime || 0,
+        active.canvas.width,
+        active.canvas.height,
+    ];
 };
 
-window.gpuRender = async function (canvasId, hlslSource, entryPoint, warpX, warpY, dotNetRef) {
+function createMeshBuffers(device, meshVertices, meshIndices) {
+    const verts = meshVertices instanceof Float32Array
+        ? meshVertices : new Float32Array(meshVertices);
+    const idx = meshIndices instanceof Uint32Array
+        ? meshIndices : new Uint32Array(meshIndices);
+    const ibSize = (idx.byteLength + 3) & ~3;
+    const vb = device.createBuffer({
+        size: verts.byteLength,
+        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    });
+    device.queue.writeBuffer(vb, 0, verts);
+    const ib = device.createBuffer({
+        size: ibSize,
+        usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
+    });
+    device.queue.writeBuffer(ib, 0, idx);
+    return { vb, ib, indexCount: idx.length };
+}
+
+function attachCameraInput() {
+    const container = document.getElementById('image-container');
+    if (!container || container.__dbgCameraInput) return;
+    container.__dbgCameraInput = true;
+
+    let dragging = false;
+    let lastX = 0, lastY = 0;
+
+    const isVertFrag = () => active && active.renderMode === 'vertfrag';
+
+    // Right click to rotate
+    container.addEventListener('mousedown', (e) => {
+        if (!isVertFrag() || e.button !== 2) return;
+        e.preventDefault();
+        e.stopPropagation();
+        dragging = true;
+        lastX = e.clientX;
+        lastY = e.clientY;
+    }, true);
+    window.addEventListener('mousemove', (e) => {
+        if (!dragging || !isVertFrag()) return;
+        const dx = e.clientX - lastX;
+        const dy = e.clientY - lastY;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        cameraYaw -= dx * 0.01;
+        cameraPitch = Math.max(-1.4, Math.min(1.4, cameraPitch + dy * 0.01));
+        redrawIfPaused();
+        window.dbgRefreshViewportOverlay?.('image-container');
+    });
+
+    // Stop rotate
+    window.addEventListener('mouseup', (e) => {
+        if (e.button === 2) dragging = false;
+    });
+    // Prevent right click menu
+    container.addEventListener('contextmenu', (e) => {
+        if (isVertFrag()) e.preventDefault();
+    });
+
+    // Scroll + right click to zoom camera
+    container.addEventListener('wheel', (e) => {
+        if (!dragging || !isVertFrag()) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const k = Math.exp(e.deltaY * 0.0015);
+        cameraDistance = Math.max(0.5, Math.min(100, cameraDistance * k));
+        redrawIfPaused();
+        window.dbgRefreshViewportOverlay?.('image-container');
+    }, { capture: true, passive: false });
+}
+
+// Map (semanticBase, semanticIndex) → byte offset within the interleaved
+// vertex (matches Mesh.GetInterleavedVertices: pos3 + normal3 + uv2).
+const MESH_OFFSET_BY_SEMANTIC = {
+    'POSITION_0': 0,
+    'NORMAL_0':   12,
+    'TEXCOORD_0': 24,
+};
+
+const VERTEX_FORMAT_BY_DIM = ['float32', 'float32x2', 'float32x3', 'float32x4'];
+
+function buildMeshAttributes(vertexInputs) {
+    if (!Array.isArray(vertexInputs)) return [];
+    return vertexInputs.map((input, i) => {
+        const key = `${input.semanticBase}_${input.semanticIndex}`;
+        const offset = MESH_OFFSET_BY_SEMANTIC[key];
+        if (offset === undefined) {
+            throw new Error(
+                `Vertex input '${key}' is not provided by the mesh. ` +
+                `Available: POSITION, NORMAL, TEXCOORD0.`);
+        }
+        const format = VERTEX_FORMAT_BY_DIM[input.dimensions - 1];
+        if (!format) {
+            throw new Error(`Vertex input '${key}' has unsupported dimension ${input.dimensions}.`);
+        }
+        return { shaderLocation: i, offset, format };
+    });
+}
+
+window.gpuRender = async function (canvasId, hlslSource, entryPoint, warpX, warpY, dotNetRef, renderMode, vertexEntryName, vertexInputs, meshVertices, meshIndices, initialTime) {
     if (!('gpu' in navigator)) throw new Error('WebGPU is not supported in this browser.');
 
     const canvas = document.getElementById(canvasId);
     if (!canvas) throw new Error('Canvas not found: ' + canvasId);
 
-    window.gpuStop();
+    const mode = renderMode === 'vertfrag' ? 'vertfrag' : 'pixel';
+    const vsName = vertexEntryName || (mode === 'vertfrag' ? 'vert' : '_dbgVertex');
 
-    const wgsl = await compileToWgsl(hlslSource, entryPoint);
+    window.gpuStop();
+    if (active && active.canvas === canvas) {
+        try { active.uniformBuffer?.destroy?.(); } catch (_) {}
+        try { active.depthTexture?.destroy?.(); } catch (_) {}
+        try { active.meshVB?.destroy?.(); } catch (_) {}
+        try { active.meshIB?.destroy?.(); } catch (_) {}
+    }
+
+    const wgsl = await compileToWgsl(hlslSource, vsName, entryPoint);
     const { vsEntry, fsEntry } = extractEntryPoints(wgsl);
     if (!vsEntry || !fsEntry) {
         throw new Error('Could not locate @vertex/@fragment entry points in compiled WGSL.');
@@ -307,29 +602,67 @@ window.gpuRender = async function (canvasId, hlslSource, entryPoint, warpX, warp
     }
 
     const uniformBuffer = device.createBuffer({
-        size: 32,
+        size: 112,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
-    const pipeline = device.createRenderPipeline({
-        layout: 'auto',
-        vertex: { module: shaderModule, entryPoint: vsEntry },
-        fragment: { module: shaderModule, entryPoint: fsEntry, targets: [{ format }] },
-        primitive: { topology: 'triangle-list' },
+    const bindGroupLayout = device.createBindGroupLayout({
+        entries: [{
+            binding: 0,
+            visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+            buffer: { type: 'uniform' },
+        }],
     });
+    const pipelineLayout = device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] });
+
+    let pipeline, meshVB = null, meshIB = null, meshIndexCount = 0;
+    if (mode === 'vertfrag') {
+        if (!meshVertices || !meshIndices)
+            throw new Error('vert+frag mode requires mesh vertex/index data.');
+        const buffers = createMeshBuffers(device, meshVertices, meshIndices);
+        meshVB = buffers.vb;
+        meshIB = buffers.ib;
+        meshIndexCount = buffers.indexCount;
+        const meshAttributes = buildMeshAttributes(vertexInputs);
+        pipeline = device.createRenderPipeline({
+            layout: pipelineLayout,
+            vertex: {
+                module: shaderModule,
+                entryPoint: vsEntry,
+                buffers: meshAttributes.length === 0 ? [] : [{
+                    arrayStride: MESH_VERTEX_STRIDE,
+                    attributes: meshAttributes,
+                }],
+            },
+            fragment: { module: shaderModule, entryPoint: fsEntry, targets: [{ format }] },
+            primitive: { topology: 'triangle-list', cullMode: 'back' },
+            depthStencil: { format: 'depth24plus', depthWriteEnabled: true, depthCompare: 'less-equal' },
+        });
+    } else {
+        pipeline = device.createRenderPipeline({
+            layout: pipelineLayout,
+            vertex: { module: shaderModule, entryPoint: vsEntry },
+            fragment: { module: shaderModule, entryPoint: fsEntry, targets: [{ format }] },
+            primitive: { topology: 'triangle-list' },
+        });
+    }
 
     const bindGroup = device.createBindGroup({
-        layout: pipeline.getBindGroupLayout(0),
+        layout: bindGroupLayout,
         entries: [{ binding: 0, resource: { buffer: uniformBuffer } }],
     });
 
     active = {
         canvas, context, device, pipeline, bindGroup, uniformBuffer,
         warpX, warpY, dotNetRef,
-        startTimeMs: performance.now(),
-        lastTime: 0,
+        renderMode: mode,
+        meshVB, meshIB, meshIndexCount,
+        depthTexture: null,
+        startTimeMs: performance.now() - (initialTime || 0) * 1000,
+        lastTime: initialTime || 0,
         running: true,
         animFrameId: null,
     };
+    attachCameraInput();
     scheduleFrame();
 };

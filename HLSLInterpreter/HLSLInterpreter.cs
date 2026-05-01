@@ -28,7 +28,10 @@ namespace HLSL
             foreach (var kvp in oldCallbacks)
                 expressionEvaluator.AddCallback(kvp.Key, kvp.Value);
         }
-
+        public void EnableThread(int threadIndex) => executionState.EnableThread(threadIndex);
+        public void DisableThread(int threadIndex) => executionState.DisableThread(threadIndex);
+        public bool IsThreadActive(int threadIndex) => executionState.IsThreadActive(threadIndex);
+        public int GetThreadIndex(int threadX, int threadY) => executionState.GetThreadIndex(threadX, threadY);
         public void SetVariable(string name, HLSLValue value) => context.SetVariable(name, value);
         public HLSLValue GetVariable(string name) => context.GetVariable(name);
 
@@ -47,8 +50,10 @@ namespace HLSL
 
         public HLSLValue CallFunction(string name, params HLSLValue[] args) => expressionEvaluator.CallFunction(name, args);
         public FunctionDefinitionNode GetFunction(string name, HLSLValue[] args) => context.GetFunction(expressionEvaluator, name, args);
-
+        public FunctionDefinitionNode GetFunction(string name) => context.GetFunction(name);
         public (string QualifiedName, FunctionDefinitionNode Func)[] GetFunctions() => context.GetFunctions();
+        public StructTypeNode GetStructType(string name) => context.GetStructType(name);
+        public TypeNode ResolveType(TypeNode type) => context.ResolveType(type);
 
         public HLSLValue EvaluateExpression(ExpressionNode node) => expressionEvaluator.Visit(node);
 

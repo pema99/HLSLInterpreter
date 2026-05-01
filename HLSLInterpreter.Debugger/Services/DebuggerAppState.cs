@@ -4,15 +4,39 @@ using HLSLInterpreter.Debugger.Core;
 
 namespace HLSLInterpreter.Debugger.Services;
 
+public enum ShaderRenderMode { Pixel, VertFrag }
+public enum DebugTarget { Pixel, Vertex }
+
 public sealed class DebuggerAppState : INotifyPropertyChanged
 {
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    private string _entryPoint = "main";
-    public string EntryPoint
+    private Mesh _currentMesh = Mesh.CreateCube();
+    public Mesh CurrentMesh
     {
-        get => _entryPoint;
-        set => Set(ref _entryPoint, value);
+        get => _currentMesh;
+        set => Set(ref _currentMesh, value);
+    }
+
+    private string _fragmentEntryPoint = "frag";
+    public string FragmentEntryPoint
+    {
+        get => _fragmentEntryPoint;
+        set => Set(ref _fragmentEntryPoint, value);
+    }
+
+    private string _vertexEntryPoint = "vert";
+    public string VertexEntryPoint
+    {
+        get => _vertexEntryPoint;
+        set => Set(ref _vertexEntryPoint, value);
+    }
+
+    private ShaderRenderMode _renderMode = ShaderRenderMode.Pixel;
+    public ShaderRenderMode ShaderRenderMode
+    {
+        get => _renderMode;
+        set => Set(ref _renderMode, value);
     }
 
     private int _warpX = 16;
@@ -49,6 +73,20 @@ public sealed class DebuggerAppState : INotifyPropertyChanged
         set => Set(ref _groupOffsetY, value);
     }
 
+    private DebugTarget _debugTarget = DebugTarget.Pixel;
+    public DebugTarget DebugTarget
+    {
+        get => _debugTarget;
+        set => Set(ref _debugTarget, value);
+    }
+
+    private int _debugVertexIndex = -1;
+    public int DebugVertexIndex
+    {
+        get => _debugVertexIndex;
+        set => Set(ref _debugVertexIndex, value);
+    }
+
     private bool _gpuPreviewEnabled = false;
     public bool GpuPreviewEnabled
     {
@@ -71,17 +109,19 @@ public sealed class DebuggerAppState : INotifyPropertyChanged
     }
 
     public PermalinkSettings ToPermalinkSettings() =>
-        new(EntryPoint, WarpX, WarpY, GroupOffsetX, GroupOffsetY, GpuPreviewEnabled);
+        new(FragmentEntryPoint, WarpX, WarpY, GroupOffsetX, GroupOffsetY, GpuPreviewEnabled, ShaderRenderMode, VertexEntryPoint);
 
     public void ApplyFromUrl(string url)
     {
         var s = PermalinkCodec.ApplyToSettings(url, ToPermalinkSettings());
-        EntryPoint = s.EntryPoint;
+        FragmentEntryPoint = s.EntryPoint;
         WarpX = s.WarpX;
         WarpY = s.WarpY;
         GroupOffsetX = s.GroupOffsetX;
         GroupOffsetY = s.GroupOffsetY;
         GpuPreviewEnabled = s.GpuPreviewEnabled;
+        ShaderRenderMode = s.ShaderRenderMode;
+        VertexEntryPoint = s.VertexEntryPoint;
     }
 
     private bool Set<T>(ref T field, T value, [CallerMemberName] string? name = null)

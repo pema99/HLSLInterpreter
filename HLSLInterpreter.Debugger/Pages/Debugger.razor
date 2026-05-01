@@ -100,12 +100,12 @@
                 <CallStackPanel Step="@DebugCtl.CurrentSession?.Current"
                                 Mode="@debugBottomMode"
                                 ModeChanged="@OnDebugBottomModeChanged"
+                                OnlyThreadStates="@(State.DebugVertexIndex >= 0)"
                                 OnExpand="@(() => needsThreadGridInit = true)" />
 
                 <ImmediatePanel Session="@DebugCtl.CurrentSession"
                                 DebugCode="@DebugCtl.DebugCode"
-                                ConfigureGlobals="@RunCtl.SetSharedGlobals"
-                                ParserConfigFactory="@MakeParserConfig" />
+                                ParserConfig="@MakeParserConfig()" />
 
                 <ConsolePanel Variant="ConsolePanel.ConsoleVariant.Debug"
                               HasError="@RunCtl.HasError" ErrorMessage="@RunCtl.ErrorMessage"
@@ -152,7 +152,7 @@ float3 hueShift (float3 color, float shift)
         tangent * sin(shift * 6.2832) + axis;
 }
 
-float4 main(float4 position : SV_Position) : SV_Target
+float4 frag(float4 position : SV_Position) : SV_Target
 {
     float2 uv = (position.xy / _Resolution) - 0.5;
     uv.x *= _Resolution.x/_Resolution.y;
@@ -242,6 +242,16 @@ float4 main(float4 position : SV_Position) : SV_Target
         InvokeAsync(StateHasChanged);
     }
 
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            string objText = await JS.InvokeAsync<string>("dbgFetchText", "_content/HLSLInterpreter.Debugger/lib/monkey.obj");
+            State.CurrentMesh = Mesh.ParseObj(objText);
+        }
+        catch (Exception ex) { Console.WriteLine("[default-mesh] " + ex.Message); }
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
@@ -253,13 +263,17 @@ float4 main(float4 position : SV_Position) : SV_Target
             await JS.InvokeVoidAsync("restoreSectionHeights");
         }
 
+        // The warp indicator overlay needs the warp size even in GPU mode, where
+        // ImagePixels stays null. Push it unconditionally so the indicator works
+        // before any CPU run has happened.
+        await JS.InvokeVoidAsync("imgSetWarp", State.WarpX, State.WarpY);
+
         // imagestate.js applies this cache to image-containers as they mount,
         // so we don't have to race Blazor's render lifecycle.
         if (needsImageRender && RunCtl.ImagePixels != null)
         {
             needsImageRender = false;
             await JS.InvokeVoidAsync("restoreImageSectionHeight");
-            await JS.InvokeVoidAsync("imgSetWarp", State.WarpX, State.WarpY);
             await JS.InvokeVoidAsync("imgSetPixels", RunCtl.ImagePixels, RunCtl.ImageWidth, RunCtl.ImageHeight);
         }
 
@@ -295,6 +309,16 @@ float4 main(float4 position : SV_Position) : SV_Target
                 await JS.InvokeVoidAsync("imgSetCpuClickHandler", null, null);
         }
 
+        // Vertex picking only applies in vert/frag mode and outside the debug
+        // session itself. Push the mesh positions and current pick mode.
+        bool vertexPicking = !DebugCtl.IsDebugging
+            && State.ShaderRenderMode == ShaderRenderMode.VertFrag
+            && State.DebugTarget == DebugTarget.Vertex;
+        await JS.InvokeVoidAsync("imgSetPickMode", vertexPicking ? "vertex" : "pixel");
+        await JS.InvokeVoidAsync("imgSetMeshData",
+            vertexPicking ? State.CurrentMesh.Positions : null,
+            vertexPicking ? State.CurrentMesh.Indices : null);
+
         if (needsThreadGridInit)
         {
             needsThreadGridInit = false;
@@ -307,7 +331,7 @@ float4 main(float4 position : SV_Position) : SV_Target
         if (editorPanel == null) return;
         await RunCtl.RunAsync(
             getCode: () => editorPanel.GetCode().AsTask(),
-            makeParserConfig: MakeParserConfig,
+            parserConfig: MakeParserConfig(),
             dotNetRef: dotNetRef,
             beforeGpuRender: async () =>
             {
@@ -316,6 +340,24 @@ float4 main(float4 position : SV_Position) : SV_Target
                 await Task.Yield();
             });
         needsImageRender = RunCtl.HasImage;
+    }
+
+    [JSInvokable]
+    public async Task LoadObjMesh(string objText)
+    {
+        if (string.IsNullOrWhiteSpace(objText)) return;
+        try
+        {
+            State.CurrentMesh = Mesh.ParseObj(objText);
+        }
+        catch (Exception ex)
+        {
+            RunCtl.HasError = true;
+            RunCtl.ErrorMessage = "Failed to load OBJ: " + ex.Message;
+            StateHasChanged();
+            return;
+        }
+        await Run();
     }
 
     [JSInvokable]
@@ -340,14 +382,41 @@ float4 main(float4 position : SV_Position) : SV_Target
         await StartDebug();
     }
 
+    [JSInvokable]
+    public async Task StartDebugAtVertex(int vertexIndex, float time, int canvasW, int canvasH)
+    {
+        int warpSize = Math.Max(1, State.WarpX * State.WarpY);
+        State.InspectedThread = vertexIndex % warpSize;
+        State.DebugVertexIndex = vertexIndex;
+        RunCtl.GpuCaptured = (time, canvasW, canvasH);
+        if (debugBottomMode != CallStackPanel.DebugBottomMode.ThreadStates)
+        {
+            debugBottomMode = CallStackPanel.DebugBottomMode.ThreadStates;
+            needsThreadGridInit = true;
+        }
+
+        await StartDebug();
+    }
+
     private async Task StartDebug()
     {
         if (editorPanel == null) return;
+
+        if (State.ShaderRenderMode == ShaderRenderMode.VertFrag
+            && State.DebugTarget == DebugTarget.Vertex
+            && State.DebugVertexIndex < 0)
+        {
+            await StartDebugAtVertex(0, RunCtl.GpuCaptured?.Time ?? 0f,
+                RunCtl.GpuCaptured?.CanvasW ?? Math.Max(1, State.WarpX),
+                RunCtl.GpuCaptured?.CanvasH ?? Math.Max(1, State.WarpY));
+            return;
+        }
+
         await JS.InvokeVoidAsync("saveSectionHeights");
 
         bool entered = await DebugCtl.StartSessionAsync(
             getCode: () => editorPanel.GetCode().AsTask(),
-            makeParserConfig: MakeParserConfig);
+            parserConfig: MakeParserConfig());
         needsImageRender = RunCtl.HasImage;
 
         if (!entered)

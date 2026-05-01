@@ -1,3 +1,4 @@
+@using HLSLInterpreter.Debugger.Services
 @inherits StateAwareComponent
 
 <div class="debug-section debug-section-image @(IsCollapsed ? "section-collapsed" : "")">
@@ -7,6 +8,19 @@
             <span>Color Output</span>
         </div>
         <div class="panel-header-actions" @onclick:stopPropagation="true">
+            @if (State.ShaderRenderMode == ShaderRenderMode.VertFrag)
+            {
+                <div class="segmented-toggle" role="radiogroup" aria-label="Debug target">
+                    <button type="button" role="radio"
+                            aria-checked="@(State.DebugTarget == DebugTarget.Vertex)"
+                            class="segmented-toggle-option @(State.DebugTarget == DebugTarget.Vertex ? "active" : "")"
+                            @onclick="@(() => State.DebugTarget = DebugTarget.Vertex)">Vert</button>
+                    <button type="button" role="radio"
+                            aria-checked="@(State.DebugTarget == DebugTarget.Pixel)"
+                            class="segmented-toggle-option @(State.DebugTarget == DebugTarget.Pixel ? "active" : "")"
+                            @onclick="@(() => State.DebugTarget = DebugTarget.Pixel)">Frag</button>
+                </div>
+            }
             @if (IsGpuMode)
             {
                 <button class="btn-time-ctrl" title="@(GpuPaused ? "Play" : "Pause")" @onclick="OnToggleGpuPause">

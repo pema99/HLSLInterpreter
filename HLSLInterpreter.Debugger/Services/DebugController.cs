@@ -51,7 +51,7 @@ public sealed class DebugController : INotifyPropertyChanged
 
     public async Task<bool> StartSessionAsync(
         Func<Task<string>> getCode,
-        Func<HLSLParserConfig> makeParserConfig)
+        HLSLParserConfig parserConfig)
     {
         _run.IsRunning = true;
         _run.HasError = false;
@@ -60,7 +60,7 @@ public sealed class DebugController : INotifyPropertyChanged
         _run.Output = null;
 
         await _run.SnapshotGpuIfNeededAsync();
-        await _run.StopGpuAsync();
+        await _run.PauseGpuRendererAsync();
         CurrentSession = null;
 
         string code = await getCode();
@@ -69,9 +69,7 @@ public sealed class DebugController : INotifyPropertyChanged
         int wy = Math.Max(1, _state.WarpY);
 
         var newSession = DebuggerSession.Record(
-            code, wx, wy, _state.GroupOffsetX, _state.GroupOffsetY, _state.EntryPoint,
-            configureGlobals: _run.SetSharedGlobals,
-            parserConfig: makeParserConfig());
+            code, wx, wy, await _run.BuildShaderInvocationAsync(), parserConfig);
 
         CurrentSession = newSession;
         _run.HasError = newSession.HasError;
@@ -102,8 +100,8 @@ public sealed class DebugController : INotifyPropertyChanged
         IsDebugging = false;
         DebugTabIndex = -1;
         CurrentSession = null;
-        _run.GpuCaptured = null;
         _run.IsGpuMode = false;
+        _state.DebugVertexIndex = -1;
         if (_savedGroupOffsets.HasValue)
         {
             _state.GroupOffsetX = _savedGroupOffsets.Value.X;

@@ -45,8 +45,8 @@ public sealed class RunController : INotifyPropertyChanged
 
     public (float Time, int CanvasW, int CanvasH)? GpuCaptured { get; set; }
 
-    private byte[]? _imagePixels;
-    public byte[]? ImagePixels { get => _imagePixels; set => Set(ref _imagePixels, value); }
+    private byte[] _imagePixels;
+    public byte[] ImagePixels { get => _imagePixels; set => Set(ref _imagePixels, value); }
 
     public int ImageWidth { get; private set; }
     public int ImageHeight { get; private set; }
@@ -56,10 +56,11 @@ public sealed class RunController : INotifyPropertyChanged
 
     public async Task RunAsync(
         Func<Task<string>> getCode,
-        Func<HLSLParserConfig> makeParserConfig,
+        HLSLParserConfig parserConfig,
         object? dotNetRef,
         Func<Task>? beforeGpuRender = null)
     {
+        float initialTime = GpuCaptured?.Time ?? 0f;
         BeginRun();
         try { await _js.InvokeVoidAsync("gpuStop"); } catch { }
 
@@ -67,13 +68,16 @@ public sealed class RunController : INotifyPropertyChanged
         {
             HasImage = true;
             IsGpuMode = true;
-            GpuPaused = false;
             if (beforeGpuRender != null) await beforeGpuRender();
-            await RunGpuInternal(getCode, dotNetRef);
+            await RunGpuInternal(getCode, parserConfig, dotNetRef, initialTime);
+            if (GpuPaused)
+            {
+                try { await _js.InvokeVoidAsync("gpuPause"); } catch { }
+            }
         }
         else
         {
-            await RunCpuInternal(getCode, makeParserConfig);
+            await RunCpuInternal(getCode, parserConfig);
         }
 
         IsRunning = false;
@@ -92,7 +96,7 @@ public sealed class RunController : INotifyPropertyChanged
         IsGpuMode = false;
     }
 
-    private async Task RunCpuInternal(Func<Task<string>> getCode, Func<HLSLParserConfig> makeParserConfig)
+    private async Task RunCpuInternal(Func<Task<string>> getCode, HLSLParserConfig parserConfig)
     {
         var sw = new System.IO.StringWriter();
         var oldOut = Console.Out;
@@ -102,16 +106,15 @@ public sealed class RunController : INotifyPropertyChanged
             string code = await getCode();
             int wx = Math.Max(1, _state.WarpX);
             int wy = Math.Max(1, _state.WarpY);
-            int threadCount = wx * wy;
 
+            var invocation = await BuildShaderInvocationAsync();
             Runner.DebugHook = null;
             Runner.Reset();
             Runner.SetWarpSize(wx, wy);
-            SetSharedGlobals(Runner);
-            Runner.ProcessCode(code, makeParserConfig());
+            invocation.SetUniforms(Runner);
+            Runner.ProcessCode(code, parserConfig);
 
-            var threadArg = DebuggerSession.BuildThreadArg(wx, wy, threadCount, _state.GroupOffsetX, _state.GroupOffsetY);
-            HLSLValue result = DebuggerSession.CallEntryPoint(Runner, threadArg, _state.EntryPoint);
+            HLSLValue result = invocation.Execute(Runner);
             TryExtractImage(result, wx, wy);
         }
         catch (Exception ex)
@@ -124,7 +127,11 @@ public sealed class RunController : INotifyPropertyChanged
         Output = sw.ToString();
     }
 
-    private async Task RunGpuInternal(Func<Task<string>> getCode, object? dotNetRef)
+    private async Task RunGpuInternal(
+        Func<Task<string>> getCode,
+        HLSLParserConfig parserConfig,
+        object? dotNetRef,
+        float initialTime)
     {
         bool hasGpu = false;
         try { hasGpu = await _js.InvokeAsync<bool>("gpuIsAvailable"); }
@@ -138,11 +145,27 @@ public sealed class RunController : INotifyPropertyChanged
 
         try
         {
-            string code = await getCode();
+            string userCode = await getCode();
             int wx = Math.Max(1, _state.WarpX);
             int wy = Math.Max(1, _state.WarpY);
-            await _js.InvokeVoidAsync("gpuRender", "color-canvas-gpu", code,
-                _state.EntryPoint, wx, wy, dotNetRef);
+            var assembled = ShaderReflection.AssembleVertexShader(
+                userCode,
+                _state.VertexEntryPoint,
+                _state.FragmentEntryPoint,
+                _state.ShaderRenderMode,
+                parserConfig);
+            string mode = _state.ShaderRenderMode == ShaderRenderMode.VertFrag ? "vertfrag" : "pixel";
+            float[]? meshVertices = null;
+            uint[]? meshIndices = null;
+            if (_state.ShaderRenderMode == ShaderRenderMode.VertFrag)
+            {
+                var mesh = _state.CurrentMesh;
+                meshVertices = mesh.GetInterleavedVertices();
+                meshIndices = mesh.Indices;
+            }
+            await _js.InvokeVoidAsync("gpuRender", "color-canvas-gpu", assembled.Source,
+                _state.FragmentEntryPoint, wx, wy, dotNetRef, mode, assembled.VertexEntry,
+                assembled.VertexInputs, meshVertices, meshIndices, initialTime);
         }
         catch (Exception ex)
         {
@@ -152,19 +175,34 @@ public sealed class RunController : INotifyPropertyChanged
         }
     }
 
-    public void SetSharedGlobals(HLSLRunner runner)
+    public async Task<ShaderInvocation> BuildShaderInvocationAsync()
     {
         int wx = Math.Max(1, _state.WarpX);
         int wy = Math.Max(1, _state.WarpY);
-        runner.SetVariable("_WarpSize", new VectorValue(ScalarType.Float,
-            new HLSLRegister<RawValue[]>(new RawValue[] { (float)wx, (float)wy })));
-        bool useCapture = _state.GpuPreviewEnabled && GpuCaptured.HasValue;
-        float resW = useCapture ? GpuCaptured!.Value.CanvasW : wx;
-        float resH = useCapture ? GpuCaptured!.Value.CanvasH : wy;
-        float t = useCapture ? GpuCaptured!.Value.Time : 0f;
-        runner.SetVariable("_Resolution", new VectorValue(ScalarType.Float,
-            new HLSLRegister<RawValue[]>(new RawValue[] { resW, resH })));
-        runner.SetVariable("_Time", new ScalarValue(ScalarType.Float, new HLSLRegister<RawValue>(t)));
+        int canvasW = GpuCaptured?.CanvasW ?? wx;
+        int canvasH = GpuCaptured?.CanvasH ?? wy;
+        float[] viewProjection = null;
+        if (_state.ShaderRenderMode == ShaderRenderMode.VertFrag)
+            viewProjection = await _js.InvokeAsync<float[]>("gpuViewProjection", canvasW, canvasH);
+        float[] mouse;
+        try { mouse = await _js.InvokeAsync<float[]>("gpuMouse"); }
+        catch { mouse = new float[] { 0f, 0f, 0f, 0f }; }
+
+        return new ShaderInvocation(
+            Mode: _state.ShaderRenderMode,
+            FragmentEntryPoint: _state.FragmentEntryPoint,
+            VertexEntryPoint: _state.VertexEntryPoint,
+            Mesh: _state.CurrentMesh,
+            WarpX: wx,
+            WarpY: wy,
+            GroupOffsetX: _state.GroupOffsetX,
+            GroupOffsetY: _state.GroupOffsetY,
+            CanvasW: canvasW,
+            CanvasH: canvasH,
+            Time: GpuCaptured?.Time ?? 0f,
+            ViewProjection: viewProjection,
+            Mouse: mouse,
+            DebugVertexIndex: _state.DebugVertexIndex);
     }
 
     public bool TryExtractImage(HLSLValue result, int wx, int wy)
@@ -202,13 +240,18 @@ public sealed class RunController : INotifyPropertyChanged
         ImagePixels = null;
     }
 
+    public async Task PauseGpuRendererAsync()
+    {
+        try { await _js.InvokeVoidAsync("gpuPause"); } catch { }
+    }
+
     public async Task SnapshotGpuIfNeededAsync()
     {
         if (!_state.GpuPreviewEnabled || GpuCaptured.HasValue) return;
         try
         {
             var snap = await _js.InvokeAsync<float[]>("gpuSnapshot");
-            if (snap != null && snap.Length == 3 && snap[1] > 0 && snap[2] > 0)
+            if (snap != null && snap.Length >= 3 && snap[1] > 0 && snap[2] > 0)
                 GpuCaptured = (snap[0], (int)snap[1], (int)snap[2]);
         }
         catch { }
