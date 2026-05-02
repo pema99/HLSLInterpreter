@@ -8,8 +8,6 @@
 
     // These should do nothing when not running tests.
     #ifndef __HLSL_TEST_RUNNER__
-        #define printf
-        #define PRINTF
         #define ASSERT(x)
         #define ASSERT_MSG(x, msg)
         #define ASSERT_EQUAL(a, b)
@@ -24,8 +22,16 @@
         #define IGNORE_TEST_MSG(msg)
         #define MOCK_RESOURCE(res, mock)
         #define TEST_NAME "Test"
-        #define TEST_CASE
         #define TEST_VALUE(x)
+        #ifdef __hlsl_dx_compiler
+            #define printf(...)
+            #define PRINTF(...)
+            #define TEST_CASE(...)
+        #else
+            #define printf
+            #define PRINTF
+            #define TEST_CASE
+        #endif
     #endif
 
 #endif
