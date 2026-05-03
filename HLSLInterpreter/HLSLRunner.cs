@@ -314,34 +314,50 @@ namespace HLSL
             return newConfig;
         }
 
-        private bool TryBuildAutoFillFactories(FunctionDefinitionNode func, out Func<HLSLRunner, HLSLValue>[] factories)
+        // Describes how to populate input for a specific test function parameter.
+        private struct ParamFill
         {
-            bool hadAutoFills = false;
-            factories = new Func<HLSLRunner, HLSLValue>[func.Parameters.Count];
+            public Func<HLSLRunner, HLSLValue> Factory; // Singular, i.e. [MockResource], SV_*
+            public List<HLSLValue> ValueSet;            // Combinatiorial, i.e. [Values], [ValueSource]
+        }
+
+        private ParamFill[] BuildParamFills(FunctionDefinitionNode func)
+        {
+            var fills = new ParamFill[func.Parameters.Count];
 
             for (int i = 0; i < func.Parameters.Count; i++)
             {
                 var param = func.Parameters[i];
 
-                // Mock resource auto fill
                 foreach (var attr in param.Attributes)
                 {
-                    if (attr.Name.Identifier.ToLower() != "mockresource" || attr.Arguments.Count == 0)
-                        continue;
+                    string attrName = attr.Name.Identifier.ToLowerInvariant();
 
-                    string mockStructName = (attr.Arguments[0] as IdentifierExpressionNode)?.GetName()
-                        ?? (interpreter.EvaluateExpression(attr.Arguments[0]) as StringValue)?.Value;
-                    if (mockStructName == null)
-                        continue;
+                    if (attrName == "mockresource" && attr.Arguments.Count > 0)
+                    {
+                        string mockStructName = (attr.Arguments[0] as IdentifierExpressionNode)?.GetName()
+                            ?? (interpreter.EvaluateExpression(attr.Arguments[0]) as StringValue)?.Value;
+                        if (mockStructName == null)
+                            continue;
+                        if (param.ParamType is not PredefinedObjectTypeNode resourceTypeNode)
+                            continue;
 
-                    if (param.ParamType is not PredefinedObjectTypeNode resourceTypeNode)
-                        continue;
-
-                    var capturedStructName = mockStructName;
-                    var capturedKind = resourceTypeNode.Kind;
-                    var capturedTemplateArgs = resourceTypeNode.TemplateArguments.ToArray();
-
-                    factories[i] = runner => runner.interpreter.CreateMockResource(capturedStructName, capturedKind, capturedTemplateArgs);
+                        var capturedStructName = mockStructName;
+                        var capturedKind = resourceTypeNode.Kind;
+                        var capturedTemplateArgs = resourceTypeNode.TemplateArguments.ToArray();
+                        fills[i].Factory = runner => runner.interpreter.CreateMockResource(capturedStructName, capturedKind, capturedTemplateArgs);
+                    }
+                    else if (attrName == "values" && attr.Arguments.Count > 0)
+                    {
+                        fills[i].ValueSet = attr.Arguments.Select(a => interpreter.EvaluateExpression(a)).ToList();
+                    }
+                    else if (attrName == "valuesource" && attr.Arguments.Count == 1)
+                    {
+                        string genName = (attr.Arguments[0] as IdentifierExpressionNode)?.GetName()
+                            ?? (interpreter.EvaluateExpression(attr.Arguments[0]) as StringValue)?.Value;
+                        if (genName != null)
+                            fills[i].ValueSet = RunValueGenerator(genName);
+                    }
                 }
 
                 // SV semantics auto fill
@@ -353,7 +369,7 @@ namespace HLSL
                     switch (semanticNode.Name.Identifier?.ToLowerInvariant())
                     {
                         case "sv_groupindex":
-                            factories[i] = static runner =>
+                            fills[i].Factory = static runner =>
                             {
                                 var es = runner.GetExecutionState();
                                 int threadCount = es.GetThreadCount();
@@ -370,7 +386,7 @@ namespace HLSL
                             break;
                         case "sv_groupthreadid":
                         case "sv_dispatchthreadid":
-                            factories[i] = static runner =>
+                            fills[i].Factory = static runner =>
                             {
                                 var es = runner.GetExecutionState();
                                 int threadCount = es.GetThreadCount();
@@ -384,18 +400,16 @@ namespace HLSL
                             };
                             break;
                         case "sv_groupid":
-                            factories[i] = static _ => new VectorValue(ScalarType.Uint,
+                            fills[i].Factory = static _ => new VectorValue(ScalarType.Uint,
                                 HLSLValueUtils.MakeVectorSGPR(new RawValue[] { (uint)0, (uint)0, (uint)0 }));
                             break;
                         default:
                             break;
                     }
                 }
-
-                hadAutoFills |= factories[i] != null;
             }
 
-            return hadAutoFills;
+            return fills;
         }
 
         private bool IsIgnored(string functionName, List<HLSLValue> inputs, out string reason)
@@ -507,9 +521,12 @@ namespace HLSL
                 testRun.FunctionName = qualifiedName;
                 testRun.TestName = func.Name.GetName();
 
-                // Detect [MockResource] and SV semantic params first so [TestCase] knows how many args to expect.
-                bool hasAutoFill = TryBuildAutoFillFactories(func, out var autoFillFactories);
-                int nonAutoFillCount = autoFillFactories.Count(f => f == null);
+                // Detect per-parameter input sources first so [TestCase] knows how many args to expect.
+                var paramFills = BuildParamFills(func);
+                int testCaseArity = paramFills.Count(f => f.Factory == null);
+                int externalInputCount = paramFills.Count(f => f.Factory == null && f.ValueSet == null);
+                bool hasAutoFill = testCaseArity < paramFills.Length;
+                bool hasValueSet = testCaseArity > externalInputCount;
 
                 // Gather test attributes
                 foreach (var attribute in func.Attributes)
@@ -546,7 +563,7 @@ namespace HLSL
                             }
                             break;
                         case "testcase":
-                            if (attribute.Arguments.Count == nonAutoFillCount)
+                            if (attribute.Arguments.Count == testCaseArity)
                             {
                                 var inputs = attribute.Arguments.Select(a => interpreter.EvaluateExpression(a)).ToList();
                                 testCases.Add((inputs, $"{testRun.FunctionName}({string.Join(", ", inputs)})"));
@@ -560,7 +577,7 @@ namespace HLSL
                                 if (generatorName != null)
                                 {
                                     var cases = RunTestCaseGenerator(generatorName);
-                                    foreach (var caseInputs in cases.Where(c => c.Count == nonAutoFillCount))
+                                    foreach (var caseInputs in cases.Where(c => c.Count == testCaseArity))
                                     {
                                         testCases.Add((caseInputs, $"{testRun.FunctionName}({string.Join(", ", caseInputs)})"));
                                     }
@@ -580,34 +597,9 @@ namespace HLSL
                 }
 
                 // Process per-parameter [Values] and [ValueSource] attributes combinatorially.
-                var paramValueSets = new List<List<HLSLValue>>();
-                bool allParamsHaveValues = func.Parameters.Count > 0;
-                foreach (var param in func.Parameters)
+                if (hasValueSet && !hasAutoFill && externalInputCount == 0)
                 {
-                    List<HLSLValue> paramValues = null;
-                    foreach (var attr in param.Attributes)
-                    {
-                        string attrLexeme = attr.Name.Identifier.ToLower();
-                        if (attrLexeme == "valuesource" && attr.Arguments.Count == 1)
-                        {
-                            string genName = (attr.Arguments[0] as IdentifierExpressionNode)?.GetName()
-                                ?? (interpreter.EvaluateExpression(attr.Arguments[0]) as StringValue)?.Value;
-                            if (genName != null)
-                                paramValues = RunValueGenerator(genName);
-                        }
-                        else if (attrLexeme == "values" && attr.Arguments.Count > 0)
-                        {
-                            paramValues = attr.Arguments.Select(a => interpreter.EvaluateExpression(a)).ToList();
-                        }
-                    }
-                    if (paramValues != null)
-                        paramValueSets.Add(paramValues);
-                    else
-                        allParamsHaveValues = false;
-                }
-                if (allParamsHaveValues && paramValueSets.Count > 0)
-                {
-                    foreach (var combo in CartesianProduct(paramValueSets))
+                    foreach (var combo in CartesianProduct(paramFills.Select(f => f.ValueSet)))
                     {
                         var comboList = combo.ToList();
                         testCases.Add((comboList, $"{testRun.FunctionName}({string.Join(", ", comboList)})"));
@@ -621,7 +613,7 @@ namespace HLSL
                     if (testCases.Count == 0)
                     {
                         if (hasAutoFill)
-                            testRun.InputGenerator = runner => autoFillFactories.Select(f => f?.Invoke(runner)).ToList();
+                            testRun.InputGenerator = runner => paramFills.Select(f => f.Factory?.Invoke(runner)).ToList();
                         testsToRun.Add(testRun);
                     }
                     // Test with cases
@@ -636,11 +628,11 @@ namespace HLSL
                             {
                                 caseRun.InputGenerator = runner =>
                                 {
-                                    var merged = new List<HLSLValue>(autoFillFactories.Length);
+                                    var merged = new List<HLSLValue>(paramFills.Length);
                                     int caseIdx = 0;
-                                    foreach (var factory in autoFillFactories)
+                                    foreach (var fill in paramFills)
                                     {
-                                        merged.Add(factory != null ? factory(runner) : caseInputs[caseIdx++]);
+                                        merged.Add(fill.Factory != null ? fill.Factory(runner) : caseInputs[caseIdx++]);
                                     }
                                     return merged;
                                 };
