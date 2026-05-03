@@ -662,14 +662,18 @@ namespace HLSL
                 currentTest = testsToRun[i];
 
                 // Setup
-                if (currentTest.UsesCustomWarpSize || currentTest.UsesCustomThreadGroup)
+                var state = interpreter.GetExecutionState();
+                int prevWarpSizeX = state.GetWarpSizeX(), prevWarpSizeY = state.GetWarpSizeY();
+                int prevGroupSizeX = state.GetSizeX(), prevGroupSizeY = state.GetSizeY(), prevGroupSizeZ = state.GetSizeZ();
+                bool customThreadLayout = currentTest.UsesCustomWarpSize || currentTest.UsesCustomThreadGroup;
+                if (customThreadLayout)
                 {
-                    int wx = currentTest.UsesCustomWarpSize ? currentTest.WarpSizeX : 2;
-                    int wy = currentTest.UsesCustomWarpSize ? currentTest.WarpSizeY : 2;
-                    int gx = currentTest.UsesCustomThreadGroup ? currentTest.ThreadGroupX : wx;
-                    int gy = currentTest.UsesCustomThreadGroup ? currentTest.ThreadGroupY : wy;
-                    int gz = currentTest.UsesCustomThreadGroup ? currentTest.ThreadGroupZ : 1;
-                    interpreter.SetWarpAndGroupSize(wx, wy, gx, gy, gz);
+                    int warpSizeX = currentTest.UsesCustomWarpSize ? currentTest.WarpSizeX : prevWarpSizeX;
+                    int warpSizeY = currentTest.UsesCustomWarpSize ? currentTest.WarpSizeY : prevWarpSizeY;
+                    int groupSizeX = currentTest.UsesCustomThreadGroup ? currentTest.ThreadGroupX : warpSizeX;
+                    int groupSizeY = currentTest.UsesCustomThreadGroup ? currentTest.ThreadGroupY : warpSizeY;
+                    int groupSizeZ = currentTest.UsesCustomThreadGroup ? currentTest.ThreadGroupZ : prevGroupSizeZ;
+                    interpreter.SetWarpAndGroupSize(warpSizeX, warpSizeY, groupSizeX, groupSizeY, groupSizeZ);
                 }
                 var sw = new StringWriter();
                 Console.SetOut(sw);
@@ -740,8 +744,11 @@ namespace HLSL
 
                 // Cleanup
                 Console.SetOut(oldConsoleOut);
-                if (currentTest.UsesCustomWarpSize || currentTest.UsesCustomThreadGroup)
-                    interpreter.SetWarpSize(2, 2);
+                if (customThreadLayout)
+                {
+                    interpreter.SetWarpAndGroupSize(prevWarpSizeX, prevWarpSizeY,
+                        prevGroupSizeX, prevGroupSizeY, prevGroupSizeZ);
+                }
             }
             return results;
         }
