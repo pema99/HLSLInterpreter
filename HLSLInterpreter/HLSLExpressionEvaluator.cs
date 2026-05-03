@@ -97,16 +97,16 @@ namespace HLSL
             if (context.GetReference("this")?.Get() is StructValue thisStruct)
             {
                 if (TryFindMethod(thisStruct.Name, name, args, out var method))
-                    return CallMethodNode(thisStruct, method, args);
+                    return CallMethodNode(thisStruct, method, args, context.IsGroupShared("this"));
             }
 
             throw Error($"Unknown function '{name}' called.");
         }
 
-        public HLSLValue CallMethod(StructValue str, string methodName, HLSLValue[] args)
+        public HLSLValue CallMethod(StructValue str, string methodName, HLSLValue[] args, bool groupShared = false)
         {
             if (TryFindMethod(str.Name, methodName, args, out var method))
-                return CallMethodNode(str, method, args);
+                return CallMethodNode(str, method, args, groupShared);
 
             throw Error($"Unknown method '{methodName}' called.");
         }
@@ -232,16 +232,21 @@ namespace HLSL
                 isGroupshared = context.IsGroupShared(named.GetName());
                 if (isGroupshared)
                 {
-                    reference = new ReferenceValue(
-                        () => context.GetVariable(named.GetName()),
-                        newValue =>
-                        {
-                            for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
+                    var underlyingRef = context.GetReference(named.GetName());
+                    if (underlyingRef != null)
+                    {
+                        reference = new ReferenceValue(
+                            () => underlyingRef.Get(),
+                            newValue =>
                             {
-                                if (!executionState.IsThreadActive(threadIndex)) continue;
-                                context.SetVariable(named.GetName(), HLSLValueUtils.Scalarize(newValue, threadIndex));
-                            }
-                        });
+                                for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
+                                {
+                                    if (!executionState.IsThreadActive(threadIndex))
+                                        continue;
+                                    underlyingRef.Set(HLSLValueUtils.Scalarize(newValue, threadIndex));
+                                }
+                            });
+                    }
                 }
                 else
                 {
@@ -632,7 +637,7 @@ namespace HLSL
             return false;
         }
 
-        private HLSLValue CallMethodNode(StructValue str, FunctionDefinitionNode method, HLSLValue[] args)
+        private HLSLValue CallMethodNode(StructValue str, FunctionDefinitionNode method, HLSLValue[] args, bool groupShared = false)
         {
             if (args.Length > method.Parameters.Count)
                 throw Error($"Argument count mismatch in call to '{method.Name.GetName()}'.");
@@ -650,7 +655,8 @@ namespace HLSL
                 {
                     context.AddVariable(field, new ReferenceValue(
                         () => str.Members[field],
-                        val => str.Members[field] = val));
+                        val => str.Members[field] = val),
+                        groupShared);
                 }
 
                 context.AddVariable("this", new ReferenceValue(
@@ -664,7 +670,8 @@ namespace HLSL
                                 str.Members[kvp.Key] = kvp.Value;
                             }
                         }
-                    }));
+                    }),
+                    groupShared);
             }
 
             var inoutCopyoutRefs = BindFunctionParameters(method.Parameters, args);
@@ -1036,9 +1043,25 @@ namespace HLSL
                 args[i] = Visit(node.Arguments[i]);
             }
 
+            // Call struct method
             var target = Visit(node.Target);
             if (target is StructValue str)
             {
+                // Walk access chain to find if the target is a groupshared struct.
+                ExpressionNode root = node.Target;
+                while (true)
+                {
+                    if (root is FieldAccessExpressionNode fieldAccess)
+                        root = fieldAccess.Target;
+                    else if (root is ElementAccessExpressionNode elemAccess)
+                        root = elemAccess.Target;
+                    else
+                        break;
+                }
+                bool targetIsGroupshared = root is NamedExpressionNode rootNamed &&
+                    context.IsGroupShared(rootNamed.GetName());
+
+                // Find and call method
                 if (TryFindMethod(str.Name, node.Name.Identifier, args, out var method))
                 {
                     // Handle out/inout parameters
@@ -1052,12 +1075,13 @@ namespace HLSL
                         }
                     }
 
-                    return CallMethodNode(str, method, args);
+                    return CallMethodNode(str, method, args, targetIsGroupshared);
                 }
 
                 throw Error(node, $"Couldn't find method '{node.Name.Identifier}' on type '{str.Name}'.");
             }
 
+            // Call resource intrinsic
             if (target is ResourceValue resource)
             {
                 string resourceMethodName = node.Name.Identifier;

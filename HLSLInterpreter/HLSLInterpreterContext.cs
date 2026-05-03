@@ -16,6 +16,7 @@ namespace HLSL
             public readonly Dictionary<string, List<FunctionDefinitionNode>> Functions = new Dictionary<string, List<FunctionDefinitionNode>>();
             public readonly Dictionary<string, StructTypeNode> Structs = new Dictionary<string, StructTypeNode>();
             public readonly Dictionary<string, TypeNode> TypeAliases = new Dictionary<string, TypeNode>();
+            public readonly HashSet<string> GroupsharedVars = new HashSet<string>();
 
             public Scope(bool isFunction, string functionName = null)
             {
@@ -36,8 +37,6 @@ namespace HLSL
 
         private Stack<HLSLValue> returnStack = new Stack<HLSLValue>();
         private Stack<string> namespaceStack = new Stack<string>();
-
-        private HashSet<string> groupsharedVars = new HashSet<string>();
 
         public void EnterNamespace(string name)
         {
@@ -120,7 +119,7 @@ namespace HLSL
             return result;
         }
 
-        private bool TryFindVariable(string name, out Dictionary<string, HLSLValue> resolvedScope, out string resolvedName, out HLSLValue resolvedValue, out bool isGlobal)
+        private bool TryFindVariable(string name, out Scope resolvedScope, out string resolvedName, out HLSLValue resolvedValue, out bool isGlobal)
         {
             int count = environment.Count;
             int idx = 0;
@@ -131,7 +130,7 @@ namespace HLSL
 
                 if (scope.Variables.TryGetValue(name, out var val))
                 {
-                    resolvedScope = scope.Variables;
+                    resolvedScope = scope;
                     resolvedName = name;
                     resolvedValue = val;
                     isGlobal = false;
@@ -148,7 +147,7 @@ namespace HLSL
             {
                 if (globalVars.TryGetValue(candidate, out var val))
                 {
-                    resolvedScope = globalVars;
+                    resolvedScope = globalScope;
                     resolvedName = candidate;
                     resolvedValue = val;
                     isGlobal = true;
@@ -173,10 +172,10 @@ namespace HLSL
         {
             if (TryFindVariable(name, out var scope, out var resolvedName, out _, out _))
             {
-                if (scope[resolvedName] is ReferenceValue refVal)
+                if (scope.Variables[resolvedName] is ReferenceValue refVal)
                     return refVal;
                 else
-                    return new ReferenceValue(() => scope[resolvedName], val => scope[resolvedName] = val);
+                    return new ReferenceValue(() => scope.Variables[resolvedName], val => scope.Variables[resolvedName] = val);
             }
             return null;
         }
@@ -202,7 +201,7 @@ namespace HLSL
 
             if (TryFindVariable(name, out var scope, out var resolvedName, out _, out _))
             {
-                scope[resolvedName] = val;
+                scope.Variables[resolvedName] = val;
                 return;
             }
 
@@ -216,11 +215,14 @@ namespace HLSL
             {
                 SetGlobalVariable(name, val);
                 if (groupShared)
-                    groupsharedVars.Add(GetQualifiedName(name));
+                    globalScope.GroupsharedVars.Add(GetQualifiedName(name));
                 return;
             }
 
-            environment.Peek().Variables[name] = val;
+            var scope = environment.Peek();
+            scope.Variables[name] = val;
+            if (groupShared)
+                scope.GroupsharedVars.Add(name);
         }
 
         public string GetQualifiedName(string name)
@@ -238,8 +240,8 @@ namespace HLSL
 
         public bool IsGroupShared(string name)
         {
-            if (TryFindVariable(name, out _, out var resolvedName, out _, out bool isGlobal))
-                return isGlobal && groupsharedVars.Contains(resolvedName);
+            if (TryFindVariable(name, out var scope, out var resolvedName, out _, out _))
+                return scope.GroupsharedVars.Contains(resolvedName);
             return false;
         }
 

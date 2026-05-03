@@ -638,3 +638,95 @@ void Atomic_VectorComponent_InterlockedExchange_ReturnsOriginal()
     ASSERT(gs_IntPair.y == 99);
     ASSERT(gs_IntPair.x == 55); // unchanged
 }
+
+// ============================================================================
+// Groupshared vs non-groupshared structs: divergent writes
+//
+// A plain (non-groupshared) global struct is per-thread state, so a divergent
+// write promotes the touched slot to VGPR and inactive threads keep their old
+// value. Marking the same struct groupshared makes the slot a single shared
+// piece of state, so the write is visible to all threads after the branch.
+// ============================================================================
+
+struct DivergentBarBaz { int a[4]; };
+
+DivergentBarBaz nonGsBarBaz;
+groupshared DivergentBarBaz gsBarBaz;
+
+[Test]
+[WarpSize(4, 1)]
+void NonGroupsharedStruct_DivergentArrayWrite_PromotesToVarying()
+{
+    nonGsBarBaz.a[0] = 0;
+    if (WaveGetLaneIndex() == 0)
+        nonGsBarBaz.a[0] = 1;
+    // Per-thread state: only thread 0's slot was written.
+    ASSERT(WaveReadLaneAt(nonGsBarBaz.a[0], 0) == 1);
+    ASSERT(WaveReadLaneAt(nonGsBarBaz.a[0], 1) == 0);
+    ASSERT(WaveReadLaneAt(nonGsBarBaz.a[0], 2) == 0);
+    ASSERT(WaveReadLaneAt(nonGsBarBaz.a[0], 3) == 0);
+}
+
+[Test]
+[WarpSize(4, 1)]
+void GroupsharedStruct_DivergentArrayWrite_AllThreadsSeeUpdate()
+{
+    gsBarBaz.a[0] = 0;
+    if (WaveGetLaneIndex() == 0)
+        gsBarBaz.a[0] = 1;
+    // Single shared slot: every thread sees thread 0's write.
+    ASSERT(gsBarBaz.a[0] == 1);
+}
+
+// ============================================================================
+// Method calls on groupshared structs
+//
+// When a method writes a struct field, the write must inherit the receiver's
+// groupshared status. On a groupshared receiver, a varying RHS lands on the
+// shared slot under last-active-lane-wins semantics. On a non-groupshared
+// receiver, the field is per-thread and the varying RHS is preserved per lane.
+// ============================================================================
+
+struct DivergentFoo
+{
+    int a;
+    void writeLaneIndex() { a = WaveGetLaneIndex(); }
+};
+
+DivergentFoo nonGsFoo;
+groupshared DivergentFoo gsFoo;
+
+[Test]
+[WarpSize(4, 1)]
+void NonGroupsharedStruct_MethodWritesVaryingField_PromotesToVarying()
+{
+    nonGsFoo.a = -1;
+    nonGsFoo.writeLaneIndex();
+    // Per-thread state: each lane keeps its own copy.
+    ASSERT(WaveReadLaneAt(nonGsFoo.a, 0) == 0);
+    ASSERT(WaveReadLaneAt(nonGsFoo.a, 1) == 1);
+    ASSERT(WaveReadLaneAt(nonGsFoo.a, 2) == 2);
+    ASSERT(WaveReadLaneAt(nonGsFoo.a, 3) == 3);
+}
+
+[Test]
+[WarpSize(4, 1)]
+void GroupsharedStruct_MethodWritesVaryingField_LastActiveLaneWins()
+{
+    gsFoo.a = -1;
+    gsFoo.writeLaneIndex();
+    // Single shared slot, all four lanes write their index, last writer wins.
+    ASSERT(gsFoo.a == 3);
+}
+
+[Test]
+[WarpSize(4, 1)]
+void GroupsharedStruct_MethodInDivergentControl_OnlyActiveLanesRace()
+{
+    gsFoo.a = -1;
+    if (WaveGetLaneIndex() < 2)
+        gsFoo.writeLaneIndex();
+    // Inside the method, only lanes 0 and 1 are active. They each write their
+    // index to the shared slot, last active wins.
+    ASSERT(gsFoo.a == 1);
+}

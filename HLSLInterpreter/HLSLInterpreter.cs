@@ -93,13 +93,13 @@ namespace HLSL
                 if (!HasMethod(methodName)) return () => defaultValue;
                 return () =>
                 {
-                    var res = expressionEvaluator.CallMethod(mockStruct, methodName, Array.Empty<HLSLValue>());
+                    var res = expressionEvaluator.CallMethod(mockStruct, methodName, Array.Empty<HLSLValue>(), true);
                     return res is ScalarValue sv ? sv.AsInt() : defaultValue;
                 };
             }
 
             if (HasMethod("Initialize"))
-                expressionEvaluator.CallMethod(mockStruct, "Initialize", Array.Empty<HLSLValue>());
+                expressionEvaluator.CallMethod(mockStruct, "Initialize", Array.Empty<HLSLValue>(), true);
 
             ResourceGetter getter = (x, y, z, w, mip) => (NumericValue)0;
             ResourceSetter setter = (x, y, z, w, mip, val) => { };
@@ -108,7 +108,7 @@ namespace HLSL
                 getter = (x, y, z, w, mip) =>
                 {
                     var args = new HLSLValue[] { (NumericValue)x, (NumericValue)y, (NumericValue)z, (NumericValue)w, (NumericValue)mip };
-                    var res = expressionEvaluator.CallMethod(mockStruct, "Read", args);
+                    var res = expressionEvaluator.CallMethod(mockStruct, "Read", args, true);
                     return res;
                 };
             }
@@ -117,7 +117,7 @@ namespace HLSL
                 setter = (x, y, z, w, mip, val) =>
                 {
                     var args = new HLSLValue[] { (NumericValue)x, (NumericValue)y, (NumericValue)z, (NumericValue)w, (NumericValue)mip, val };
-                    expressionEvaluator.CallMethod(mockStruct, "Write", args);
+                    expressionEvaluator.CallMethod(mockStruct, "Write", args, true);
                 };
             }
 
