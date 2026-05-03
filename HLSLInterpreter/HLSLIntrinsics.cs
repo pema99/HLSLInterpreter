@@ -1546,6 +1546,14 @@ namespace HLSL
 
         public static void Printf(HLSLExecutionState executionState, HLSLValue[] args)
         {
+            // Convenience overload for directly printing a value.
+            if (args.Length == 1 && args[0] is not ScalarValue { Type: ScalarType.String })
+            {
+                Printf(executionState, new[] { (StringValue)"%d", args[0] });
+                return;
+            }
+
+            // General case
             if (args.Length > 0)
             {
                 int maxThreadCount = args.Max(x => x.ThreadCount);
@@ -1557,12 +1565,6 @@ namespace HLSL
                 {
                     if (scalarizeLoop && !executionState.IsThreadActive(threadIndex))
                         continue;
-
-                    if (scalarizeLoop && args.Length == 1)
-                    {
-                        Console.WriteLine(Convert.ToString(HLSLValueUtils.Scalarize(args[0], threadIndex), CultureInfo.InvariantCulture));
-                        continue;
-                    }
 
                     string formatString = args[0].ToString();
                     StringBuilder sb = new StringBuilder();
@@ -1589,122 +1591,118 @@ namespace HLSL
 
         public static ScalarValue WaveGetLaneIndex(HLSLExecutionState executionState)
         {
-            return new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarVGPR(Enumerable.Range(0, executionState.GetThreadCount()).Select(i => (RawValue)(uint)i)));
+            int groupSize = executionState.GetThreadCount();
+            int warpSize = executionState.GetWarpThreadCount();
+            var lanes = new RawValue[groupSize];
+            for (int i = 0; i < groupSize; i++)
+            {
+                lanes[i] = (uint)(i % warpSize);
+            }
+            return new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarVGPR(lanes));
         }
 
         public static ScalarValue WaveGetLaneCount(HLSLExecutionState executionState)
         {
-            return (ScalarValue)executionState.GetThreadCount();
+            return executionState.GetWarpThreadCount();
         }
 
-        public static ScalarValue WaveIsFirstLane(HLSLExecutionState executionState)
+        public static NumericValue WaveIsFirstLane(HLSLExecutionState executionState)
         {
-            var perLaneIsFirst = new RawValue[executionState.GetThreadCount()];
-            for (int threadIdx = 0; threadIdx < executionState.GetThreadCount(); threadIdx++)
-            {
-                if (executionState.IsThreadActive(threadIdx))
-                {
-                    perLaneIsFirst[threadIdx] = true;
-                    break;
-                }
-            }
-            return new ScalarValue(ScalarType.Bool, HLSLValueUtils.MakeScalarVGPR(perLaneIsFirst));
+            var lane = WaveGetLaneIndex(executionState);
+            return lane == WaveReadLaneFirst(executionState, lane);
         }
 
         public static NumericValue WaveReadLaneAt(HLSLExecutionState executionState, NumericValue expr, ScalarValue laneIndex)
         {
-            if (laneIndex.IsUniform)
-                return expr.Scalarize(laneIndex.AsInt());
+            int threadCount = executionState.GetThreadCount();
+            uint warpSize = (uint)executionState.GetWarpThreadCount();
 
-            int threadCount = laneIndex.ThreadCount;
-            if (expr is ScalarValue scalarExpr)
+            // Fast path
+            if (executionState.GetWarpCount() == 1 && laneIndex.IsUniform)
+                return expr.Scalarize((int)(laneIndex.AsUint() % warpSize));
+
+            int ThreadIndexToLane(int threadIndex)
             {
-                RawValue[] perLaneValue = new RawValue[threadCount];
-                for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
-                    perLaneValue[threadIndex] = scalarExpr.Value.Get(laneIndex.AsInt(threadIndex));
-                return new ScalarValue(expr.Type, HLSLValueUtils.MakeScalarVGPR(perLaneValue));
+                int warpIndex = executionState.GetWarpIndexOfThread(threadIndex);
+                int warpStart = executionState.GetFirstThreadIndexInWarp(warpIndex);
+                return warpStart + (int)(laneIndex.AsUint(threadIndex) % warpSize);
             }
-            if (expr is VectorValue vectorExpr)
+
+            // Vectorize so the mapper runs once per thread even when expr is uniform.
+            var src = expr.Vectorize(threadCount);
+            return src switch
             {
-                RawValue[][] perLaneValue = new RawValue[threadCount][];
-                for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
-                    perLaneValue[threadIndex] = vectorExpr.Values.Get(laneIndex.AsInt(threadIndex));
-                return new VectorValue(expr.Type, HLSLValueUtils.MakeVectorVGPR(perLaneValue));
-            }
-            if (expr is MatrixValue matrixExpr)
-            {
-                RawValue[][] perLaneValue = new RawValue[threadCount][];
-                for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
-                    perLaneValue[threadIndex] = matrixExpr.Values.Get(laneIndex.AsInt(threadIndex));
-                return new MatrixValue(expr.Type, matrixExpr.Rows, matrixExpr.Columns, HLSLValueUtils.MakeVectorVGPR(perLaneValue));
-            }
-            throw new InvalidOperationException();
+                ScalarValue s => s.MapThreads((_, threadIndex) => s.Value.Get(ThreadIndexToLane(threadIndex))),
+                VectorValue v => v.MapThreads((_, threadIndex) => v.Values.Get(ThreadIndexToLane(threadIndex))),
+                MatrixValue m => m.MapThreads((_, threadIndex) => m.Values.Get(ThreadIndexToLane(threadIndex))),
+                _ => throw new InvalidOperationException(),
+            };
         }
 
-        public static NumericValue QuadReadAcrossDiagonal(HLSLExecutionState executionState, NumericValue expr)
+        public static NumericValue QuadReadLaneAt(HLSLExecutionState executionState, NumericValue expr, ScalarValue quadLaneIndex)
         {
-            var laneIndex = HLSLValueUtils.MakeScalarVGPR(new RawValue[] { 3u, 2u, 1u, 0u });
-            return WaveReadLaneAt(executionState, expr, new ScalarValue(ScalarType.Uint, laneIndex));
-        }
-
-        public static NumericValue QuadReadLaneAt(HLSLExecutionState executionState, NumericValue expr, ScalarValue laneIndex)
-        {
-            return WaveReadLaneAt(executionState, expr, laneIndex);
+            uint warpSizeX = (uint)executionState.GetWarpSizeX();
+            var lane = WaveGetLaneIndex(executionState);
+            var quadIndex = quadLaneIndex & 3u;
+            var newLx = (lane % warpSizeX & ~1u) | (quadIndex & 1u);
+            var newLy = (lane / warpSizeX & ~1u) | (quadIndex / 2u);
+            return WaveReadLaneAt(executionState, expr, newLy * warpSizeX + newLx);
         }
 
         public static NumericValue QuadReadAcrossX(HLSLExecutionState executionState, NumericValue expr)
         {
-            var laneIndex = HLSLValueUtils.MakeScalarVGPR(new RawValue[] { 1u, 0u, 3u, 2u });
-            return WaveReadLaneAt(executionState, expr, new ScalarValue(ScalarType.Uint, laneIndex));
+            uint warpSizeX = (uint)executionState.GetWarpSizeX();
+            var lane = WaveGetLaneIndex(executionState);
+            return WaveReadLaneAt(executionState, expr, lane / warpSizeX * warpSizeX + (lane % warpSizeX ^ 1u));
         }
 
         public static NumericValue QuadReadAcrossY(HLSLExecutionState executionState, NumericValue expr)
         {
-            var laneIndex = HLSLValueUtils.MakeScalarVGPR(new RawValue[] { 2u, 3u, 0u, 1u });
-            return WaveReadLaneAt(executionState, expr, new ScalarValue(ScalarType.Uint, laneIndex));
+            uint warpSizeX = (uint)executionState.GetWarpSizeX();
+            var lane = WaveGetLaneIndex(executionState);
+            return WaveReadLaneAt(executionState, expr, (lane / warpSizeX ^ 1u) * warpSizeX + lane % warpSizeX);
         }
 
+        public static NumericValue QuadReadAcrossDiagonal(HLSLExecutionState executionState, NumericValue expr) =>
+            QuadReadAcrossX(executionState, QuadReadAcrossY(executionState, expr));
+
+        // Splat per-warp results back across each warp's lanes.
         public static NumericValue WaveActiveAllEqual(HLSLExecutionState executionState, NumericValue expr)
-        {
-            NumericValue exprFirst = null;
-            NumericValue retVal = null;
-
-            for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
-            {
-                if (!executionState.IsThreadActive(threadIndex))
-                    continue;
-
-                if (exprFirst is null)
-                {
-                    exprFirst = expr.Scalarize(threadIndex);
-                    #pragma warning disable CS1718 // Comparison made to same variable
-                    retVal = exprFirst == exprFirst;
-                    #pragma warning restore CS1718
-                }
-                else
-                {
-                    retVal = HLSLOperators.BoolAnd(retVal, exprFirst == expr.Scalarize(threadIndex));
-                }
-            }
-
-            return retVal;
-        }
+            => WaveActiveAllTrue(executionState, expr == WaveReadLaneFirst(executionState, expr));
 
         private static NumericValue WaveActiveReduce(HLSLExecutionState executionState, NumericValue expr, Func<NumericValue, NumericValue, NumericValue> op)
         {
-            NumericValue acc = null;
-            for (int i = 0; i < executionState.GetThreadCount(); i++)
-            {
-                if (!executionState.IsThreadActive(i))
-                    continue;
+            int warpCount = executionState.GetWarpCount();
+            int warpSize = executionState.GetWarpThreadCount();
+            int threadCount = executionState.GetThreadCount();
 
-                var lane = expr.Scalarize(i);
-                if (acc is null)
-                    acc = lane;
-                else
-                    acc = op(acc, lane);
+            var perWarp = new NumericValue[warpCount];
+            for (int warp = 0; warp < warpCount; warp++)
+            {
+                int start = executionState.GetFirstThreadIndexInWarp(warp);
+                for (int lane = 0; lane < warpSize; lane++)
+                {
+                    int threadIndex = start + lane;
+                    if (!executionState.IsThreadActive(threadIndex))
+                        continue;
+                    var laneVal = expr.Scalarize(threadIndex);
+                    perWarp[warp] = perWarp[warp] is null ? laneVal : op(perWarp[warp], laneVal);
+                }
             }
-            return acc;
+
+            // Single-warp
+            if (warpCount == 1)
+                return perWarp[0];
+
+            // Multi-warp
+            NumericValue result = expr.Vectorize(threadCount);
+            for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
+            {
+                var value = perWarp[executionState.GetWarpIndexOfThread(threadIndex)];
+                if (value is not null)
+                    result = (NumericValue)HLSLValueUtils.SetThreadValue(result, threadIndex, value);
+            }
+            return result;
         }
 
         public static NumericValue WaveActiveBitAnd(HLSLExecutionState executionState, NumericValue expr) =>
@@ -1716,23 +1714,8 @@ namespace HLSL
         public static NumericValue WaveActiveBitXor(HLSLExecutionState executionState, NumericValue expr) =>
             WaveActiveReduce(executionState, expr, (a, b) => a ^ b);
 
-        public static NumericValue WaveActiveCountBits(HLSLExecutionState executionState, NumericValue expr)
-        {
-            var exprS = (ScalarValue)expr.Cast(ScalarType.Bool);
-
-            uint count = 0;
-
-            for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
-            {
-                if (!executionState.IsThreadActive(threadIndex))
-                    continue;
-
-                if (exprS.AsBool(threadIndex))
-                    count++;
-            }
-
-            return count;
-        }
+        public static NumericValue WaveActiveCountBits(HLSLExecutionState executionState, NumericValue expr) =>
+            WaveActiveSum(executionState, Select(expr, 1u, 0u));
 
         public static NumericValue WaveActiveMax(HLSLExecutionState executionState, NumericValue expr) =>
             WaveActiveReduce(executionState, expr, Max);
@@ -1746,65 +1729,24 @@ namespace HLSL
         public static NumericValue WaveActiveSum(HLSLExecutionState executionState, NumericValue expr) =>
             WaveActiveReduce(executionState, expr, (a, b) => a + b);
 
-        public static NumericValue WaveActiveAllTrue(HLSLExecutionState executionState, NumericValue expr)
-        {
-            var exprS = (ScalarValue)expr.Cast(ScalarType.Bool);
+        public static NumericValue WaveActiveAllTrue(HLSLExecutionState executionState, NumericValue expr) =>
+            WaveActiveReduce(executionState, expr, HLSLOperators.BoolAnd);
 
-            for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
-            {
-                if (!executionState.IsThreadActive(threadIndex))
-                    continue;
-
-                if (!exprS.AsBool(threadIndex))
-                    return false;
-            }
-
-            return true;
-        }
-
-        public static NumericValue WaveActiveAnyTrue(HLSLExecutionState executionState, NumericValue expr)
-        {
-            var exprS = (ScalarValue)expr.Cast(ScalarType.Bool);
-
-            for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
-            {
-                if (!executionState.IsThreadActive(threadIndex))
-                    continue;
-
-                if (exprS.AsBool(threadIndex))
-                    return true;
-            }
-
-            return false;
-        }
+        public static NumericValue WaveActiveAnyTrue(HLSLExecutionState executionState, NumericValue expr) =>
+            !WaveActiveAllTrue(executionState, !expr);
 
         public static NumericValue WaveActiveBallot(HLSLExecutionState executionState, NumericValue expr)
         {
-            var exprS = (ScalarValue)expr.Cast(ScalarType.Bool);
-            bool[] perLane = new bool[executionState.GetThreadCount()];
-
-            for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
+            var lane = WaveGetLaneIndex(executionState);
+            var components = new ScalarValue[4];
+            for (uint word = 0; word < 4; word++)
             {
-                if (!executionState.IsThreadActive(threadIndex))
-                    continue;
-
-                if (exprS.AsBool(threadIndex))
-                    perLane[threadIndex] = true;
+                var inWord = lane / 32u == (NumericValue)word;
+                var laneBit = HLSLOperators.BitSHL((NumericValue)1u, lane % 32u);
+                var bit = Select(HLSLOperators.BoolAnd(expr, inWord), laneBit, (NumericValue)0u);
+                components[word] = (ScalarValue)WaveActiveBitOr(executionState, bit);
             }
-
-            ScalarValue[] uints = new ScalarValue[4];
-            for (int i = 0; i < 4; i++)
-            {
-                uint res = 0;
-                for (int j = 0; j < 32; j++)
-                {
-                    int idx = i * 32 + j;
-                    if (idx < perLane.Length && perLane[idx])
-                        res |= 1u << j;
-                }
-                uints[i] = res;
-            }
-            return VectorValue.FromScalars(uints);
+            return VectorValue.FromScalars(components);
         }
 
         public static NumericValue WavePrefixCountBits(HLSLExecutionState executionState, NumericValue expr)
@@ -1812,69 +1754,40 @@ namespace HLSL
             return WavePrefixSum(executionState, expr.Cast(ScalarType.Bool).Cast(ScalarType.Uint));
         }
 
-        public static NumericValue WavePrefixProduct(HLSLExecutionState executionState, NumericValue expr)
+        private static NumericValue WavePrefixOp(HLSLExecutionState executionState, NumericValue expr, NumericValue identity, Func<NumericValue, NumericValue, NumericValue> op)
         {
-            NumericValue exprFirst = null;
-            NumericValue sum = null;
-
-            for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
+            int warpCount = executionState.GetWarpCount();
+            int warpSize = executionState.GetWarpThreadCount();
+            int threadCount = executionState.GetThreadCount();
+            NumericValue result = expr.Vectorize(threadCount);
+            for (int warp = 0; warp < warpCount; warp++)
             {
-                if (!executionState.IsThreadActive(threadIndex))
-                    continue;
-
-                if (exprFirst is null)
+                int start = executionState.GetFirstThreadIndexInWarp(warp);
+                NumericValue acc = null;
+                for (int lane = 0; lane < warpSize; lane++)
                 {
-                    sum = HLSLTypeUtils.GetOneValue(expr).Scalarize(threadIndex);
-                    exprFirst = (NumericValue)HLSLValueUtils.SetThreadValue(expr.Vectorize(executionState.GetThreadCount()), threadIndex, sum);
-                    sum = expr.Scalarize(threadIndex);
-                }
-                else
-                {
-                    exprFirst = (NumericValue)HLSLValueUtils.SetThreadValue(exprFirst, threadIndex, sum);
-                    sum = sum * expr.Scalarize(threadIndex);
+                    int threadIndex = start + lane;
+                    if (!executionState.IsThreadActive(threadIndex))
+                        continue;
+                    if (acc is null)
+                        acc = identity.Scalarize(threadIndex);
+                    result = (NumericValue)HLSLValueUtils.SetThreadValue(result, threadIndex, acc);
+                    acc = op(acc, expr.Scalarize(threadIndex));
                 }
             }
-
-            return exprFirst;
+            return result;
         }
 
-        public static NumericValue WavePrefixSum(HLSLExecutionState executionState, NumericValue expr)
-        {
-            NumericValue exprFirst = null;
-            NumericValue sum = null;
+        public static NumericValue WavePrefixProduct(HLSLExecutionState executionState, NumericValue expr) =>
+            WavePrefixOp(executionState, expr, HLSLTypeUtils.GetOneValue(expr), (a, b) => a * b);
 
-            for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
-            {
-                if (!executionState.IsThreadActive(threadIndex))
-                    continue;
-
-                if (exprFirst is null)
-                {
-                    sum = HLSLTypeUtils.GetZeroValue(expr).Scalarize(threadIndex);
-                    exprFirst = (NumericValue)HLSLValueUtils.SetThreadValue(expr.Vectorize(executionState.GetThreadCount()), threadIndex, sum);
-                    sum = sum + expr.Scalarize(threadIndex);
-                }
-                else
-                {
-                    exprFirst = (NumericValue)HLSLValueUtils.SetThreadValue(exprFirst, threadIndex, sum);
-                    sum = sum + expr.Scalarize(threadIndex);
-                }
-            }
-
-            return exprFirst;
-        }
+        public static NumericValue WavePrefixSum(HLSLExecutionState executionState, NumericValue expr) =>
+            WavePrefixOp(executionState, expr, HLSLTypeUtils.GetZeroValue(expr), (a, b) => a + b);
 
         public static NumericValue WaveReadLaneFirst(HLSLExecutionState executionState, NumericValue expr)
         {
-            for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
-            {
-                if (!executionState.IsThreadActive(threadIndex))
-                    continue;
-
-                return expr.Scalarize(threadIndex);
-            }
-
-            return expr.Scalarize(0);
+            var firstLane = (ScalarValue)WaveActiveMin(executionState, WaveGetLaneIndex(executionState));
+            return WaveReadLaneAt(executionState, expr, firstLane);
         }
 
         public static NumericValue DdxFine(HLSLExecutionState executionState, NumericValue val)
@@ -1882,20 +1795,9 @@ namespace HLSL
             if (val.IsUniform)
                 return val - val;
 
-            NumericValue Compute(int threadIndex)
-            {
-                (int x, int y) = executionState.GetThreadPosition(threadIndex);
-                int offset = (x % 2 == 0) ? 1 : -1;
-
-                var me = val.Scalarize(threadIndex);
-                var other = val.Scalarize(executionState.GetThreadIndex(x + offset, y));
-                return (other - me) * offset;
-            }
-
-            if (val is ScalarValue sv) return sv.MapThreads((_, threadIndex) => ((ScalarValue)Compute(threadIndex)).GetThreadValue(0));
-            if (val is VectorValue vv) return vv.MapThreads((_, threadIndex) => ((VectorValue)Compute(threadIndex)).GetThreadValue(0));
-            if (val is MatrixValue mv) return mv.MapThreads((_, threadIndex) => ((MatrixValue)Compute(threadIndex)).GetThreadValue(0));
-            throw new InvalidOperationException();
+            uint warpSizeX = (uint)executionState.GetWarpSizeX();
+            var yBit = (WaveGetLaneIndex(executionState) / warpSizeX & 1u) * 2u;
+            return QuadReadLaneAt(executionState, val, yBit | 1u) - QuadReadLaneAt(executionState, val, yBit);
         }
 
         public static NumericValue DdyFine(HLSLExecutionState executionState, NumericValue val)
@@ -1903,20 +1805,8 @@ namespace HLSL
             if (val.IsUniform)
                 return val - val;
 
-            NumericValue Compute(int threadIndex)
-            {
-                (int x, int y) = executionState.GetThreadPosition(threadIndex);
-                int offset = (y % 2 == 0) ? 1 : -1;
-
-                var me = val.Scalarize(threadIndex);
-                var other = val.Scalarize(executionState.GetThreadIndex(x, y + offset));
-                return (other - me) * offset;
-            }
-
-            if (val is ScalarValue sv) return sv.MapThreads((_, threadIndex) => ((ScalarValue)Compute(threadIndex)).GetThreadValue(0));
-            if (val is VectorValue vv) return vv.MapThreads((_, threadIndex) => ((VectorValue)Compute(threadIndex)).GetThreadValue(0));
-            if (val is MatrixValue mv) return mv.MapThreads((_, threadIndex) => ((MatrixValue)Compute(threadIndex)).GetThreadValue(0));
-            throw new InvalidOperationException();
+            var xBit = WaveGetLaneIndex(executionState) & 1u;
+            return QuadReadLaneAt(executionState, val, xBit | 2u) - QuadReadLaneAt(executionState, val, xBit);
         }
 
         public static NumericValue Ddx(HLSLExecutionState executionState, NumericValue val)
@@ -1924,22 +1814,7 @@ namespace HLSL
             if (val.IsUniform)
                 return val - val;
 
-            NumericValue Compute(int threadIndex)
-            {
-                (int x, int y) = executionState.GetThreadPosition(threadIndex);
-                y -= (y & 1);
-                threadIndex = executionState.GetThreadIndex(x, y);
-                int offset = (x % 2 == 0) ? 1 : -1;
-
-                var me = val.Scalarize(threadIndex);
-                var other = val.Scalarize(executionState.GetThreadIndex(x + offset, y));
-                return (other - me) * offset;
-            }
-
-            if (val is ScalarValue sv) return sv.MapThreads((_, threadIndex) => ((ScalarValue)Compute(threadIndex)).GetThreadValue(0));
-            if (val is VectorValue vv) return vv.MapThreads((_, threadIndex) => ((VectorValue)Compute(threadIndex)).GetThreadValue(0));
-            if (val is MatrixValue mv) return mv.MapThreads((_, threadIndex) => ((MatrixValue)Compute(threadIndex)).GetThreadValue(0));
-            throw new InvalidOperationException();
+            return QuadReadLaneAt(executionState, val, 1) - QuadReadLaneAt(executionState, val, 0);
         }
 
         public static NumericValue Ddy(HLSLExecutionState executionState, NumericValue val)
@@ -1947,22 +1822,7 @@ namespace HLSL
             if (val.IsUniform)
                 return val - val;
 
-            NumericValue Compute(int threadIndex)
-            {
-                (int x, int y) = executionState.GetThreadPosition(threadIndex);
-                x -= (x & 1);
-                threadIndex = executionState.GetThreadIndex(x, y);
-                int offset = (y % 2 == 0) ? 1 : -1;
-
-                var me = val.Scalarize(threadIndex);
-                var other = val.Scalarize(executionState.GetThreadIndex(x, y + offset));
-                return (other - me) * offset;
-            }
-
-            if (val is ScalarValue sv) return sv.MapThreads((_, threadIndex) => ((ScalarValue)Compute(threadIndex)).GetThreadValue(0));
-            if (val is VectorValue vv) return vv.MapThreads((_, threadIndex) => ((VectorValue)Compute(threadIndex)).GetThreadValue(0));
-            if (val is MatrixValue mv) return mv.MapThreads((_, threadIndex) => ((MatrixValue)Compute(threadIndex)).GetThreadValue(0));
-            throw new InvalidOperationException();
+            return QuadReadLaneAt(executionState, val, 2) - QuadReadLaneAt(executionState, val, 0);
         }
 
         public static NumericValue Fwidth(HLSLExecutionState executionState, NumericValue val) =>

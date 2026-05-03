@@ -47,7 +47,12 @@ namespace HLSL
             public int WarpSizeX;
             public int WarpSizeY;
 
-            public Func<List<HLSLValue>> InputGenerator;
+            public bool UsesCustomThreadGroup;
+            public int ThreadGroupX;
+            public int ThreadGroupY;
+            public int ThreadGroupZ;
+
+            public Func<HLSLRunner, List<HLSLValue>> InputGenerator;
         }
 
         public struct TestResult
@@ -309,14 +314,16 @@ namespace HLSL
             return newConfig;
         }
 
-        private bool TryBuildMockResourceFactories(FunctionDefinitionNode func, out Func<HLSLValue>[] factories)
+        private bool TryBuildAutoFillFactories(FunctionDefinitionNode func, out Func<HLSLRunner, HLSLValue>[] factories)
         {
-            bool any = false;
-            factories = new Func<HLSLValue>[func.Parameters.Count];
+            bool hadAutoFills = false;
+            factories = new Func<HLSLRunner, HLSLValue>[func.Parameters.Count];
 
             for (int i = 0; i < func.Parameters.Count; i++)
             {
                 var param = func.Parameters[i];
+
+                // Mock resource auto fill
                 foreach (var attr in param.Attributes)
                 {
                     if (attr.Name.Identifier.ToLower() != "mockresource" || attr.Arguments.Count == 0)
@@ -330,17 +337,65 @@ namespace HLSL
                     if (param.ParamType is not PredefinedObjectTypeNode resourceTypeNode)
                         continue;
 
-                    any = true;
                     var capturedStructName = mockStructName;
                     var capturedKind = resourceTypeNode.Kind;
                     var capturedTemplateArgs = resourceTypeNode.TemplateArguments.ToArray();
 
-                    factories[i] = () => interpreter.CreateMockResource(capturedStructName, capturedKind, capturedTemplateArgs);
+                    factories[i] = runner => runner.interpreter.CreateMockResource(capturedStructName, capturedKind, capturedTemplateArgs);
                 }
 
+                // SV semantics auto fill
+                foreach (var qual in param.Declarator.Qualifiers)
+                {
+                    if (qual is not SemanticNode semanticNode)
+                        continue;
+
+                    switch (semanticNode.Name.Identifier?.ToLowerInvariant())
+                    {
+                        case "sv_groupindex":
+                            factories[i] = static runner =>
+                            {
+                                var es = runner.GetExecutionState();
+                                int threadCount = es.GetThreadCount();
+                                int gx = es.GetSizeX();
+                                int gy = es.GetSizeY();
+                                var lanes = new RawValue[threadCount];
+                                for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
+                                {
+                                    var (tx, ty, tz) = es.GetThreadPosition(threadIndex);
+                                    lanes[threadIndex] = (uint)(tz * gx * gy + ty * gx + tx);
+                                }
+                                return new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarVGPR(lanes));
+                            };
+                            break;
+                        case "sv_groupthreadid":
+                        case "sv_dispatchthreadid":
+                            factories[i] = static runner =>
+                            {
+                                var es = runner.GetExecutionState();
+                                int threadCount = es.GetThreadCount();
+                                var lanes = new RawValue[threadCount][];
+                                for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
+                                {
+                                    var (tx, ty, tz) = es.GetThreadPosition(threadIndex);
+                                    lanes[threadIndex] = new RawValue[] { (uint)tx, (uint)ty, (uint)tz };
+                                }
+                                return new VectorValue(ScalarType.Uint, HLSLValueUtils.MakeVectorVGPR(lanes));
+                            };
+                            break;
+                        case "sv_groupid":
+                            factories[i] = static _ => new VectorValue(ScalarType.Uint,
+                                HLSLValueUtils.MakeVectorSGPR(new RawValue[] { (uint)0, (uint)0, (uint)0 }));
+                            break;
+                        default:
+                            break;
+                    }
+                }
+
+                hadAutoFills |= factories[i] != null;
             }
 
-            return any;
+            return hadAutoFills;
         }
 
         private bool IsIgnored(string functionName, List<HLSLValue> inputs, out string reason)
@@ -415,11 +470,9 @@ namespace HLSL
         public HLSLValue GetVariable(string name) => interpreter.GetVariable(name);
         public HLSLValue CallFunction(string name, params HLSLValue[] args) => interpreter.CallFunction(name, args);
 
-        public void SetWarpSize(int threadsX, int threadsY) => interpreter.SetWarpSize(threadsX, threadsY);
-        public void EnableThread(int threadIndex) => interpreter.EnableThread(threadIndex);
-        public void DisableThread(int threadIndex) => interpreter.DisableThread(threadIndex);
-        public bool IsThreadActive(int threadIndex) => interpreter.IsThreadActive(threadIndex);
-        public int GetThreadIndex(int threadX, int threadY) => interpreter.GetThreadIndex(threadX, threadY);
+        public void SetWarpSize(int warpSizeX, int warpSizeY) => interpreter.SetWarpSize(warpSizeX, warpSizeY);
+        public void SetWarpAndGroupSize(int warpSizeX, int warpSizeY, int groupSizeX, int groupSizeY, int groupSizeZ) => interpreter.SetWarpAndGroupSize(warpSizeX, warpSizeY, groupSizeX, groupSizeY, groupSizeZ);
+        public HLSLExecutionState GetExecutionState() => interpreter.GetExecutionState();
 
         // Reflection API
         public FunctionDefinitionNode GetFunction(string name, HLSLValue[] args) => interpreter.GetFunction(name, args);
@@ -454,14 +507,14 @@ namespace HLSL
                 testRun.FunctionName = qualifiedName;
                 testRun.TestName = func.Name.GetName();
 
-                // Detect [MockResource] params first so [TestCase] knows how many args to expect.
-                bool hasMocks = TryBuildMockResourceFactories(func, out var mockFactories);
-                int nonMockCount = mockFactories.Count(f => f == null);
+                // Detect [MockResource] and SV semantic params first so [TestCase] knows how many args to expect.
+                bool hasAutoFill = TryBuildAutoFillFactories(func, out var autoFillFactories);
+                int nonAutoFillCount = autoFillFactories.Count(f => f == null);
 
                 // Gather test attributes
                 foreach (var attribute in func.Attributes)
                 {
-                    string lexeme = attribute.Name.Identifier.ToLower();
+                    string lexeme = attribute.Name.Identifier.ToLowerInvariant();
                     switch (lexeme)
                     {
                         case "test":
@@ -481,8 +534,19 @@ namespace HLSL
                                 testRun.WarpSizeY = 1;
                             }
                             break;
+                        case "numthreads":
+                            if (attribute.Arguments.Count >= 1)
+                            {
+                                testRun.UsesCustomThreadGroup = true;
+                                testRun.ThreadGroupX = (interpreter.EvaluateExpression(attribute.Arguments[0]) as ScalarValue).AsInt();
+                                testRun.ThreadGroupY = attribute.Arguments.Count > 1
+                                    ? (interpreter.EvaluateExpression(attribute.Arguments[1]) as ScalarValue).AsInt() : 1;
+                                testRun.ThreadGroupZ = attribute.Arguments.Count > 2
+                                    ? (interpreter.EvaluateExpression(attribute.Arguments[2]) as ScalarValue).AsInt() : 1;
+                            }
+                            break;
                         case "testcase":
-                            if (attribute.Arguments.Count == nonMockCount)
+                            if (attribute.Arguments.Count == nonAutoFillCount)
                             {
                                 var inputs = attribute.Arguments.Select(a => interpreter.EvaluateExpression(a)).ToList();
                                 testCases.Add((inputs, $"{testRun.FunctionName}({string.Join(", ", inputs)})"));
@@ -496,7 +560,7 @@ namespace HLSL
                                 if (generatorName != null)
                                 {
                                     var cases = RunTestCaseGenerator(generatorName);
-                                    foreach (var caseInputs in cases.Where(c => c.Count == nonMockCount))
+                                    foreach (var caseInputs in cases.Where(c => c.Count == nonAutoFillCount))
                                     {
                                         testCases.Add((caseInputs, $"{testRun.FunctionName}({string.Join(", ", caseInputs)})"));
                                     }
@@ -556,8 +620,8 @@ namespace HLSL
                     // Simple test
                     if (testCases.Count == 0)
                     {
-                        if (hasMocks)
-                            testRun.InputGenerator = () => mockFactories.Select(f => f?.Invoke()).ToList();
+                        if (hasAutoFill)
+                            testRun.InputGenerator = runner => autoFillFactories.Select(f => f?.Invoke(runner)).ToList();
                         testsToRun.Add(testRun);
                     }
                     // Test with cases
@@ -567,16 +631,16 @@ namespace HLSL
                         {
                             var caseRun = testRun;
                             caseRun.TestName = formattedName;
-                            // If we have mocks, include them
-                            if (hasMocks)
+                            // If we have autofills, include them
+                            if (hasAutoFill)
                             {
-                                caseRun.InputGenerator = () =>
+                                caseRun.InputGenerator = runner =>
                                 {
-                                    var merged = new List<HLSLValue>(mockFactories.Length);
+                                    var merged = new List<HLSLValue>(autoFillFactories.Length);
                                     int caseIdx = 0;
-                                    foreach (var factory in mockFactories)
+                                    foreach (var factory in autoFillFactories)
                                     {
-                                        merged.Add(factory != null ? factory() : caseInputs[caseIdx++]);
+                                        merged.Add(factory != null ? factory(runner) : caseInputs[caseIdx++]);
                                     }
                                     return merged;
                                 };
@@ -584,7 +648,7 @@ namespace HLSL
                             // Otherwise use the regular generator
                             else
                             {
-                                caseRun.InputGenerator = () => caseInputs;
+                                caseRun.InputGenerator = _ => caseInputs;
                             }
                             testsToRun.Add(caseRun);
                         }
@@ -606,8 +670,15 @@ namespace HLSL
                 currentTest = testsToRun[i];
 
                 // Setup
-                if (currentTest.UsesCustomWarpSize)
-                    interpreter.SetWarpSize(currentTest.WarpSizeX, currentTest.WarpSizeY);
+                if (currentTest.UsesCustomWarpSize || currentTest.UsesCustomThreadGroup)
+                {
+                    int wx = currentTest.UsesCustomWarpSize ? currentTest.WarpSizeX : 2;
+                    int wy = currentTest.UsesCustomWarpSize ? currentTest.WarpSizeY : 2;
+                    int gx = currentTest.UsesCustomThreadGroup ? currentTest.ThreadGroupX : wx;
+                    int gy = currentTest.UsesCustomThreadGroup ? currentTest.ThreadGroupY : wy;
+                    int gz = currentTest.UsesCustomThreadGroup ? currentTest.ThreadGroupZ : 1;
+                    interpreter.SetWarpAndGroupSize(wx, wy, gx, gy, gz);
+                }
                 var sw = new StringWriter();
                 Console.SetOut(sw);
 
@@ -617,7 +688,7 @@ namespace HLSL
                 {
                     if (currentTest.InputGenerator != null)
                     {
-                        inputs = currentTest.InputGenerator();
+                        inputs = currentTest.InputGenerator(this);
                     }
                 }
                 catch (Exception ex)
@@ -677,7 +748,7 @@ namespace HLSL
 
                 // Cleanup
                 Console.SetOut(oldConsoleOut);
-                if (currentTest.UsesCustomWarpSize)
+                if (currentTest.UsesCustomWarpSize || currentTest.UsesCustomThreadGroup)
                     interpreter.SetWarpSize(2, 2);
             }
             return results;

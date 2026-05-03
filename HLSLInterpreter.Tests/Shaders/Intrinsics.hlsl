@@ -254,6 +254,156 @@ void Intrinsic_Dot()
     ASSERT(dot(float3(3.0, 4.0, 0.0), float3(3.0, 4.0, 0.0)) == 25.0);
 }
 
+// 2x2 quad layout under the default 2x2 warp:
+//   lane 0 (x=0, y=0) | lane 1 (x=1, y=0)
+//   lane 2 (x=0, y=1) | lane 3 (x=1, y=1)
+//
+// The values 1, 5, 10, 22 are picked so that the per-row x-derivatives differ
+// (4 vs 12) and the per-column y-derivatives differ (9 vs 17). That lets the
+// fine variants be distinguished from the coarse ones, and also means a buggy
+// implementation that always returns 0 (or always returns the wrong axis) fails.
+
+[Test]
+void Intrinsic_DdxFine()
+{
+    uint lane = WaveGetLaneIndex();
+    float v = lane == 0 ? 1.0 :
+              lane == 1 ? 5.0 :
+              lane == 2 ? 10.0 :
+                          22.0;
+    float dx = ddx_fine(v);
+    if (lane == 0 || lane == 1) ASSERT(dx == 4.0);   // top row: 5 - 1
+    else                        ASSERT(dx == 12.0);  // bottom row: 22 - 10
+
+    // Negative derivative when the right lane is smaller than the left lane.
+    float w = (lane == 0 || lane == 2) ? 5.0 : 1.0;
+    ASSERT(ddx_fine(w) == -4.0);
+
+    // Component-wise on vectors. Two rows produce different per-component answers.
+    float3 vec = float3(v, 2.0 * v, v + 1.0);
+    float3 dxv = ddx_fine(vec);
+    if (lane == 0 || lane == 1) ASSERT(dxv.x == 4.0  && dxv.y == 8.0  && dxv.z == 4.0);
+    else                        ASSERT(dxv.x == 12.0 && dxv.y == 24.0 && dxv.z == 12.0);
+
+    // ddx_fine of a uniform value is 0.
+    ASSERT(ddx_fine(7.5) == 0.0);
+}
+
+[Test]
+void Intrinsic_DdyFine()
+{
+    uint lane = WaveGetLaneIndex();
+    float v = lane == 0 ? 1.0 :
+              lane == 1 ? 5.0 :
+              lane == 2 ? 10.0 :
+                          22.0;
+    float dy = ddy_fine(v);
+    if (lane == 0 || lane == 2) ASSERT(dy == 9.0);   // left col: 10 - 1
+    else                        ASSERT(dy == 17.0);  // right col: 22 - 5
+
+    // Negative direction.
+    float w = (lane == 0 || lane == 1) ? 5.0 : 1.0;
+    ASSERT(ddy_fine(w) == -4.0);
+
+    // Component-wise on vectors.
+    float3 vec = float3(v, 2.0 * v, v + 1.0);
+    float3 dyv = ddy_fine(vec);
+    if (lane == 0 || lane == 2) ASSERT(dyv.x == 9.0  && dyv.y == 18.0 && dyv.z == 9.0);
+    else                        ASSERT(dyv.x == 17.0 && dyv.y == 34.0 && dyv.z == 17.0);
+
+    // ddy_fine of a uniform value is 0.
+    ASSERT(ddy_fine(7.5) == 0.0);
+}
+
+[Test]
+void Intrinsic_Ddx()
+{
+    uint lane = WaveGetLaneIndex();
+    float v = lane == 0 ? 1.0 :
+              lane == 1 ? 5.0 :
+              lane == 2 ? 10.0 :
+                          22.0;
+    // Coarse ddx broadcasts the top row's x-derivative across both rows.
+    ASSERT(ddx(v) == 4.0);
+
+    // Confirm that the bottom row's larger derivative is *not* selected.
+    float w = lane == 0 ? 0.0 :
+              lane == 1 ? 7.0 :
+              lane == 2 ? 100.0 :
+                          200.0;
+    ASSERT(ddx(w) == 7.0);
+
+    // Negative derivative.
+    float n = (lane == 0 || lane == 2) ? 5.0 : 1.0;
+    ASSERT(ddx(n) == -4.0);
+
+    // Component-wise.
+    float3 vec = float3(v, 2.0 * v, -v);
+    float3 dxv = ddx(vec);
+    ASSERT(dxv.x == 4.0 && dxv.y == 8.0 && dxv.z == -4.0);
+
+    // ddx of a uniform value is 0.
+    ASSERT(ddx(7.5) == 0.0);
+}
+
+[Test]
+void Intrinsic_Ddy()
+{
+    uint lane = WaveGetLaneIndex();
+    float v = lane == 0 ? 1.0 :
+              lane == 1 ? 5.0 :
+              lane == 2 ? 10.0 :
+                          22.0;
+    // Coarse ddy broadcasts the left column's y-derivative across both columns.
+    ASSERT(ddy(v) == 9.0);
+
+    // Confirm that the right column's larger derivative is *not* selected.
+    float w = lane == 0 ? 0.0 :
+              lane == 1 ? 100.0 :
+              lane == 2 ? 7.0 :
+                          200.0;
+    ASSERT(ddy(w) == 7.0);
+
+    // Negative derivative.
+    float n = (lane == 0 || lane == 1) ? 5.0 : 1.0;
+    ASSERT(ddy(n) == -4.0);
+
+    // Component-wise.
+    float3 vec = float3(v, 2.0 * v, -v);
+    float3 dyv = ddy(vec);
+    ASSERT(dyv.x == 9.0 && dyv.y == 18.0 && dyv.z == -9.0);
+
+    // ddy of a uniform value is 0.
+    ASSERT(ddy(7.5) == 0.0);
+}
+
+[Test]
+void Intrinsic_Fwidth()
+{
+    uint lane = WaveGetLaneIndex();
+    // fwidth = |ddx| + |ddy|, using the coarse derivatives.
+    float v = lane == 0 ? 1.0 :
+              lane == 1 ? 5.0 :
+              lane == 2 ? 10.0 :
+                          22.0;
+    ASSERT(fwidth(v) == 13.0);   // |4| + |9|
+
+    // Negative derivatives still contribute their absolute value.
+    float w = lane == 0 ? 5.0 :
+              lane == 1 ? 1.0 :
+              lane == 2 ? 2.0 :
+                          0.0;
+    ASSERT(fwidth(w) == 7.0);    // |1-5| + |2-5|
+
+    // Component-wise.
+    float3 vec = float3(v, 2.0 * v, -v);
+    float3 fw = fwidth(vec);
+    ASSERT(fw.x == 13.0 && fw.y == 26.0 && fw.z == 13.0);
+
+    // fwidth of a uniform value is 0.
+    ASSERT(fwidth(7.5) == 0.0);
+}
+
 [Test]
 void Intrinsic_Exp()
 {

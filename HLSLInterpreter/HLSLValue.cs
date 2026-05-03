@@ -215,6 +215,8 @@ namespace HLSL
 
         public override HLSLValue Copy() => new StringValue(Value);
 
+        public static implicit operator StringValue(string v) => new StringValue(v);
+
         public override string ToString() => Value;
     }
 

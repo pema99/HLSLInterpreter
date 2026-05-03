@@ -67,7 +67,7 @@ public static class SoftwareRenderer
         for (int threadIdx = 0; threadIdx < threadsPerWarp; threadIdx++)
         {
             if (!fragments[threadIdx].IsValid)
-                runner.DisableThread(threadIdx);
+                runner.GetExecutionState().DisableThread(threadIdx);
         }
 
         // Run frag function.
@@ -101,10 +101,10 @@ public static class SoftwareRenderer
             int batchSize = Math.Min(threadsPerWarp, vertexCount - batchStart);
             var args = BuildVertexArgs(runner, vertFunc, mesh, vertexOffset + batchStart, threadsPerWarp);
             for (int t = batchSize; t < threadsPerWarp; t++)
-                runner.DisableThread(t);
+                runner.GetExecutionState().DisableThread(t);
             var batchOutput = runner.CallFunction(vertEntry, args);
             for (int t = batchSize; t < threadsPerWarp; t++)
-                runner.EnableThread(t);
+                runner.GetExecutionState().EnableThread(t);
             for (int i = 0; i < batchSize; i++)
                 outs[batchStart + i] = HLSLValueUtils.Scalarize(batchOutput, i);
         }

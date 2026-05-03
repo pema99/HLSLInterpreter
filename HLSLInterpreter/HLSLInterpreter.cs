@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using UnityShaderParser.Common;
 using UnityShaderParser.HLSL;
@@ -20,18 +21,19 @@ namespace HLSL
         }
 
         // Public interface
-        public void SetWarpSize(int threadsX, int threadsY)
+        public void SetWarpSize(int warpSizeX, int warpSizeY)
+        {
+            SetWarpAndGroupSize(warpSizeX, warpSizeY, warpSizeX, warpSizeY, 1);
+        }
+        public void SetWarpAndGroupSize(int warpSizeX, int warpSizeY, int groupSizeX, int groupSizeY, int groupSizeZ)
         {
             var oldCallbacks = expressionEvaluator.GetCallbacks();
-            executionState = new HLSLExecutionState(threadsX, threadsY);
+            executionState = new HLSLExecutionState(warpSizeX, warpSizeY, groupSizeX, groupSizeY, groupSizeZ);
             expressionEvaluator = new HLSLExpressionEvaluator(this, context, executionState);
             foreach (var kvp in oldCallbacks)
                 expressionEvaluator.AddCallback(kvp.Key, kvp.Value);
         }
-        public void EnableThread(int threadIndex) => executionState.EnableThread(threadIndex);
-        public void DisableThread(int threadIndex) => executionState.DisableThread(threadIndex);
-        public bool IsThreadActive(int threadIndex) => executionState.IsThreadActive(threadIndex);
-        public int GetThreadIndex(int threadX, int threadY) => executionState.GetThreadIndex(threadX, threadY);
+        public HLSLExecutionState GetExecutionState() => executionState;
         public void SetVariable(string name, HLSLValue value) => context.SetVariable(name, value);
         public HLSLValue GetVariable(string name) => context.GetVariable(name);
 
@@ -39,7 +41,9 @@ namespace HLSL
         {
             var oldCallbacks = expressionEvaluator.GetCallbacks();
             context = new HLSLInterpreterContext();
-            executionState = new HLSLExecutionState(executionState.GetThreadsX(), executionState.GetThreadsY());
+            executionState = new HLSLExecutionState(
+                executionState.GetWarpSizeX(), executionState.GetWarpSizeY(),
+                executionState.GetSizeX(), executionState.GetSizeY(), executionState.GetSizeZ());
             expressionEvaluator = new HLSLExpressionEvaluator(this, context, executionState);
             foreach (var kvp in oldCallbacks)
                 expressionEvaluator.AddCallback(kvp.Key, kvp.Value);
@@ -379,6 +383,7 @@ namespace HLSL
         }
 
         // Visitor implementation
+        [DebuggerStepThrough]
         public override void Visit(HLSLSyntaxNode node)
         {
             if (DebugHook != null

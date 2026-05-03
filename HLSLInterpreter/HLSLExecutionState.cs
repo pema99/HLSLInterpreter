@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -22,17 +22,38 @@ namespace HLSL
             Suspended, // Disabled by continue
         }
 
-        private int threadsX, threadsY;
+        private int warpSizeX, warpSizeY;
+        private int warpSizeInThreads;
+        private int groupSizeX, groupSizeY, groupSizeZ;
+        private int warpsPerGroupX, warpsPerGroupY;
+        private int groupSizeInThreads;
         private Stack<(ExecutionScope scope, ThreadState[] mask)> executionMask;
 
-        public HLSLExecutionState(int threadsX, int threadsY)
+        public HLSLExecutionState(int warpSizeX, int warpSizeY)
+            : this(warpSizeX, warpSizeY, warpSizeX, warpSizeY, 1) { }
+
+        public HLSLExecutionState(int warpSizeX, int warpSizeY, int groupSizeX, int groupSizeY, int groupSizeZ)
         {
-            this.threadsX = threadsX;
-            this.threadsY = threadsY;
+            this.warpSizeX = warpSizeX;
+            this.warpSizeY = warpSizeY;
+            this.groupSizeX = groupSizeX;
+            this.groupSizeY = groupSizeY;
+            this.groupSizeZ = groupSizeZ;
+            warpSizeInThreads = warpSizeX * warpSizeY;
+            warpsPerGroupX = (groupSizeX + warpSizeX - 1) / warpSizeX;
+            warpsPerGroupY = (groupSizeY + warpSizeY - 1) / warpSizeY;
+            groupSizeInThreads = warpsPerGroupX * warpsPerGroupY * groupSizeZ * warpSizeInThreads;
+
             executionMask = new Stack<(ExecutionScope, ThreadState[])>();
 
-            var initial = new ThreadState[threadsX * threadsY];
-            Array.Fill(initial, ThreadState.Active);
+            // Padding threads, when warps don't tile the group exactly:
+            var initial = new ThreadState[groupSizeInThreads];
+            for (int threadIndex = 0; threadIndex < groupSizeInThreads; threadIndex++)
+            {
+                var (tx, ty, tz) = GetThreadPosition(threadIndex);
+                bool inGroup = tx < groupSizeX && ty < groupSizeY && tz < groupSizeZ;
+                initial[threadIndex] = inGroup ? ThreadState.Active : ThreadState.Inactive;
+            }
             executionMask.Push((ExecutionScope.Function, initial));
         }
 
@@ -119,6 +140,43 @@ namespace HLSL
             }
         }
 
+        public bool IsAnyThreadActive() => executionMask.Peek().mask.Any(x => x == ThreadState.Active);
+        public bool IsUniformExecution() => executionMask.Peek().mask.All(x => x == ThreadState.Active);
+        public bool IsVaryingExecution() => !IsUniformExecution();
+
+        // Warp helpers:
+        public int GetWarpSizeX() => warpSizeX;
+        public int GetWarpSizeY() => warpSizeY;
+        public int GetWarpThreadCount() => warpSizeInThreads;
+        public (int lx, int ly) GetThreadPositionInWarp(int threadIndex)
+        {
+            int lane = threadIndex % warpSizeInThreads;
+            return (lane % warpSizeX, lane / warpSizeX);
+        }
+
+        // Thread group helpers:
+        public int GetSizeX() => groupSizeX;
+        public int GetSizeY() => groupSizeY;
+        public int GetSizeZ() => groupSizeZ;
+        public int GetThreadCount() => groupSizeInThreads;
+        public (int tx, int ty, int tz) GetThreadPosition(int threadIndex)
+        {
+            int warpIdx = threadIndex / warpSizeInThreads;
+            (int lx, int ly) = GetThreadPositionInWarp(threadIndex);
+            int wxy = warpsPerGroupX * warpsPerGroupY;
+            int wz = warpIdx / wxy;
+            int wxyIdx = warpIdx % wxy;
+            int wy = wxyIdx / warpsPerGroupX;
+            int wx = wxyIdx % warpsPerGroupX;
+            return (wx * warpSizeX + lx, wy * warpSizeY + ly, wz);
+        }
+
+        // Thread group <-> warp helpers:
+        public int GetFirstThreadIndexInWarp(int warpIndex) => warpIndex * warpSizeInThreads;
+        public int GetWarpIndexOfThread(int threadIndex) => threadIndex / warpSizeInThreads;
+        public int GetWarpCount() => warpsPerGroupX * warpsPerGroupY * groupSizeZ;
+
+        // Debug API:
         public ThreadState[] GetThreadStates() => executionMask.Peek().mask.ToArray();
         public ThreadState[][] GetThreadStatesPerFrame()
         {
@@ -139,14 +197,5 @@ namespace HLSL
 
             return frames.ToArray();
         }
-        public bool IsAnyThreadActive() => executionMask.Peek().mask.Any(x => x == ThreadState.Active);
-        public bool IsUniformExecution() => executionMask.Peek().mask.All(x => x == ThreadState.Active);
-        public bool IsVaryingExecution() => !IsUniformExecution();
-
-        public int GetThreadIndex(int threadX, int threadY) => threadY * threadsX + threadX;
-        public (int threadX, int threadY) GetThreadPosition(int threadIndex) => (threadIndex % threadsX, threadIndex / threadsX);
-        public int GetThreadCount() => threadsX * threadsY;
-        public int GetThreadsX() => threadsX;
-        public int GetThreadsY() => threadsY;
     }
 }
