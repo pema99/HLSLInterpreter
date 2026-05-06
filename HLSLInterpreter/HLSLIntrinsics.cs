@@ -832,7 +832,8 @@ namespace HLSL
 
         public static NumericValue Frac(NumericValue x)
         {
-            return Abs(ToFloatLike(x).Map(val => val.Float % 1.0f));
+            x = ToFloatLike(x);
+            return x - Floor(x);
         }
 
         public static NumericValue Isnan(NumericValue x)
@@ -1236,7 +1237,7 @@ namespace HLSL
             x = ToFloatLike(x);
             var bits = Asuint(x);
             var biased_exp = (HLSLOperators.BitSHR(bits, 23) & 0xFF).Cast(ScalarType.Int);
-            var mantissa_bits = (bits & 0x807FFFFFu) | (126u << 23);
+            var mantissa_bits = (bits & 0x007FFFFFu) | (126u << 23);
             e.Set(Select(x == 0, 0, biased_exp - 126));
             return Select(x == 0, x, Asfloat(mantissa_bits));
         }
