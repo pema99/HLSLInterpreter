@@ -287,6 +287,14 @@ void Intrinsic_DdxFine()
 
     // ddx_fine of a uniform value is 0.
     ASSERT(ddx_fine(7.5) == 0.0);
+
+    // Int input must be promoted to float per DXC.
+    int iv = lane == 0 ? 1 :
+             lane == 1 ? 5 :
+             lane == 2 ? 10 :
+                         22;
+    if (lane == 0 || lane == 1) ASSERT(abs(1 / ddx_fine(iv) - 0.25) < 0.001);
+    else                        ASSERT(abs(1 / ddx_fine(iv) - 0.083333) < 0.001);
 }
 
 [Test]
@@ -313,6 +321,14 @@ void Intrinsic_DdyFine()
 
     // ddy_fine of a uniform value is 0.
     ASSERT(ddy_fine(7.5) == 0.0);
+
+    // Int input must be promoted to float per DXC.
+    int iv = lane == 0 ? 1 :
+             lane == 1 ? 5 :
+             lane == 2 ? 10 :
+                         22;
+    if (lane == 0 || lane == 2) ASSERT(abs(1 / ddy_fine(iv) - 0.111111) < 0.001);
+    else                        ASSERT(abs(1 / ddy_fine(iv) - 0.058823) < 0.001);
 }
 
 [Test]
@@ -344,6 +360,13 @@ void Intrinsic_Ddx()
 
     // ddx of a uniform value is 0.
     ASSERT(ddx(7.5) == 0.0);
+
+    // Int input must be promoted to float per DXC's float_like signature.
+    int iv = lane == 0 ? 1 :
+             lane == 1 ? 5 :
+             lane == 2 ? 10 :
+                         22;
+    ASSERT(abs(1 / ddx(iv) - 0.25) < 0.001);
 }
 
 [Test]
@@ -375,6 +398,13 @@ void Intrinsic_Ddy()
 
     // ddy of a uniform value is 0.
     ASSERT(ddy(7.5) == 0.0);
+
+    // Int input must be promoted to float per DXC's float_like signature.
+    int iv = lane == 0 ? 1 :
+             lane == 1 ? 5 :
+             lane == 2 ? 10 :
+                         22;
+    ASSERT(abs(1 / ddy(iv) - 0.111111) < 0.001);
 }
 
 [Test]
@@ -461,6 +491,12 @@ void Intrinsic_Faceforward()
     ng = float3(1.0, 0.0, 0.0);
     result = faceforward(n, i, ng);
     ASSERT(result.x == 1.0 && result.y == 0.0 && result.z == 0.0);
+
+    // Int args must be promoted to float per DXC's float_like signature.
+    int3 ni = int3(2, 0, 0);
+    int3 ii = int3(-1, 0, 0);
+    int3 ngi = int3(1, 0, 0);
+    ASSERT(abs(1 / faceforward(ni, ii, ngi).x - 0.5) < 0.001);
 }
 
 
@@ -503,6 +539,10 @@ void Intrinsic_Fma()
     // Zero cases
     ASSERT(fma(0.0, 5.0, 10.0) == 10.0);
     ASSERT(fma(5.0, 0.0, 10.0) == 10.0);
+
+    // Int args must be promoted to float per DXC.
+    int ia = 2, ib = 3, ic = 4;
+    ASSERT(abs(1 / fma(ia, ib, ic) - 0.1) < 0.001);
 }
 
 [Test]
@@ -669,6 +709,11 @@ void Intrinsic_Lerp()
     // Vector with negative values
     float3 v2 = lerp(float3(-5.0, 10.0, 0.0), float3(5.0, 0.0, 10.0), 0.5);
     ASSERT(v2.x == 0.0 && v2.y == 5.0 && v2.z == 5.0);
+
+    // Per DXC, lerp takes float_like, so all-int args must be promoted to float.
+    // Otherwise dividing an int literal by the result triggers integer division.
+    int ix = 0, iy = 10, is_ = 1;
+    ASSERT(abs(1 / lerp(ix, iy, is_) - 0.1) < 0.001);
 }
 
 [Test]
@@ -1078,6 +1123,12 @@ void Intrinsic_Smoothstep()
     // Different range
     ASSERT(abs(smoothstep(0.0, 10.0, 5.0) - 0.5) < 0.001);
     ASSERT(abs(smoothstep(-1.0, 1.0, 0.0) - 0.5) < 0.001);
+
+    // Integer arguments should be promoted to float (no integer division).
+    ASSERT(abs(smoothstep(0, 15, 7) - 0.45007) < 0.001);
+    ASSERT(abs(smoothstep(0, 10, 5) - 0.5) < 0.001);
+    int a = 0, b = 10, x = 5;
+    ASSERT(abs(smoothstep(a, b, x) - 0.5) < 0.001);
 }
 
 [Test]
@@ -1131,6 +1182,11 @@ void Intrinsic_Step()
     // Vector with negative values
     float3 v2 = step(float3(0.0, -1.0, 1.0), float3(-0.5, -0.5, 1.5));
     ASSERT(v2.x == 0.0 && v2.y == 1.0 && v2.z == 1.0);
+
+    // Int args must be promoted to float per DXC; result must be float so that
+    // (step + 1) does not become an integer that defeats float division.
+    int iy = 0, ix = 2;
+    ASSERT(abs(1 / (step(iy, ix) + 1) - 0.5) < 0.001);
 }
 
 [Test]
@@ -1885,6 +1941,12 @@ void Intrinsic_Dst()
     // Verify first component is always 1
     result = dst(float4(99.0, 2.0, 3.0, 4.0), float4(88.0, 6.0, 7.0, 8.0));
     ASSERT(result.x == 1.0);
+
+    // dst is `numeric` per DXC, so int4 inputs must produce an int4 result.
+    // Putting the result through int division surfaces a float over-cast bug.
+    int4 ir = dst(int4(1, 2, 3, 4), int4(5, 6, 7, 8));
+    ASSERT(ir.x == 1 && ir.y == 12 && ir.z == 3 && ir.w == 8);
+    ASSERT(10 / dst(int4(1, 2, 3, 4), int4(5, 6, 7, 8)).y == 0);
 }
 
 [Test]
@@ -3037,6 +3099,16 @@ void Intrinsic_Frexp()
     ASSERT(abs(reconstructed3.x - original3.x) < 0.001);
     ASSERT(abs(reconstructed3.y - original3.y) < 0.001);
     ASSERT(abs(reconstructed3.z - original3.z) < 0.001);
+
+    // Integer arguments must be promoted to float; otherwise the bit-level
+    // exponent extraction would interpret raw int bits as a float.
+    int iexp;
+    float imantissa = frexp(8, iexp);
+    ASSERT(abs(imantissa - 0.5) < 0.001);
+    ASSERT(iexp == 4);
+    imantissa = frexp(3, iexp);
+    ASSERT(abs(imantissa - 0.75) < 0.001);
+    ASSERT(iexp == 2);
 }
 
 [Test]

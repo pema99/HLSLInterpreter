@@ -290,6 +290,13 @@ void Intrinsic_WaveActiveBitAnd()
     
     ASSERT(WaveReadLaneAt(conditional, 2) == 0x0000FFFF);
     ASSERT(WaveReadLaneAt(conditional, 3) == 0x0000FFFF);
+
+    // Int input must produce a uint result per DXC's uint_only signature.
+    // Without the cast, int(-1) AND-reduces to int(-1) which compares as
+    // negative against a uint zero; uint(0xFFFFFFFF) compares as a large
+    // positive number.
+    int negOne = -1;
+    ASSERT(WaveActiveBitAnd(negOne) > 0u);
 }
 
 [Test]
@@ -333,8 +340,12 @@ void Intrinsic_WaveActiveBitOr()
     uint conditional = 0;
     if (lane >= 2)
         conditional = WaveActiveBitOr(1 << lane);
-    
+
     ASSERT(WaveReadLaneAt(conditional, 2) == 0xC); // Bits 2 and 3
+
+    // Int input must produce a uint result per DXC's uint_only signature.
+    int negOne = -1;
+    ASSERT(WaveActiveBitOr(negOne) > 0u);
 }
 
 [Test]
@@ -375,6 +386,12 @@ void Intrinsic_WaveActiveBitXor()
     uint threeSame = (lane == 3) ? 0xF0F0F0F0 : 0x0F0F0F0F;
     uint threeSameXor = WaveActiveBitXor(threeSame);
     ASSERT(threeSameXor == 0xFFFFFFFF); // Odd count of each bit
+
+    // Int input must produce a uint result per DXC's uint_only signature.
+    // Lane 0 contributes -1 (0xFFFFFFFF); other lanes contribute 0; result
+    // should be 0xFFFFFFFF (positive uint), not -1 (negative int).
+    int xorIn = (lane == 0) ? -1 : 0;
+    ASSERT(WaveActiveBitXor(xorIn) > 0u);
 }
 
 [Test]

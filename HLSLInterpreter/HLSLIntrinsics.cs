@@ -275,6 +275,9 @@ namespace HLSL
         // https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-lerp
         public static NumericValue Lerp(NumericValue x, NumericValue y, NumericValue s)
         {
+            x = ToFloatLike(x);
+            y = ToFloatLike(y);
+            s = ToFloatLike(s);
             return x * (1 - s) + y * s;
         }
 
@@ -499,7 +502,9 @@ namespace HLSL
 
         public static NumericValue Step(NumericValue y, NumericValue x)
         {
-            return Select(x >= y, 1, 0);
+            y = ToFloatLike(y);
+            x = ToFloatLike(x);
+            return Select(x >= y, 1.0f, 0.0f);
         }
 
         public static NumericValue Ceil(NumericValue x)
@@ -730,6 +735,9 @@ namespace HLSL
 
         public static NumericValue Faceforward(NumericValue n, NumericValue i, NumericValue ng)
         {
+            n = ToFloatLike(n);
+            i = ToFloatLike(i);
+            ng = ToFloatLike(ng);
             return -n * Sign(Dot(i, ng));
         }
 
@@ -808,6 +816,9 @@ namespace HLSL
 
         public static NumericValue Fma(NumericValue a, NumericValue b, NumericValue c)
         {
+            a = ToFloatLike(a);
+            b = ToFloatLike(b);
+            c = ToFloatLike(c);
             return a * b + c;
         }
 
@@ -957,6 +968,9 @@ namespace HLSL
         // https://developer.download.nvidia.com/cg/smoothstep.html
         public static NumericValue Smoothstep(NumericValue a, NumericValue b, NumericValue x)
         {
+            a = ToFloatLike(a);
+            b = ToFloatLike(b);
+            x = ToFloatLike(x);
             var t = Saturate((x - a)/(b - a));
             return t*t*(3.0f - (2.0f*t));
         }
@@ -1035,9 +1049,11 @@ namespace HLSL
 
         public static NumericValue Dst(NumericValue src0, NumericValue src1)
         {
-            var src0vec = CastToVector(ToFloatLike(src0));
-            var src1vec = CastToVector(ToFloatLike(src1));
-            return VectorValue.FromScalars((ScalarValue)(NumericValue)1.0f, src0vec.y * src1vec.y, src0vec.z, src1vec.w);
+            (src0, src1) = HLSLTypeUtils.Promote(src0, src1, false);
+            var src0vec = CastToVector(src0);
+            var src1vec = CastToVector(src1);
+            var one = (ScalarValue)((NumericValue)1).Cast(src0vec.Type);
+            return VectorValue.FromScalars(one, src0vec.y * src1vec.y, src0vec.z, src1vec.w);
         }
 
         public static NumericValue Length(NumericValue x)
@@ -1217,6 +1233,7 @@ namespace HLSL
 
         public static NumericValue Frexp(NumericValue x, ReferenceValue e)
         {
+            x = ToFloatLike(x);
             var bits = Asuint(x);
             var biased_exp = (HLSLOperators.BitSHR(bits, 23) & 0xFF).Cast(ScalarType.Int);
             var mantissa_bits = (bits & 0x807FFFFFu) | (126u << 23);
@@ -1706,13 +1723,13 @@ namespace HLSL
         }
 
         public static NumericValue WaveActiveBitAnd(HLSLExecutionState executionState, NumericValue expr) =>
-            WaveActiveReduce(executionState, expr, (a, b) => a & b);
+            WaveActiveReduce(executionState, expr.Cast(ScalarType.Uint), (a, b) => a & b);
 
         public static NumericValue WaveActiveBitOr(HLSLExecutionState executionState, NumericValue expr) =>
-            WaveActiveReduce(executionState, expr, (a, b) => a | b);
+            WaveActiveReduce(executionState, expr.Cast(ScalarType.Uint), (a, b) => a | b);
 
         public static NumericValue WaveActiveBitXor(HLSLExecutionState executionState, NumericValue expr) =>
-            WaveActiveReduce(executionState, expr, (a, b) => a ^ b);
+            WaveActiveReduce(executionState, expr.Cast(ScalarType.Uint), (a, b) => a ^ b);
 
         public static NumericValue WaveActiveCountBits(HLSLExecutionState executionState, NumericValue expr) =>
             WaveActiveSum(executionState, Select(expr, 1u, 0u));
@@ -1792,6 +1809,7 @@ namespace HLSL
 
         public static NumericValue DdxFine(HLSLExecutionState executionState, NumericValue val)
         {
+            val = ToFloatLike(val);
             if (val.IsUniform)
                 return val - val;
 
@@ -1802,6 +1820,7 @@ namespace HLSL
 
         public static NumericValue DdyFine(HLSLExecutionState executionState, NumericValue val)
         {
+            val = ToFloatLike(val);
             if (val.IsUniform)
                 return val - val;
 
@@ -1811,6 +1830,7 @@ namespace HLSL
 
         public static NumericValue Ddx(HLSLExecutionState executionState, NumericValue val)
         {
+            val = ToFloatLike(val);
             if (val.IsUniform)
                 return val - val;
 
@@ -1819,6 +1839,7 @@ namespace HLSL
 
         public static NumericValue Ddy(HLSLExecutionState executionState, NumericValue val)
         {
+            val = ToFloatLike(val);
             if (val.IsUniform)
                 return val - val;
 
