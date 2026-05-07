@@ -316,11 +316,11 @@
 }
 .editor-tabs::-webkit-scrollbar { display: none; }
 .editor-tab {
-    padding: 0 16px;
-    height: 35px;
+    padding: 0 12px;
+    height: 28px;
     display: flex;
     align-items: center;
-    font-size: 13px;
+    font-size: 12px;
     color: #969696;
     cursor: pointer;
     white-space: nowrap;
