@@ -818,9 +818,16 @@ window.setMonacoReadOnly = function (readOnly) {
 
     document.addEventListener('mousedown', function (e) {
         if (e.target.classList.contains('resize-h-handle')) {
-            activeHandle = 'horizontal';
-            startPos = e.clientX;
-            startSize = document.querySelector('.output-panel').getBoundingClientRect().width;
+            const panel = document.querySelector('.output-panel');
+            if (window.innerWidth <= 768) {
+                activeHandle = 'horizontal-narrow';
+                startPos = e.clientY;
+                startSize = panel.getBoundingClientRect().height;
+            } else {
+                activeHandle = 'horizontal';
+                startPos = e.clientX;
+                startSize = panel.getBoundingClientRect().width;
+            }
             e.preventDefault();
         } else if (e.target.classList.contains('resize-v-handle')) {
             const section = e.target.closest('.image-section, .debug-section-image, .debug-section-console, .debug-section-vars, .debug-section-callstack, .debug-section-immediate');
@@ -839,6 +846,9 @@ window.setMonacoReadOnly = function (readOnly) {
             const newWidth = Math.max(160, startSize - (e.clientX - startPos));
             document.querySelector('.output-panel').style.width = newWidth + 'px';
             // Thread grid reacts via ResizeObserver automatically
+        } else if (activeHandle === 'horizontal-narrow') {
+            const newHeight = Math.max(120, startSize - (e.clientY - startPos));
+            document.querySelector('.output-panel').style.height = newHeight + 'px';
         } else if (activeHandle && activeHandle.type === 'vertical') {
             // Handle is at the bottom of the section: drag down = grow
             const newHeight = Math.max(60, Math.min(800, startSize + (e.clientY - startPos)));

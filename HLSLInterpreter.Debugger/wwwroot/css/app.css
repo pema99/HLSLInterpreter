@@ -201,6 +201,36 @@
     overflow-y: auto;
 }
 
+/* In wide mode, ignore any leftover inline height from a prior narrow-mode drag. */
+@media (min-width: 769px) {
+    .output-panel {
+        height: auto !important;
+    }
+}
+
+/* Narrow viewports: stack editor on top and output panel on the bottom. */
+@media (max-width: 768px) {
+    .main-split {
+        flex-direction: column;
+    }
+    .editor-panel {
+        flex: 1 1 auto;
+        min-height: 120px;
+        width: 100%;
+    }
+    .resize-h-handle {
+        width: auto;
+        height: 4px;
+        cursor: row-resize;
+    }
+    .output-panel {
+        width: auto !important;
+        min-width: 0;
+        height: 40vh;
+        flex-shrink: 0;
+    }
+}
+
 /* VS Code-style thin scrollbars throughout the output panel. */
 .output-panel,
 .output-panel *,
