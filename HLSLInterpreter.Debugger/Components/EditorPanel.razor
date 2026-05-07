@@ -65,6 +65,8 @@
     public int ActiveTabIndex => activeTabIndex;
     public string ActiveTabPath =>
         TabbedEditorConfig.Enabled && tabs.Count > 0 ? tabs[activeTabIndex].Path : null;
+    public string ActiveTabName =>
+        TabbedEditorConfig.Enabled && tabs.Count > 0 ? tabs[activeTabIndex].Name : InitialCodeName;
 
     public ValueTask<string> GetCode() => JS.InvokeAsync<string>("getMonacoValue");
     public ValueTask SetReadOnly(bool readOnly) => JS.InvokeVoidAsync("setMonacoReadOnly", readOnly);
