@@ -23,12 +23,6 @@
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
                 HLSLInterpreter
             </a>
-            <button class="btn-permalink" title="Copy permalink to clipboard"
-                    @onclick="@(async () => {
-                        string code = editorPanel != null ? await editorPanel.GetCode() : "";
-                        string baseUrl = PermalinkBase.Url ?? new Uri(Nav.Uri).GetLeftPart(UriPartial.Path);
-                        await PermalinkCodec.CopyToClipboardAsync(JS, code, baseUrl, State.ToPermalinkSettings());
-                    })">&#x1F517; Copy permalink</button>
         </div>
 
         <div class="topbar-center">
@@ -49,35 +43,31 @@
         </div>
 
         <div class="topbar-right">
-            @if (DebugCtl.IsDebugging)
-            {
-                <div class="thread-selector">
-                    <label class="warp-label">Thread</label>
-                    <input class="warp-input" type="number" min="0" max="@(State.WarpX * State.WarpY - 1)"
-                           value="@State.InspectedThread"
-                           @oninput="@(e => { if (int.TryParse(e.Value?.ToString(), out var v)) State.InspectedThread = v; })" />
-                    <span class="warp-sep">(@(State.InspectedThread % State.WarpX), @(State.InspectedThread / State.WarpX))</span>
-                </div>
-            }
-            <button class="btn-settings" @onclick="@(() => showSettings = true)" title="Settings">&#x2699;&#xFE0F; Settings</button>
-            <button class="btn-run" @onclick="Run" disabled="@(RunCtl.IsRunning || DebugCtl.IsDebugging)">
+            <div class="share-button-wrap">
+                <button class="btn-share" @onclick="CopyPermalink" title="Copy permalink to clipboard"><i class="mdi mdi-share-variant"></i></button>
+                @if (permalinkCopied)
+                {
+                    <span class="permalink-toast" @key="permalinkToastKey">Permalink copied to clipboard</span>
+                }
+            </div>
+            <button class="btn-settings" @onclick="@(() => showSettings = true)" title="Settings"><i class="mdi mdi-cog"></i></button>
+            <button class="btn-run" @onclick="Run" disabled="@(RunCtl.IsRunning || DebugCtl.IsDebugging)" title="Run">
                 @if (RunCtl.IsRunning)
                 {
                     <span class="spinner"></span>
-                    <span>Running...</span>
                 }
                 else
                 {
-                    <span>&#9654; Run</span>
+                    <i class="mdi mdi-play"></i>
                 }
             </button>
             @if (DebugCtl.IsDebugging)
             {
-                <button class="btn-stop" @onclick="ExitDebug" title="Stop debugging">&#x25A0; Stop</button>
+                <button class="btn-stop" @onclick="ExitDebug" title="Stop debugging"><i class="mdi mdi-stop"></i></button>
             }
             else
             {
-                <button class="btn-debug-start" @onclick="StartDebug" disabled="@RunCtl.IsRunning" title="Debug (record execution trace)">&#x1F41E; Debug</button>
+                <button class="btn-debug-start" @onclick="StartDebug" disabled="@RunCtl.IsRunning" title="Debug (record execution trace)"><i class="mdi mdi-bug-outline"></i></button>
             }
         </div>
     </header>
@@ -208,6 +198,8 @@ float4 frag(float4 position : SV_Position) : SV_Target
 
 
     private bool showSettings = false;
+    private bool permalinkCopied = false;
+    private int permalinkToastKey = 0;
     private bool needsImageRender = false;
 
     private DotNetObjectReference<Debugger> dotNetRef;
@@ -472,6 +464,23 @@ float4 frag(float4 position : SV_Position) : SV_Target
         await JS.InvokeVoidAsync("disposeThreadGridResize");
         needsSectionHeightRestore = true;
         if (State.GpuPreviewEnabled) await Run();
+    }
+
+    private async Task CopyPermalink()
+    {
+        string code = editorPanel != null ? await editorPanel.GetCode() : "";
+        string baseUrl = PermalinkBase.Url ?? new Uri(Nav.Uri).GetLeftPart(UriPartial.Path);
+        await PermalinkCodec.CopyToClipboardAsync(JS, code, baseUrl, State.ToPermalinkSettings());
+
+        int newKey = ++permalinkToastKey;
+        permalinkCopied = true;
+        StateHasChanged();
+        await Task.Delay(1500);
+        if (permalinkToastKey == newKey)
+        {
+            permalinkCopied = false;
+            StateHasChanged();
+        }
     }
 
     private HLSLParserConfig MakeParserConfig()
