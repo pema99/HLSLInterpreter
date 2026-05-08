@@ -126,7 +126,7 @@ float4 frag(float4 position : SV_Position) : SV_Target
     float3 ro = float3(PI/2.,0, -_Time*.5);
     float3 rd = normalize(float3(uv, -.5));
 
-    if (_Mouse.w > 0.) {
+    if (_Mouse.z > 0.) {
         rd.zy = mul(rot(mo.y*PI), rd.zy);
         rd.xz = mul(rot(-mo.x*PI), rd.xz);
     } else {

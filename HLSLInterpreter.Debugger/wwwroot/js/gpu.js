@@ -193,7 +193,7 @@ window.addEventListener('mouseup', e => {
 });
 
 window.gpuMouse = function () {
-    return [mouseX, mouseY, mouseLeft, mouseRight];
+    return [mouseX, mouseY, mouseRight, mouseLeft];
 };
 
 window.gpuView = function () {
@@ -355,8 +355,8 @@ function drawFrame(r, now) {
     writeMat4(u, 24, projMat);
     u[40] = mouseX;
     u[41] = mouseY;
-    u[42] = mouseLeft;
-    u[43] = mouseRight;
+    u[42] = mouseRight;
+    u[43] = mouseLeft;
     r.device.queue.writeBuffer(r.uniformBuffer, 0, u);
 
     let view;
