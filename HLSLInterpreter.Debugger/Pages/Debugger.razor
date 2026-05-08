@@ -35,6 +35,7 @@
                             <div class="menu-divider"></div>
                         }
                         <button class="menu-item" @onclick="MenuOpenExamples">Example shaders</button>
+                        <button class="menu-item" @onclick="MenuOpenShaderToyImport">Import ShaderToy</button>
                         <a class="menu-item" href="https://github.com/pema99/HLSLInterpreter" target="_blank" rel="noopener noreferrer" @onclick="@(() => menuOpen = false)">View GitHub repo</a>
                         <div class="menu-divider"></div>
                         <button class="menu-item" @onclick="MenuCopyPermalink">Copy permalink</button>
@@ -149,6 +150,8 @@
 
 <ExamplesModal @bind-IsOpen="showExamples" OnSelected="OnExampleSelected" />
 
+<ShaderToyImportModal @bind-IsOpen="showShaderToyImport" OnImported="OnShaderToyImported" />
+
 <NewFileModal @bind-IsOpen="showNewFile" OnSelected="OnNewFileSelected" />
 
 @code {
@@ -224,6 +227,7 @@ float4 frag(float4 position : SV_Position) : SV_Target
 
     private bool showSettings = false;
     private bool showExamples = false;
+    private bool showShaderToyImport = false;
     private bool showNewFile = false;
     private bool menuOpen = false;
     private bool permalinkCopied = false;
@@ -519,6 +523,22 @@ float4 frag(float4 position : SV_Position) : SV_Target
     {
         menuOpen = false;
         showExamples = true;
+    }
+
+    private void MenuOpenShaderToyImport()
+    {
+        menuOpen = false;
+        showShaderToyImport = true;
+    }
+
+    private async Task OnShaderToyImported(ShaderToyImportModal.ImportResult r)
+    {
+        if (editorPanel == null) return;
+        if (DebugCtl.IsDebugging) await ExitDebug();
+        await editorPanel.LoadContent(r.Name, r.Hlsl);
+        State.ShaderRenderMode = ShaderRenderMode.Pixel;
+        State.FragmentEntryPoint = "frag";
+        await Run();
     }
 
     private void MenuNewFile()

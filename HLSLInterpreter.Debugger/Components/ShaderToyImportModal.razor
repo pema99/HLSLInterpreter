@@ -1,0 +1,85 @@
+@inherits StateAwareComponent
+@inject IJSRuntime JS
+
+@if (IsOpen)
+{
+    <div class="modal-overlay" @onclick="Close">
+        <div class="modal-dialog" @onclick:stopPropagation="true" style="max-width: 1100px; width: 90vw;">
+            <div class="modal-header">Import ShaderToy</div>
+            <div class="modal-body">
+                <div class="settings-row" style="align-items: stretch;">
+                    <textarea class="settings-text-input" rows="24"
+                              style="min-height: 60vh; width: 100%;"
+                              placeholder="void mainImage(out vec4 fragColor, in vec2 fragCoord) { ... }"
+                              value="@_paste"
+                              @oninput="@(e => _paste = e.Value?.ToString() ?? "")"
+                              disabled="@_busy"></textarea>
+                </div>
+
+                @if (!string.IsNullOrEmpty(_error))
+                {
+                    <div class="settings-row" style="color: #ff7a7a;">@_error</div>
+                }
+            </div>
+            <div class="modal-footer">
+                <button class="btn-modal-save" @onclick="Close" disabled="@_busy">Cancel</button>
+                <button class="btn-modal-save" @onclick="DoImport" disabled="@_busy">
+                    @(_busy ? "Importing..." : "Import")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public EventCallback<ImportResult> OnImported { get; set; }
+
+    public sealed record ImportResult(string Name, string Hlsl);
+
+    private string _paste = "";
+    private string _error = "";
+    private bool _busy = false;
+
+    private async Task Close()
+    {
+        if (_busy) return;
+        Reset();
+        await IsOpenChanged.InvokeAsync(false);
+    }
+
+    private void Reset()
+    {
+        _paste = "";
+        _error = "";
+    }
+
+    private async Task DoImport()
+    {
+        _error = "";
+        _busy = true;
+        StateHasChanged();
+        try
+        {
+            if (string.IsNullOrWhiteSpace(_paste))
+            {
+                _error = "Paste some GLSL first.";
+                return;
+            }
+            string hlsl = await JS.InvokeAsync<string>("glsl2hlslTranspile", _paste);
+            Reset();
+            await IsOpenChanged.InvokeAsync(false);
+            await OnImported.InvokeAsync(new ImportResult("shadertoy.hlsl", hlsl));
+        }
+        catch (Exception ex)
+        {
+            _error = "Import failed: " + ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+            StateHasChanged();
+        }
+    }
+}

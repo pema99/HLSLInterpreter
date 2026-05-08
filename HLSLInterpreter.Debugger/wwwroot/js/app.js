@@ -819,6 +819,24 @@ window.setMonacoReadOnly = function (readOnly) {
     }
 };
 
+window._glsl2hlslPromise = null;
+async function loadGlsl2Hlsl() {
+    if (!window._glsl2hlslPromise) {
+        window._glsl2hlslPromise = (async () => {
+            const base = new URL('/_content/HLSLInterpreter.Debugger/lib/glsl2hlsl/', document.baseURI).href;
+            const mod = await import(base + 'glsl2hlsl_wasm.js');
+            await mod.default(base + 'glsl2hlsl_wasm_bg.wasm');
+            return mod;
+        })();
+    }
+    return window._glsl2hlslPromise;
+}
+
+window.glsl2hlslTranspile = async function (glsl) {
+    const mod = await loadGlsl2Hlsl();
+    return mod.transpile(glsl);
+};
+
 window.downloadTextFile = function (filename, content) {
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);

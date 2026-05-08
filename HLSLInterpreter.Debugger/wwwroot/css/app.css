@@ -956,6 +956,35 @@
     opacity: 0.5;
 }
 
+textarea.settings-text-input {
+    height: auto;
+    padding: 8px;
+    resize: none;
+    line-height: 1.4;
+    scrollbar-width: thin;
+    scrollbar-color: #4f4f4f transparent;
+}
+textarea.settings-text-input::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+textarea.settings-text-input::-webkit-scrollbar-track {
+    background: transparent;
+}
+textarea.settings-text-input::-webkit-scrollbar-thumb {
+    background: #4f4f4f;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    border-radius: 6px;
+}
+textarea.settings-text-input::-webkit-scrollbar-thumb:hover {
+    background: #6f6f6f;
+    background-clip: padding-box;
+}
+textarea.settings-text-input::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
 .btn-debug-start {
     display: flex;
     align-items: center;
