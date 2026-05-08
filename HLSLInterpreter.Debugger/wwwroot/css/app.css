@@ -707,6 +707,12 @@
     font-weight: 500;
 }
 
+.example-mode {
+    font-size: 11px;
+    color: #9ca3af;
+    margin-top: 2px;
+}
+
 .btn-share {
     display: flex;
     align-items: center;

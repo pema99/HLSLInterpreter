@@ -1,8 +1,10 @@
-// Name: Raymarching Basic by gyabo
+// Name: Raymarching basic
 // RenderMode: Pixel
 // FragEntry: frag
 
 // Shader: https://www.shadertoy.com/view/Ml2XRD
+// License: CC-BY-NC-SA-3.0
+// Author: gyabo
 
 #define glsl_mod(x, y) ((x) - (y) * floor((x) / (y)))
 

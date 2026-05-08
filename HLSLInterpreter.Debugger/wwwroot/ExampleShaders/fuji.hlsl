@@ -1,8 +1,10 @@
-// Name: Cyber Fuji 2020 by kaiware007
+// Name: Cyber fuji 2020
 // RenderMode: Pixel
 // FragEntry: frag
 
 // Shader: https://www.shadertoy.com/view/Wt33Wf
+// License: CC-BY-3.0
+// Author: kaiware007
 
 #define glsl_mod(x, y) ((x) - (y) * floor((x) / (y)))
 

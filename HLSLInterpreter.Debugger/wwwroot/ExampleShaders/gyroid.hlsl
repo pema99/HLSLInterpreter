@@ -1,8 +1,10 @@
-// Name: tm gyroid 2 by tubeman
+// Name: Gyroid
 // RenderMode: Pixel
 // FragEntry: frag
 
 // Shader: https://www.shadertoy.com/view/tXtyW8
+// License: CC-BY-NC-SA-3.0
+// Author: tubeman
 
 #define FAR 30.0
 #define PI 3.1415

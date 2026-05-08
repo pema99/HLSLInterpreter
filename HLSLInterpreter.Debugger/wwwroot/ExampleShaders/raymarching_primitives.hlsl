@@ -1,9 +1,10 @@
-// Name: Raymarching primitives by iq
+// Name: Raymarching primitives
 // RenderMode: Pixel
 // FragEntry: frag
 
 // Shader: https://www.shadertoy.com/view/Xds3zN
-// MIT License - Copyright (c) 2013 Inigo Quilez
+// License: MIT
+// Author: Inigo Quilez
 
 float dot2(float2 v) { return dot(v, v); }
 float dot2(float3 v) { return dot(v, v); }

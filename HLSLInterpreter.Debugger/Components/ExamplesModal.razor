@@ -21,6 +21,7 @@
                     {
                         <button class="example-item" @onclick="@(() => Pick(ex))">
                             <span class="example-name">@ex.Name</span>
+                            <span class="example-mode">@FormatMode(ex.Mode)</span>
                         </button>
                     }
                 }
@@ -54,6 +55,20 @@
 
     private Task Close() => IsOpenChanged.InvokeAsync(false);
 
+    private static string FormatMode(ShaderRenderMode? mode) => mode switch
+    {
+        ShaderRenderMode.VertFrag => "Vertex+Fragment",
+        ShaderRenderMode.Pixel => "Fragment",
+        _ => "",
+    };
+
+    private static int ModeOrder(ShaderRenderMode? mode) => mode switch
+    {
+        ShaderRenderMode.Pixel => 0,
+        ShaderRenderMode.VertFrag => 1,
+        _ => 2,
+    };
+
     protected override async Task OnParametersSetAsync()
     {
         if (IsOpen && !_wasOpen && _examples == null)
@@ -82,7 +97,12 @@
                 }
                 catch (Exception e) { Console.WriteLine($"[examples] {file}: {e.Message}"); }
             }
-            entries.Sort((a, b) => StringComparer.OrdinalIgnoreCase.Compare(a.Name, b.Name));
+            entries.Sort((a, b) =>
+            {
+                int byMode = ModeOrder(a.Mode).CompareTo(ModeOrder(b.Mode));
+                if (byMode != 0) return byMode;
+                return StringComparer.OrdinalIgnoreCase.Compare(a.Name, b.Name);
+            });
         }
         catch (Exception e) { Console.WriteLine("[examples] index: " + e.Message); }
 

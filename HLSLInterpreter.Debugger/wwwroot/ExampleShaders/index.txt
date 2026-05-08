@@ -1,3 +1,4 @@
+breathing_cube.hlsl
 fuji.hlsl
 gyroid.hlsl
 rainbow_spiral.hlsl
