@@ -69,6 +69,19 @@
         TabbedEditorConfig.Enabled && tabs.Count > 0 ? tabs[activeTabIndex].Name : InitialCodeName;
 
     public ValueTask<string> GetCode() => JS.InvokeAsync<string>("getMonacoValue");
+
+    public async Task LoadContent(string name, string content)
+    {
+        if (TabbedEditorConfig.Enabled)
+        {
+            await OpenFileInTab(name, content);
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("setMonacoValue", content);
+        }
+    }
+
     public ValueTask SetReadOnly(bool readOnly) => JS.InvokeVoidAsync("setMonacoReadOnly", readOnly);
     public ValueTask HighlightLine(int line) => JS.InvokeVoidAsync("highlightDebugLine", line);
 

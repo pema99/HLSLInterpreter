@@ -25,4 +25,14 @@
           SkipUnchangedFiles="true" />
   </Target>
 
+  <!-- ExamplesModal fetches index.txt to enumerate available examples. -->
+  <Target Name="GenerateExampleShadersIndex" BeforeTargets="ResolveStaticWebAssetsInputs;BeforeBuild">
+    <ItemGroup>
+      <_ExampleShader Include="wwwroot\ExampleShaders\*.hlsl" />
+    </ItemGroup>
+    <WriteLinesToFile File="wwwroot\ExampleShaders\index.txt"
+                      Lines="@(_ExampleShader -> '%(Filename)%(Extension)')"
+                      Overwrite="true" />
+  </Target>
+
 </Project>

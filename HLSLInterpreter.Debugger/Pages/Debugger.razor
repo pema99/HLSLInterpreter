@@ -26,12 +26,14 @@
                     <div class="menu-backdrop" @onclick="@(() => menuOpen = false)"></div>
                     <div class="menu-dropdown">
                         <a class="menu-item" href="https://github.com/pema99/HLSLInterpreter" target="_blank" rel="noopener noreferrer" @onclick="@(() => menuOpen = false)">View GitHub repo</a>
+                        <button class="menu-item" @onclick="MenuOpenExamples">Example shaders</button>
                         <button class="menu-item" @onclick="MenuCopyPermalink">Copy permalink</button>
                         <button class="menu-item" @onclick="MenuDownloadCurrentFile">Download current file</button>
                         <button class="menu-item" @onclick="MenuOpenSettings">Settings</button>
                     </div>
                 }
             </div>
+            <span class="topbar-title">HLSLInterpreter</span>
         </div>
 
         <div class="topbar-center">
@@ -134,6 +136,8 @@
 
 <SettingsModal @bind-IsOpen="showSettings" IsLocked="@(RunCtl.IsRunning || DebugCtl.IsDebugging)" />
 
+<ExamplesModal @bind-IsOpen="showExamples" OnSelected="OnExampleSelected" />
+
 @code {
     private static readonly string DefaultCode =
 @"static float TWIST = 12.0;
@@ -206,6 +210,7 @@ float4 frag(float4 position : SV_Position) : SV_Target
 
 
     private bool showSettings = false;
+    private bool showExamples = false;
     private bool menuOpen = false;
     private bool permalinkCopied = false;
     private int permalinkToastKey = 0;
@@ -494,6 +499,20 @@ float4 frag(float4 position : SV_Position) : SV_Target
         string code = await editorPanel.GetCode();
         string filename = string.IsNullOrWhiteSpace(editorPanel.ActiveTabName) ? "shader.hlsl" : editorPanel.ActiveTabName;
         await JS.InvokeVoidAsync("downloadTextFile", filename, code);
+    }
+
+    private void MenuOpenExamples()
+    {
+        menuOpen = false;
+        showExamples = true;
+    }
+
+    private async Task OnExampleSelected((string Name, string Content) ex)
+    {
+        if (editorPanel == null) return;
+        if (DebugCtl.IsDebugging) await ExitDebug();
+        await editorPanel.LoadContent(ex.Name, ex.Content);
+        await Run();
     }
 
     private async Task CopyPermalink()
