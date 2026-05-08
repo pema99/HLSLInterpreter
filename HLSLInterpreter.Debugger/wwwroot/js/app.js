@@ -446,6 +446,37 @@ window.initMonaco = function (containerId, initialCode, editorRef) {
             colors: {}
         });
 
+        monaco.editor.defineTheme('hlsl-bonzomatic', {
+            base: 'vs-dark',
+            inherit: true,
+            rules: [
+                { token: 'keyword.control',   foreground: 'c586c0' },
+                { token: 'keyword.modifier',  foreground: '569cd6' },
+                { token: 'keyword.type',      foreground: '4ec9b0' },
+                { token: 'keyword.literal',   foreground: '569cd6' },
+                { token: 'keyword.directive', foreground: '9b9b9b' },
+                { token: 'support.function',  foreground: 'dcdcaa' },
+                { token: 'annotation',        foreground: 'c8c8c8' },
+                { token: 'annotation.bracket',foreground: 'c8c8c8' },
+                { token: 'number',            foreground: 'b5cea8' },
+                { token: 'number.float',      foreground: 'b5cea8' },
+                { token: 'number.hex',        foreground: 'b5cea8' },
+                { token: 'string',            foreground: 'ce9178' },
+                { token: 'comment',           foreground: '6a9955' },
+                { token: 'identifier',        foreground: '9cdcfe' },
+                { token: 'operator',          foreground: 'd4d4d4' },
+            ],
+            colors: {
+                'editor.background': '#00000000',
+                'editorGutter.background': '#00000000',
+                'editor.lineHighlightBackground': '#ffffff14',
+                'editor.lineHighlightBorder': '#00000000',
+                'minimap.background': '#00000000',
+                'scrollbarSlider.background': '#80808060',
+                'editorOverviewRuler.background': '#00000000',
+            }
+        });
+
         window._monacoEditor = monaco.editor.create(document.getElementById(containerId), {
             value: initialCode,
             language: 'hlsl',
@@ -511,6 +542,12 @@ window.initMonaco = function (containerId, initialCode, editorRef) {
             var btn = document.querySelector('[data-dbg="' + action + '"]');
             if (btn && !btn.disabled) btn.click();
         }
+        function clickDbgOrToggleBonzomaticEditor(action) {
+            var btn = document.querySelector('[data-dbg="' + action + '"]');
+            if (btn && !btn.disabled) { btn.click(); return; }
+            var shell = document.querySelector('.app-shell.bonzomatic');
+            if (shell) shell.classList.toggle('editor-hidden');
+        }
         function toggleBreakpointAtCursor() {
             if (window._dotNetEditorRef) {
                 var pos = window._monacoEditor.getPosition();
@@ -519,13 +556,13 @@ window.initMonaco = function (containerId, initialCode, editorRef) {
         }
         window._monacoEditor.addCommand(monaco.KeyCode.F5, function () {
             var cont = document.querySelector('[data-dbg="continue"]');
-            var start = document.querySelector('.btn-debug-start');
+            var run = document.querySelector('.btn-run');
             if (cont && !cont.disabled) cont.click();
-            else if (start && !start.disabled) start.click();
+            else if (run && !run.disabled) run.click();
         });
         window._monacoEditor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F5, function () { clickDbg('continue-back'); });
         window._monacoEditor.addCommand(monaco.KeyCode.F9, function () { toggleBreakpointAtCursor(); });
-        window._monacoEditor.addCommand(monaco.KeyCode.F10, function () { clickDbg('step-over'); });
+        window._monacoEditor.addCommand(monaco.KeyCode.F10, function () { clickDbgOrToggleBonzomaticEditor('step-over'); });
         window._monacoEditor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F10, function () { clickDbg('step-over-back'); });
         window._monacoEditor.addCommand(monaco.KeyCode.F11, function () { clickDbg('step-in'); });
         window._monacoEditor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F11, function () { clickDbg('step-in-back'); });
@@ -555,9 +592,9 @@ document.addEventListener('keydown', function (e) {
     if (e.key === 'F5' && !e.shiftKey) {
         e.preventDefault();
         var cont = document.querySelector('[data-dbg="continue"]');
-        var start = document.querySelector('.btn-debug-start');
+        var run = document.querySelector('.btn-run');
         if (cont && !cont.disabled) cont.click();
-        else if (start && !start.disabled) start.click();
+        else if (run && !run.disabled) run.click();
     } else if (e.key === 'F5' && e.shiftKey) {
         e.preventDefault();
         clickDbgGlobal('continue-back');
@@ -569,7 +606,13 @@ document.addEventListener('keydown', function (e) {
         }
     } else if (e.key === 'F10' && !e.shiftKey) {
         e.preventDefault();
-        clickDbgGlobal('step-over');
+        var stepOver = document.querySelector('[data-dbg="step-over"]');
+        if (stepOver && !stepOver.disabled) {
+            stepOver.click();
+        } else {
+            var shell = document.querySelector('.app-shell.bonzomatic');
+            if (shell) shell.classList.toggle('editor-hidden');
+        }
     } else if (e.key === 'F10' && e.shiftKey) {
         e.preventDefault();
         clickDbgGlobal('step-over-back');
@@ -802,6 +845,10 @@ window.setMonacoValue = function (value) {
     if (window._monacoEditor) {
         window._monacoEditor.setValue(value);
     }
+};
+
+window.setMonacoTheme = function (theme) {
+    if (window._monacoEditor) monaco.editor.setTheme(theme);
 };
 
 window.setMonacoFontSize = function (size) {

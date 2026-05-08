@@ -352,6 +352,60 @@
     flex: 1 1 auto;
     align-self: stretch;
 }
+
+/* Bonzomatic mode: rendered output sits behind a transparent code editor. */
+.app-shell.bonzomatic .main-split {
+    position: relative;
+}
+.app-shell.bonzomatic .resize-h-handle {
+    display: none;
+}
+.app-shell.bonzomatic .editor-panel {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.75);
+    z-index: 2;
+}
+.app-shell.bonzomatic .editor-panel .panel-header,
+.app-shell.bonzomatic .editor-panel .editor-tabs,
+.app-shell.bonzomatic .editor-panel .editor-tab.active {
+    background: transparent;
+}
+.app-shell.bonzomatic .editor-container {
+    background: transparent !important;
+}
+.app-shell.bonzomatic .output-panel {
+    position: absolute !important;
+    inset: 0;
+    width: auto !important;
+    height: auto !important;
+    z-index: 1;
+    background: transparent;
+    overflow: hidden;
+    pointer-events: none;
+}
+.app-shell.bonzomatic .output-panel > *:not(.debug-section-image),
+.app-shell.bonzomatic .output-panel .panel-header,
+.app-shell.bonzomatic .output-panel .resize-v-handle {
+    display: none !important;
+}
+.app-shell.bonzomatic .output-panel .debug-section-image {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+}
+.app-shell.bonzomatic .image-container {
+    height: 100% !important;
+    width: 100% !important;
+}
+.app-shell.bonzomatic.editor-hidden .editor-panel {
+    display: none;
+}
+.app-shell.bonzomatic.editor-hidden .output-panel {
+    pointer-events: auto;
+}
+.app-shell.bonzomatic:not(.editor-hidden) .image-overlay {
+    display: none;
+}
 .editor-tab-close:hover { opacity: 1 !important; background: rgba(255,255,255,0.1); }
 
 .editor-toolbar-group {
@@ -701,6 +755,20 @@ a.topbar-title:focus-visible {
     height: 1px;
     background: #3c3c3c;
     margin: 4px 0;
+}
+
+.menu-item-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    width: 100%;
+}
+
+.menu-item-check {
+    color: #d4d4d4;
+    min-width: 10px;
+    text-align: right;
 }
 
 .example-list {

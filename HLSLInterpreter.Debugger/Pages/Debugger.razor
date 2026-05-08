@@ -17,7 +17,7 @@
 @using HLSLInterpreter = global::HLSLInterpreter
 @implements IAsyncDisposable
 
-<div class="app-shell">
+<div class="app-shell @(State.BonzomaticMode && !DebugCtl.IsDebugging ? "bonzomatic" : "")">
     <header class="topbar">
         <div class="topbar-left">
             <div class="menu-button-wrap">
@@ -36,6 +36,10 @@
                         }
                         <button class="menu-item" @onclick="MenuOpenExamples">Example shaders</button>
                         <button class="menu-item" @onclick="MenuOpenShaderToyImport">Import ShaderToy</button>
+                        <button class="menu-item menu-item-toggle" @onclick="ToggleBonzomaticMode">
+                            <span>Bonzomatic mode</span>
+                            <span class="menu-item-check">@(State.BonzomaticMode ? "✓" : "")</span>
+                        </button>
                         <div class="menu-divider"></div>
                         <button class="menu-item" @onclick="MenuCopyPermalink">Copy permalink</button>
                         <button class="menu-item" @onclick="MenuDownloadCurrentFile">Download current file</button>
@@ -275,10 +279,19 @@ float4 frag(float4 position : SV_Position) : SV_Target
         catch (Exception ex) { Console.WriteLine("[default-mesh] " + ex.Message); }
     }
 
+    private bool _lastBonzomaticActive = false;
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
             await JS.InvokeVoidAsync("setDebuggerRef", dotNetRef);
+
+        bool bonzomaticActive = State.BonzomaticMode && !DebugCtl.IsDebugging;
+        if (bonzomaticActive != _lastBonzomaticActive || firstRender)
+        {
+            _lastBonzomaticActive = bonzomaticActive;
+            await JS.InvokeVoidAsync("setMonacoTheme", bonzomaticActive ? "hlsl-bonzomatic" : "hlsl-dark");
+        }
 
         if (needsSectionHeightRestore)
         {
@@ -528,6 +541,18 @@ float4 frag(float4 position : SV_Position) : SV_Target
     {
         menuOpen = false;
         showShaderToyImport = true;
+    }
+
+    private async Task ToggleBonzomaticMode()
+    {
+        menuOpen = false;
+        if (DebugCtl.IsDebugging) await ExitDebug();
+        State.BonzomaticMode = !State.BonzomaticMode;
+        if (State.BonzomaticMode && !State.GpuPreviewEnabled)
+        {
+            State.GpuPreviewEnabled = true;
+            await Run();
+        }
     }
 
     private async Task OnShaderToyImported(ShaderToyImportModal.ImportResult r)

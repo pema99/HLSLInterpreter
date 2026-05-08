@@ -115,6 +115,13 @@ public sealed class DebuggerAppState : INotifyPropertyChanged
         set => Set(ref _editorFontSize, value);
     }
 
+    private bool _bonzomaticMode = false;
+    public bool BonzomaticMode
+    {
+        get => _bonzomaticMode;
+        set => Set(ref _bonzomaticMode, value);
+    }
+
     public PermalinkSettings ToPermalinkSettings() =>
         new(FragmentEntryPoint, WarpX, WarpY, GroupOffsetX, GroupOffsetY, GpuPreviewEnabled, ShaderRenderMode, VertexEntryPoint);
 
