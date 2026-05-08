@@ -72,7 +72,7 @@ public static class ValueImageRenderer
                 pixels[i * 4 + 0] = FloatToByte(components > 0 ? c[0].Float : 0f);
                 pixels[i * 4 + 1] = FloatToByte(components > 1 ? c[1].Float : 0f);
                 pixels[i * 4 + 2] = FloatToByte(components > 2 ? c[2].Float : 0f);
-                pixels[i * 4 + 3] = FloatToByte(components > 3 ? c[3].Float : 1f);
+                pixels[i * 4 + 3] = 255;
             }
             return pixels;
         }
