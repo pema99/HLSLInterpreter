@@ -1,0 +1,76 @@
+@inherits StateAwareComponent
+
+@if (IsOpen)
+{
+    <div class="modal-overlay" @onclick="Close">
+        <div class="modal-dialog" @onclick:stopPropagation="true">
+            <div class="modal-header">New file</div>
+            <div class="modal-body example-list">
+                @foreach (var t in Templates)
+                {
+                    <button class="example-item" @onclick="@(() => Pick(t))">
+                        <span class="example-name">@t.Name</span>
+                        <span class="example-mode">@t.Description</span>
+                    </button>
+                }
+            </div>
+            <div class="modal-footer">
+                <button class="btn-modal-save" @onclick="Close">Close</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public EventCallback<NewFileTemplate> OnSelected { get; set; }
+
+    public sealed record NewFileTemplate(
+        string Name,
+        string Description,
+        string FileName,
+        string Content,
+        ShaderRenderMode? Mode,
+        string FragEntry,
+        string VertEntry);
+
+    private static readonly NewFileTemplate[] Templates =
+    {
+        new("Empty", "Blank file", "new.hlsl", "", null, null, null),
+        new("Fragment", "Minimal fragment shader", "new.hlsl", FragmentTemplate, ShaderRenderMode.Pixel, "frag", null),
+        new("Vertex+Fragment", "Minimal vertex and fragment shader", "new.hlsl", VertFragTemplate, ShaderRenderMode.VertFrag, "frag", "vert"),
+    };
+
+    private const string FragmentTemplate = @"float4 frag(float4 position : SV_Position) : SV_Target
+{
+    return float4(1, 0, 0, 1);
+}
+";
+
+    private const string VertFragTemplate = @"struct VSOut
+{
+    float4 pos : SV_Position;
+};
+
+VSOut vert(float3 pos : POSITION)
+{
+    VSOut o;
+    o.pos = mul(_Projection, mul(_View, float4(pos, 1.0)));
+    return o;
+}
+
+float4 frag(VSOut i) : SV_Target
+{
+    return float4(1, 0, 0, 1);
+}
+";
+
+    private Task Close() => IsOpenChanged.InvokeAsync(false);
+
+    private async Task Pick(NewFileTemplate t)
+    {
+        await IsOpenChanged.InvokeAsync(false);
+        await OnSelected.InvokeAsync(t);
+    }
+}
