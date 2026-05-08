@@ -493,6 +493,7 @@ window.initMonaco = function (containerId, initialCode, editorRef) {
             wordWrap: 'off',
             tabSize: 4,
             insertSpaces: true,
+            stickyScroll: { enabled: false },
         });
 
         window._monacoEditor.addCommand(
