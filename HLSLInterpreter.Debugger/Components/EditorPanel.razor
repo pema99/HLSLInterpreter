@@ -51,7 +51,23 @@
 
     private DotNetObjectReference<EditorPanel> _selfRef;
 
-    private sealed class EditorTab { public string Name = ""; public string Code = ""; public string Path; }
+    private sealed class TabSettings
+    {
+        public ShaderRenderMode RenderMode;
+        public Mesh Mesh;
+        public string VertEntry;
+        public string FragEntry;
+        public int GroupOffsetX, GroupOffsetY;
+        public int WarpX, WarpY;
+    }
+
+    private sealed class EditorTab
+    {
+        public string Name = "";
+        public string Code = "";
+        public string Path;
+        public TabSettings Settings;
+    }
     private List<EditorTab> tabs = new();
     private int activeTabIndex;
 
@@ -148,9 +164,36 @@
     {
         if (index == activeTabIndex) return;
         tabs[activeTabIndex].Code = await JS.InvokeAsync<string>("getMonacoValue");
+        tabs[activeTabIndex].Settings = SnapshotState();
         activeTabIndex = index;
         await JS.InvokeVoidAsync("setMonacoValue", tabs[activeTabIndex].Code);
+        if (tabs[activeTabIndex].Settings != null)
+            ApplyTabSettings(tabs[activeTabIndex].Settings);
         await OnTabSwitched.InvokeAsync(activeTabIndex);
+    }
+
+    private TabSettings SnapshotState() => new()
+    {
+        RenderMode = State.ShaderRenderMode,
+        Mesh = State.CurrentMesh,
+        VertEntry = State.VertexEntryPoint,
+        FragEntry = State.FragmentEntryPoint,
+        GroupOffsetX = State.GroupOffsetX,
+        GroupOffsetY = State.GroupOffsetY,
+        WarpX = State.WarpX,
+        WarpY = State.WarpY,
+    };
+
+    private void ApplyTabSettings(TabSettings s)
+    {
+        State.ShaderRenderMode = s.RenderMode;
+        State.CurrentMesh = s.Mesh;
+        State.VertexEntryPoint = s.VertEntry;
+        State.FragmentEntryPoint = s.FragEntry;
+        State.GroupOffsetX = s.GroupOffsetX;
+        State.GroupOffsetY = s.GroupOffsetY;
+        State.WarpX = s.WarpX;
+        State.WarpY = s.WarpY;
     }
 
     private int draggedTabIndex = -1;
@@ -210,8 +253,9 @@
         var existing = tabs.FindIndex(t => t.Path == path);
         if (existing >= 0) { await SwitchTab(existing); return; }
         tabs[activeTabIndex].Code = await JS.InvokeAsync<string>("getMonacoValue");
+        tabs[activeTabIndex].Settings = SnapshotState();
         string name = System.IO.Path.GetFileName(path);
-        tabs.Add(new EditorTab { Name = name, Code = content, Path = path });
+        tabs.Add(new EditorTab { Name = name, Code = content, Path = path, Settings = SnapshotState() });
         activeTabIndex = tabs.Count - 1;
         await JS.InvokeVoidAsync("setMonacoValue", content);
         StateHasChanged();
@@ -251,7 +295,8 @@
         else
         {
             tabs[activeTabIndex].Code = await JS.InvokeAsync<string>("getMonacoValue");
-            tabs.Add(new EditorTab { Name = name, Code = content, Path = string.IsNullOrEmpty(path) ? null : path });
+            tabs[activeTabIndex].Settings = SnapshotState();
+            tabs.Add(new EditorTab { Name = name, Code = content, Path = string.IsNullOrEmpty(path) ? null : path, Settings = SnapshotState() });
             activeTabIndex = tabs.Count - 1;
             await JS.InvokeVoidAsync("setMonacoValue", content);
         }

@@ -535,11 +535,14 @@ float4 frag(float4 position : SV_Position) : SV_Target
         if (editorPanel != null) await editorPanel.SaveFileAsDialog();
     }
 
-    private async Task OnExampleSelected((string Name, string Content) ex)
+    private async Task OnExampleSelected(HLSLInterpreter.Debugger.Components.ExamplesModal.ExampleSelection ex)
     {
         if (editorPanel == null) return;
         if (DebugCtl.IsDebugging) await ExitDebug();
         await editorPanel.LoadContent(ex.Name, ex.Content);
+        if (ex.Mode.HasValue) State.ShaderRenderMode = ex.Mode.Value;
+        if (!string.IsNullOrWhiteSpace(ex.FragEntry)) State.FragmentEntryPoint = ex.FragEntry;
+        if (!string.IsNullOrWhiteSpace(ex.VertEntry)) State.VertexEntryPoint = ex.VertEntry;
         await Run();
     }
 

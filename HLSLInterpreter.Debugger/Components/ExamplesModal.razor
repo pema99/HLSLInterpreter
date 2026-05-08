@@ -36,7 +36,14 @@
 @code {
     [Parameter] public bool IsOpen { get; set; }
     [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
-    [Parameter] public EventCallback<(string Name, string Content)> OnSelected { get; set; }
+    [Parameter] public EventCallback<ExampleSelection> OnSelected { get; set; }
+
+    public sealed record ExampleSelection(
+        string Name,
+        string Content,
+        ShaderRenderMode? Mode,
+        string FragEntry,
+        string VertEntry);
 
     private const string BaseUrl = "_content/HLSLInterpreter.Debugger/ExampleShaders/";
 
@@ -112,11 +119,8 @@
 
     private async Task Pick(Example ex)
     {
-        if (ex.Mode.HasValue) State.ShaderRenderMode = ex.Mode.Value;
-        if (!string.IsNullOrWhiteSpace(ex.FragEntry)) State.FragmentEntryPoint = ex.FragEntry;
-        if (!string.IsNullOrWhiteSpace(ex.VertEntry)) State.VertexEntryPoint = ex.VertEntry;
         await IsOpenChanged.InvokeAsync(false);
-        await OnSelected.InvokeAsync((ex.Name, ex.Cleaned));
+        await OnSelected.InvokeAsync(new ExampleSelection(ex.Name, ex.Cleaned, ex.Mode, ex.FragEntry, ex.VertEntry));
     }
 
     private static Example ParseHeader(string content)
