@@ -16,11 +16,21 @@
             {
                 var idx = i;
                 <div class="editor-tab @(idx == activeTabIndex ? "active" : "")"
-                     @onclick="() => SwitchTab(idx)">
+                     draggable="true"
+                     @onclick="() => SwitchTab(idx)"
+                     @ondragstart="() => OnTabDragStart(idx)"
+                     @ondragover="OnTabDragOver"
+                     @ondragover:preventDefault="true"
+                     @ondrop="(e) => OnTabDrop(e, idx)"
+                     @ondragend="OnTabDragEnd">
                     @tabs[idx].Name
                     <span class="editor-tab-close" @onclick="() => CloseTab(idx)" @onclick:stopPropagation>&#x2715;</span>
                 </div>
             }
+            <div class="editor-tabs-rest"
+                 @ondragover="OnTabDragOver"
+                 @ondragover:preventDefault="true"
+                 @ondrop="OnTabDropEnd"></div>
         </div>
     }
     else
@@ -141,6 +151,43 @@
         activeTabIndex = index;
         await JS.InvokeVoidAsync("setMonacoValue", tabs[activeTabIndex].Code);
         await OnTabSwitched.InvokeAsync(activeTabIndex);
+    }
+
+    private int draggedTabIndex = -1;
+
+    private void OnTabDragStart(int index) => draggedTabIndex = index;
+    private void OnTabDragEnd() => draggedTabIndex = -1;
+    private void OnTabDragOver() { }
+
+    private async Task OnTabDrop(DragEventArgs e, int targetIndex)
+    {
+        int from = draggedTabIndex;
+        draggedTabIndex = -1;
+        if (from < 0) return;
+
+        bool dropAfter = await JS.InvokeAsync<bool>("dbgIsTabDropAfter", targetIndex, e.ClientX);
+        int desired = dropAfter ? targetIndex + 1 : targetIndex;
+        MoveTabTo(from, desired);
+    }
+
+    private void OnTabDropEnd()
+    {
+        int from = draggedTabIndex;
+        draggedTabIndex = -1;
+        if (from < 0) return;
+        MoveTabTo(from, tabs.Count);
+    }
+
+    private void MoveTabTo(int from, int desired)
+    {
+        if (desired == from || desired == from + 1) return;
+        var active = tabs[activeTabIndex];
+        var moving = tabs[from];
+        tabs.RemoveAt(from);
+        int insertAt = desired > from ? desired - 1 : desired;
+        tabs.Insert(insertAt, moving);
+        activeTabIndex = tabs.IndexOf(active);
+        StateHasChanged();
     }
 
     private async Task CloseTab(int index)

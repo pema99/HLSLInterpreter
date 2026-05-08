@@ -9,6 +9,14 @@ window.dbgFetchText = async function (url) {
     return await r.text();
 };
 
+window.dbgIsTabDropAfter = function (tabIndex, clientX) {
+    const tabs = document.querySelectorAll('.editor-tab');
+    const el = tabs[tabIndex];
+    if (!el) return false;
+    const r = el.getBoundingClientRect();
+    return clientX > r.left + r.width / 2;
+};
+
 window.dbgPickObj = function () {
     const input = document.createElement('input');
     input.type = 'file';

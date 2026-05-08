@@ -347,6 +347,11 @@
 .panel-header-tabs {
     border-bottom: 1px solid #3c3c3c;
 }
+
+.editor-tabs-rest {
+    flex: 1 1 auto;
+    align-self: stretch;
+}
 .editor-tab-close:hover { opacity: 1 !important; background: rgba(255,255,255,0.1); }
 
 .editor-toolbar-group {
