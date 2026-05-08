@@ -6,6 +6,7 @@
 @inject DebuggerAppState State
 @inject RunController RunCtl
 @inject DebugController DebugCtl
+@inject TabbedEditorOptions TabbedEditorConfig
 @using HLSL
 @using UnityShaderParser.HLSL
 @using HLSLInterpreter.Debugger.Core
@@ -25,10 +26,19 @@
                 {
                     <div class="menu-backdrop" @onclick="@(() => menuOpen = false)"></div>
                     <div class="menu-dropdown">
+                        @if (TabbedEditorConfig.Enabled)
+                        {
+                            <button class="menu-item" @onclick="MenuOpenFile">Open file</button>
+                            <button class="menu-item" @onclick="MenuSaveFile">Save</button>
+                            <button class="menu-item" @onclick="MenuSaveFileAs">Save as</button>
+                            <div class="menu-divider"></div>
+                        }
                         <a class="menu-item" href="https://github.com/pema99/HLSLInterpreter" target="_blank" rel="noopener noreferrer" @onclick="@(() => menuOpen = false)">View GitHub repo</a>
                         <button class="menu-item" @onclick="MenuOpenExamples">Example shaders</button>
+                        <div class="menu-divider"></div>
                         <button class="menu-item" @onclick="MenuCopyPermalink">Copy permalink</button>
                         <button class="menu-item" @onclick="MenuDownloadCurrentFile">Download current file</button>
+                        <div class="menu-divider"></div>
                         <button class="menu-item" @onclick="MenuOpenSettings">Settings</button>
                     </div>
                 }
@@ -505,6 +515,24 @@ float4 frag(float4 position : SV_Position) : SV_Target
     {
         menuOpen = false;
         showExamples = true;
+    }
+
+    private async Task MenuOpenFile()
+    {
+        menuOpen = false;
+        if (editorPanel != null) await editorPanel.OpenFileDialog();
+    }
+
+    private async Task MenuSaveFile()
+    {
+        menuOpen = false;
+        if (editorPanel != null) await editorPanel.SaveFileDialog();
+    }
+
+    private async Task MenuSaveFileAs()
+    {
+        menuOpen = false;
+        if (editorPanel != null) await editorPanel.SaveFileAsDialog();
     }
 
     private async Task OnExampleSelected((string Name, string Content) ex)

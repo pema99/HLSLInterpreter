@@ -676,6 +676,12 @@
     cursor: not-allowed;
 }
 
+.menu-divider {
+    height: 1px;
+    background: #3c3c3c;
+    margin: 4px 0;
+}
+
 .example-list {
     gap: 4px;
     max-height: 60vh;

@@ -10,18 +10,7 @@
 
 <div class="editor-panel">
     <div class="panel-header">
-        @if (TabbedEditorConfig.Enabled)
-        {
-            <div class="editor-toolbar-group">
-                <button class="btn-editor-toolbar" @onclick="OpenFileDialog" title="Open file">Open</button>
-                <button class="btn-editor-toolbar" @onclick="SaveFileDialog" title="Save">Save</button>
-                <button class="btn-editor-toolbar" @onclick="SaveFileAsDialog" title="Save As">Save As</button>
-            </div>
-        }
-        else
-        {
-            <span>Input</span>
-        }
+        <span>Input</span>
         <select class="footer-select" title="Font size" @onchange="OnFontSizeChanged">
             @foreach (var size in fontSizes)
             {
@@ -181,7 +170,7 @@
         if (activeTabIndex > index) activeTabIndex--;
     }
 
-    private async Task OpenFileDialog()
+    public async Task OpenFileDialog()
     {
         var (path, content) = await FileDialogs.OpenFile();
         if (path == null || content == null) return;
@@ -195,7 +184,7 @@
         StateHasChanged();
     }
 
-    private async Task SaveFileDialog()
+    public async Task SaveFileDialog()
     {
         string code = await JS.InvokeAsync<string>("getMonacoValue");
         string savedPath = await FileDialogs.SaveFile(code, tabs[activeTabIndex].Path);
@@ -206,7 +195,7 @@
         StateHasChanged();
     }
 
-    private async Task SaveFileAsDialog()
+    public async Task SaveFileAsDialog()
     {
         string code = await JS.InvokeAsync<string>("getMonacoValue");
         string savedPath = await FileDialogs.SaveFileAs(code);
