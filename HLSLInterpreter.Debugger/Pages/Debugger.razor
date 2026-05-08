@@ -36,7 +36,6 @@
                         }
                         <button class="menu-item" @onclick="MenuOpenExamples">Example shaders</button>
                         <button class="menu-item" @onclick="MenuOpenShaderToyImport">Import ShaderToy</button>
-                        <a class="menu-item" href="https://github.com/pema99/HLSLInterpreter" target="_blank" rel="noopener noreferrer" @onclick="@(() => menuOpen = false)">View GitHub repo</a>
                         <div class="menu-divider"></div>
                         <button class="menu-item" @onclick="MenuCopyPermalink">Copy permalink</button>
                         <button class="menu-item" @onclick="MenuDownloadCurrentFile">Download current file</button>
@@ -45,7 +44,7 @@
                     </div>
                 }
             </div>
-            <span class="topbar-title">HLSLInterpreter</span>
+            <a class="topbar-title" href="https://github.com/pema99/HLSLInterpreter" target="_blank" rel="noopener noreferrer" title="View on GitHub">HLSLInterpreter</a>
         </div>
 
         <div class="topbar-center">

@@ -639,6 +639,18 @@
     padding: 0 2px;
 }
 
+a.topbar-title {
+    text-decoration: none;
+    transition: color 0.15s ease;
+}
+
+a.topbar-title:hover,
+a.topbar-title:focus-visible {
+    color: #ffffff;
+    text-shadow: 0 0 6px rgba(255, 255, 255, 0.4);
+    outline: none;
+}
+
 .menu-backdrop {
     position: fixed;
     inset: 0;
