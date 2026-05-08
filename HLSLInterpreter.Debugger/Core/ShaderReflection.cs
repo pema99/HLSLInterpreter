@@ -23,7 +23,8 @@ public static class ShaderReflection
                 float2 _WarpSize;
                 float2 _Resolution;
                 float _Time;
-                float4x4 _ViewProjection;
+                float4x4 _View;
+                float4x4 _Projection;
                 float4 _Mouse;
             };
         ";

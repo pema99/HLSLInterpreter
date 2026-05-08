@@ -948,9 +948,9 @@
     height: 30px;
     width: 30px;
     padding: 0;
-    background: #3c3c3c;
-    color: #d4d4d4;
-    border: 1px solid #555;
+    background: #0e639c;
+    color: #ffffff;
+    border: 1px solid #0e639c;
     border-radius: 3px;
     font-size: 18px;
     line-height: 1;
@@ -960,8 +960,8 @@
 }
 
 .btn-debug-start:hover:not(:disabled) {
-    background: #4e4e4e;
-    border-color: #777;
+    background: #1177bd;
+    border-color: #1177bd;
 }
 
 .btn-debug-start:disabled {

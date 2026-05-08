@@ -25,7 +25,7 @@ VSOut vert(float3 pos : POSITION, float3 normal : NORMAL)
     float3 newPos = pos + normal * pulse;
 
     VSOut o;
-    o.pos = mul(_ViewProjection, float4(newPos, 1.0));
+    o.pos = mul(_Projection, mul(_View, float4(newPos, 1.0)));
     o.normal = normal;
     o.color = 0.5 + 0.5 * sin(newPos * 2.5 + float3(0, 2, 4) + _Time);
     return o;

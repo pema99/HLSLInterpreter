@@ -181,9 +181,13 @@ public sealed class RunController : INotifyPropertyChanged
         int wy = Math.Max(1, _state.WarpY);
         int canvasW = GpuCaptured?.CanvasW ?? wx;
         int canvasH = GpuCaptured?.CanvasH ?? wy;
-        float[] viewProjection = null;
+        float[] view = null;
+        float[] projection = null;
         if (_state.ShaderRenderMode == ShaderRenderMode.VertFrag)
-            viewProjection = await _js.InvokeAsync<float[]>("gpuViewProjection", canvasW, canvasH);
+        {
+            view = await _js.InvokeAsync<float[]>("gpuView");
+            projection = await _js.InvokeAsync<float[]>("gpuProjection", canvasW, canvasH);
+        }
         float[] mouse;
         try { mouse = await _js.InvokeAsync<float[]>("gpuMouse"); }
         catch { mouse = new float[] { 0f, 0f, 0f, 0f }; }
@@ -200,7 +204,8 @@ public sealed class RunController : INotifyPropertyChanged
             CanvasW: canvasW,
             CanvasH: canvasH,
             Time: GpuCaptured?.Time ?? 0f,
-            ViewProjection: viewProjection,
+            View: view,
+            Projection: projection,
             Mouse: mouse,
             DebugVertexIndex: _state.DebugVertexIndex);
     }

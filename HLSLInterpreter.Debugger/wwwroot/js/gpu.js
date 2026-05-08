@@ -196,16 +196,22 @@ window.gpuMouse = function () {
     return [mouseX, mouseY, mouseLeft, mouseRight];
 };
 
-window.gpuViewProjection = function (canvasW, canvasH) {
-    const aspect = Math.max(1e-4, canvasW / Math.max(1, canvasH));
+window.gpuView = function () {
     const cp = Math.cos(cameraPitch), sp = Math.sin(cameraPitch);
     const cy = Math.cos(cameraYaw),   sy = Math.sin(cameraYaw);
     const ex = sy * cp * cameraDistance;
     const ey = sp * cameraDistance;
     const ez = cy * cp * cameraDistance;
-    const proj = matPerspective(CAMERA_FOV_Y, aspect, 0.1, 100);
-    const view = matLookAt(ex, ey, ez, 0, 0, 0, 0, 1, 0);
-    return matMul(proj, view);
+    return matLookAt(ex, ey, ez, 0, 0, 0, 0, 1, 0);
+};
+
+window.gpuProjection = function (canvasW, canvasH) {
+    const aspect = Math.max(1e-4, canvasW / Math.max(1, canvasH));
+    return matPerspective(CAMERA_FOV_Y, aspect, 0.1, 100);
+};
+
+window.gpuViewProjection = function (canvasW, canvasH) {
+    return matMul(window.gpuProjection(canvasW, canvasH), window.gpuView());
 };
 
 window.gpuPickRay = function (imgX, imgY, imgW, imgH) {
@@ -334,21 +340,23 @@ function drawFrame(r, now) {
     const t = (now - r.startTimeMs) / 1000;
     r.lastTime = t;
 
-    const u = new Float32Array(28);
+    const u = new Float32Array(44);
     u[0] = r.warpX;
     u[1] = r.warpY;
     u[2] = r.canvas.width;
     u[3] = r.canvas.height;
     u[4] = t;
 
-    const viewProj = r.renderMode === 'vertfrag'
-        ? window.gpuViewProjection(r.canvas.width, r.canvas.height)
+    const viewMat = r.renderMode === 'vertfrag' ? window.gpuView() : matIdentity();
+    const projMat = r.renderMode === 'vertfrag'
+        ? window.gpuProjection(r.canvas.width, r.canvas.height)
         : matIdentity();
-    writeMat4(u, 8, viewProj);
-    u[24] = mouseX;
-    u[25] = mouseY;
-    u[26] = mouseLeft;
-    u[27] = mouseRight;
+    writeMat4(u, 8, viewMat);
+    writeMat4(u, 24, projMat);
+    u[40] = mouseX;
+    u[41] = mouseY;
+    u[42] = mouseLeft;
+    u[43] = mouseRight;
     r.device.queue.writeBuffer(r.uniformBuffer, 0, u);
 
     let view;
@@ -602,7 +610,7 @@ window.gpuRender = async function (canvasId, hlslSource, entryPoint, warpX, warp
     }
 
     const uniformBuffer = device.createBuffer({
-        size: 112,
+        size: 176,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
