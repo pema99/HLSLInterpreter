@@ -29,8 +29,8 @@
                         @if (TabbedEditorConfig.Enabled)
                         {
                             <button class="menu-item" @onclick="MenuOpenFile">Open file</button>
-                            <button class="menu-item" @onclick="MenuSaveFile">Save</button>
                             <button class="menu-item" @onclick="MenuSaveFileAs">Save as</button>
+                            <button class="menu-item" @onclick="MenuSaveFile">Save</button>
                             <div class="menu-divider"></div>
                         }
                         <a class="menu-item" href="https://github.com/pema99/HLSLInterpreter" target="_blank" rel="noopener noreferrer" @onclick="@(() => menuOpen = false)">View GitHub repo</a>

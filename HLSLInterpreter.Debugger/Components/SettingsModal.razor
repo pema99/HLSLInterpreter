@@ -68,6 +68,18 @@
                                disabled="@IsLocked" title="Warp Y" />
                     </div>
                 </div>
+                <div class="settings-row">
+                    <label class="settings-label">Font size</label>
+                    <select class="settings-text-input"
+                            value="@State.EditorFontSize"
+                            @onchange="OnFontSizeChanged"
+                            title="Editor font size">
+                        @foreach (var size in fontSizes)
+                        {
+                            <option value="@size">@size</option>
+                        }
+                    </select>
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="btn-modal-save" @onclick="Close">Close</button>
@@ -80,6 +92,8 @@
     [Parameter] public bool IsOpen { get; set; }
     [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
     [Parameter] public bool IsLocked { get; set; }
+
+    private static readonly int[] fontSizes = { 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36 };
 
     private Task Close() => IsOpenChanged.InvokeAsync(false);
 
@@ -94,4 +108,13 @@
     }
 
     private Task PickMesh() => JS.InvokeVoidAsync("dbgPickObj").AsTask();
+
+    private async Task OnFontSizeChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int size))
+        {
+            State.EditorFontSize = size;
+            await JS.InvokeVoidAsync("setMonacoFontSize", size);
+        }
+    }
 }

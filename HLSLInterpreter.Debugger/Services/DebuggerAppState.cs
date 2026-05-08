@@ -108,6 +108,13 @@ public sealed class DebuggerAppState : INotifyPropertyChanged
         set => Set(ref _selectedFrame, Math.Max(0, value));
     }
 
+    private int _editorFontSize = 16;
+    public int EditorFontSize
+    {
+        get => _editorFontSize;
+        set => Set(ref _editorFontSize, value);
+    }
+
     public PermalinkSettings ToPermalinkSettings() =>
         new(FragmentEntryPoint, WarpX, WarpY, GroupOffsetX, GroupOffsetY, GpuPreviewEnabled, ShaderRenderMode, VertexEntryPoint);
 

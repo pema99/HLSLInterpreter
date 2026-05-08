@@ -9,18 +9,9 @@
 @inject RunController RunCtl
 
 <div class="editor-panel">
-    <div class="panel-header">
-        <span>Input</span>
-        <select class="footer-select" title="Font size" @onchange="OnFontSizeChanged">
-            @foreach (var size in fontSizes)
-            {
-                <option value="@size" selected="@(size == fontSize)">@size</option>
-            }
-        </select>
-    </div>
     @if (TabbedEditorConfig.Enabled)
     {
-        <div class="editor-tabs">
+        <div class="editor-tabs panel-header-tabs">
             @for (int i = 0; i < tabs.Count; i++)
             {
                 var idx = i;
@@ -30,6 +21,12 @@
                     <span class="editor-tab-close" @onclick="() => CloseTab(idx)" @onclick:stopPropagation>&#x2715;</span>
                 </div>
             }
+        </div>
+    }
+    else
+    {
+        <div class="panel-header">
+            <span>Code</span>
         </div>
     }
     <div id="monaco-container" class="editor-container"></div>
@@ -43,9 +40,6 @@
     [Parameter] public EventCallback OnReady { get; set; }
 
     private DotNetObjectReference<EditorPanel> _selfRef;
-
-    private static readonly int[] fontSizes = { 12, 13, 14, 15, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36 };
-    private int fontSize = 16;
 
     private sealed class EditorTab { public string Name = ""; public string Code = ""; public string Path; }
     private List<EditorTab> tabs = new();
@@ -131,6 +125,7 @@
         if (firstRender)
         {
             await JS.InvokeVoidAsync("initMonaco", "monaco-container", InitialCode, _selfRef);
+            await JS.InvokeVoidAsync("setMonacoFontSize", State.EditorFontSize);
             if (TabbedEditorConfig.Enabled)
                 FileDialogs.FileDropped = async (name, content, path) => await OpenFileInTab(name, content, path);
             await OnReady.InvokeAsync();
@@ -138,15 +133,6 @@
     }
 
     public void Dispose() => _selfRef?.Dispose();
-
-    private async Task OnFontSizeChanged(ChangeEventArgs e)
-    {
-        if (int.TryParse(e.Value?.ToString(), out int size))
-        {
-            fontSize = size;
-            await JS.InvokeVoidAsync("setMonacoFontSize", size);
-        }
-    }
 
     public async Task SwitchTab(int index)
     {

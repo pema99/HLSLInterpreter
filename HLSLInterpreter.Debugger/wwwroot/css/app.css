@@ -343,6 +343,10 @@
 }
 .editor-tab:hover .editor-tab-close,
 .editor-tab.active .editor-tab-close { opacity: 0.6; }
+
+.panel-header-tabs {
+    border-bottom: 1px solid #3c3c3c;
+}
 .editor-tab-close:hover { opacity: 1 !important; background: rgba(255,255,255,0.1); }
 
 .editor-toolbar-group {
