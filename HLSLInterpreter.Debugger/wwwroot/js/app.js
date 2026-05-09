@@ -871,7 +871,7 @@ window._glsl2hlslPromise = null;
 async function loadGlsl2Hlsl() {
     if (!window._glsl2hlslPromise) {
         window._glsl2hlslPromise = (async () => {
-            const base = new URL('/_content/HLSLInterpreter.Debugger/lib/glsl2hlsl/', document.baseURI).href;
+            const base = new URL('_content/HLSLInterpreter.Debugger/lib/glsl2hlsl/', document.baseURI).href;
             const mod = await import(base + 'glsl2hlsl_wasm.js');
             await mod.default(base + 'glsl2hlsl_wasm_bg.wasm');
             return mod;
