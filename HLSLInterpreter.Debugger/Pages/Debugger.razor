@@ -103,7 +103,7 @@
                      InitialCodeName="@(InitialCode.Name ?? "new.hlsl")"
                      InitialCodePath="@InitialCode.Path"
                      OnTabSwitched="@OnEditorTabSwitched"
-                     OnReady="@Run" />
+                     OnReady="@OnEditorReady" />
 
         <div class="resize-h-handle" title="Drag to resize"></div>
 
@@ -257,8 +257,33 @@ float4 frag(float4 position : SV_Position) : SV_Target
             try { code = PermalinkCodec.DecompressCode(param); }
             catch { }
         }
+        var stParam = PermalinkCodec.GetQueryParam(Nav.Uri, "shadertoy");
+        if (!string.IsNullOrEmpty(stParam))
+        {
+            try { _pendingShaderToyImport = PermalinkCodec.DecompressCode(stParam); }
+            catch (Exception ex) { Console.WriteLine("[shadertoy-url] decode failed: " + ex.Message); }
+        }
         initialEditorCode = code;
         State.ApplyFromUrl(Nav.Uri);
+    }
+
+    private string _pendingShaderToyImport;
+
+    private async Task OnEditorReady()
+    {
+        if (_pendingShaderToyImport != null)
+        {
+            string glsl = _pendingShaderToyImport;
+            _pendingShaderToyImport = null;
+            try
+            {
+                string hlsl = await JS.InvokeAsync<string>("glsl2hlslTranspile", glsl);
+                await OnShaderToyImported(new ShaderToyImportModal.ImportResult("shadertoy.hlsl", hlsl));
+                return;
+            }
+            catch (Exception ex) { Console.WriteLine("[shadertoy-url] " + ex.Message); }
+        }
+        await Run();
     }
 
     private void OnStateChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
