@@ -582,7 +582,15 @@ window.initMonaco = function (containerId, initialCode, editorRef) {
 
 // Global debug hotkeys (when Monaco does not have focus)
 document.addEventListener('keydown', function (e) {
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    if (e.key === 'Escape') {
+        var overlays = document.querySelectorAll('.modal-overlay');
+        if (overlays.length > 0) {
+            overlays[overlays.length - 1].click();
+            e.preventDefault();
+            return;
+        }
+    }
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
     var mc = document.getElementById('monaco-container');
     if (mc && mc.contains(document.activeElement)) return;
 
