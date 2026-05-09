@@ -41,7 +41,9 @@
     @* Keep canvases mounted even when collapsed so the GPU loop's
        references stay valid across collapse/expand. *@
     <div class="image-container @(IsGpuMode ? "gpu-mode" : "")" id="image-container"
-         data-mode-target="regular" style="@(IsCollapsed ? "display:none" : "")">
+         data-mode-target="regular" style="@(IsCollapsed ? "display:none" : "")"
+         @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true"
+         @oncontextmenu="@(() => {})">
         <canvas class="image-canvas color-canvas-2d"></canvas>
         <canvas id="color-canvas-gpu" class="image-canvas"></canvas>
         <canvas class="image-overlay"></canvas>
