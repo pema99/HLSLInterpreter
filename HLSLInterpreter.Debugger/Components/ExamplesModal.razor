@@ -43,7 +43,8 @@
         string Content,
         ShaderRenderMode? Mode,
         string FragEntry,
-        string VertEntry);
+        string VertEntry,
+        IReadOnlyList<(string UniformName, string FileName)> Textures);
 
     private const string BaseUrl = "_content/HLSLInterpreter.Debugger/ExampleShaders/";
 
@@ -55,6 +56,7 @@
         public ShaderRenderMode? Mode;
         public string FragEntry;
         public string VertEntry;
+        public List<(string UniformName, string FileName)> Textures = new();
     }
 
     private List<Example> _examples;
@@ -120,7 +122,7 @@
     private async Task Pick(Example ex)
     {
         await IsOpenChanged.InvokeAsync(false);
-        await OnSelected.InvokeAsync(new ExampleSelection(ex.Name, ex.Cleaned, ex.Mode, ex.FragEntry, ex.VertEntry));
+        await OnSelected.InvokeAsync(new ExampleSelection(ex.Name, ex.Cleaned, ex.Mode, ex.FragEntry, ex.VertEntry, ex.Textures));
     }
 
     private static Example ParseHeader(string content)
@@ -149,6 +151,11 @@
             }
             else if (key.Equals("FragEntry", StringComparison.OrdinalIgnoreCase)) ex.FragEntry = value;
             else if (key.Equals("VertEntry", StringComparison.OrdinalIgnoreCase)) ex.VertEntry = value;
+            else if (key.Equals("Texture", StringComparison.OrdinalIgnoreCase))
+            {
+                var parts = value.Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length >= 2) ex.Textures.Add((parts[0], parts[1]));
+            }
             else recognized = false;
 
             if (!recognized) break;

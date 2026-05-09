@@ -6,6 +6,7 @@
 @inject DebuggerAppState State
 @inject RunController RunCtl
 @inject DebugController DebugCtl
+@inject HLSLInterpreter.Debugger.Services.ImageLibrary ImageLib
 @inject TabbedEditorOptions TabbedEditorConfig
 @using HLSL
 @using UnityShaderParser.HLSL
@@ -654,6 +655,31 @@ float4 frag(float4 position : SV_Position) : SV_Target
         if (ex.Mode.HasValue) State.ShaderRenderMode = ex.Mode.Value;
         if (!string.IsNullOrWhiteSpace(ex.FragEntry)) State.FragmentEntryPoint = ex.FragEntry;
         if (!string.IsNullOrWhiteSpace(ex.VertEntry)) State.VertexEntryPoint = ex.VertEntry;
+
+        var newTextures = new List<TextureBinding>();
+        if (ex.Textures.Count > 0)
+        {
+            await ImageLib.EnsureExamplesLoadingAsync();
+            foreach (var (uniformName, fileName) in ex.Textures)
+            {
+                var src = ImageLib.Examples.FirstOrDefault(t => t.FileName == fileName);
+                if (src == null) continue;
+                await ImageLib.EnsureBytesAsync(src);
+                if (src.Rgba8 == null) continue;
+                newTextures.Add(new TextureBinding
+                {
+                    Name = uniformName,
+                    FileName = src.FileName,
+                    Rgba8 = src.Rgba8,
+                    Width = src.Width,
+                    Height = src.Height,
+                    PreviewDataUrl = src.PreviewDataUrl,
+                });
+            }
+        }
+        State.Textures = newTextures;
+        State.Samplers = new();
+
         await Run();
     }
 
