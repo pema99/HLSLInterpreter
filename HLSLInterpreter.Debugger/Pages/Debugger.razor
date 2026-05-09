@@ -44,6 +44,7 @@
                         <button class="menu-item" @onclick="MenuCopyPermalink">Copy permalink</button>
                         <button class="menu-item" @onclick="MenuDownloadCurrentFile">Download current file</button>
                         <div class="menu-divider"></div>
+                        <button class="menu-item" @onclick="MenuOpenHotkeys">Hotkeys</button>
                         <button class="menu-item" @onclick="MenuOpenSettings">Settings</button>
                     </div>
                 }
@@ -151,6 +152,8 @@
 
 <SettingsModal @bind-IsOpen="showSettings" IsLocked="@(RunCtl.IsRunning || DebugCtl.IsDebugging)" />
 
+<HotkeysModal @bind-IsOpen="showHotkeys" />
+
 <ExamplesModal @bind-IsOpen="showExamples" OnSelected="OnExampleSelected" />
 
 <ShaderToyImportModal @bind-IsOpen="showShaderToyImport" OnImported="OnShaderToyImported" />
@@ -229,6 +232,7 @@ float4 frag(float4 position : SV_Position) : SV_Target
 
 
     private bool showSettings = false;
+    private bool showHotkeys = false;
     private bool showExamples = false;
     private bool showShaderToyImport = false;
     private bool showNewFile = false;
@@ -545,6 +549,12 @@ float4 frag(float4 position : SV_Position) : SV_Target
     {
         menuOpen = false;
         showSettings = true;
+    }
+
+    private void MenuOpenHotkeys()
+    {
+        menuOpen = false;
+        showHotkeys = true;
     }
 
     private async Task MenuDownloadCurrentFile()

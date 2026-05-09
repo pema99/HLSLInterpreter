@@ -867,6 +867,59 @@ a.topbar-title:focus-visible {
     gap: 12px;
 }
 
+.hotkeys-group-title {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #7d8492;
+    margin: 14px 0 4px;
+    padding-bottom: 2px;
+    border-bottom: 1px solid #2f3338;
+}
+
+.hotkeys-group-title:first-child {
+    margin-top: 0;
+}
+
+.hotkeys-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.hotkeys-table td {
+    padding: 4px 8px;
+    vertical-align: middle;
+}
+
+.hotkeys-keys {
+    width: 130px;
+    white-space: nowrap;
+    text-align: right;
+    color: #cdd6e2;
+}
+
+.hotkeys-desc {
+    color: #aab2bd;
+}
+
+.hotkeys-table kbd {
+    display: inline-block;
+    padding: 1px 6px;
+    background: #2a2a2a;
+    border: 1px solid #555;
+    border-bottom-width: 2px;
+    border-radius: 3px;
+    color: #e6e6e6;
+    font: 11px Consolas, monospace;
+    line-height: 16px;
+}
+
+.hotkeys-plus {
+    color: #888;
+    margin: 0 4px;
+}
+
 .settings-label {
     font-size: 13px;
     color: #cccccc;

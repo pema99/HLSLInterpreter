@@ -1,0 +1,69 @@
+@if (IsOpen)
+{
+    <div class="modal-overlay" @onclick="Close">
+        <div class="modal-dialog" @onclick:stopPropagation="true" style="max-width: 420px; width: 90vw;">
+            <div class="modal-header">Hotkeys</div>
+            <div class="modal-body">
+                @foreach (var group in Groups)
+                {
+                    <div class="hotkeys-group-title">@group.Title</div>
+                    <table class="hotkeys-table">
+                        @foreach (var (keys, desc) in group.Items)
+                        {
+                            <tr>
+                                <td class="hotkeys-keys">
+                                    @for (int i = 0; i < keys.Length; i++)
+                                    {
+                                        if (i > 0)
+                                        {
+                                            <span class="hotkeys-plus">+</span>
+                                        }
+                                        <kbd>@keys[i]</kbd>
+                                    }
+                                </td>
+                                <td class="hotkeys-desc">@desc</td>
+                            </tr>
+                        }
+                    </table>
+                }
+            </div>
+            <div class="modal-footer">
+                <button class="btn-modal-save" @onclick="Close">Close</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+
+    private Task Close() => IsOpenChanged.InvokeAsync(false);
+
+    private record HotkeyGroup(string Title, (string[] Keys, string Desc)[] Items);
+
+    private static readonly HotkeyGroup[] Groups =
+    {
+        new("General", new (string[], string)[]
+        {
+            (new[] { "Ctrl", "Enter" }, "Run"),
+            (new[] { "F5" }, "Run"),
+            (new[] { "F9" }, "Toggle breakpoint at cursor"),
+        }),
+        new("Debug mode", new (string[], string)[]
+        {
+            (new[] { "F5" }, "Continue to next breakpoint"),
+            (new[] { "Shift", "F5" }, "Continue to previous breakpoint"),
+            (new[] { "F10" }, "Step over"),
+            (new[] { "Shift", "F10" }, "Step over backwards"),
+            (new[] { "F11" }, "Step into"),
+            (new[] { "Shift", "F11" }, "Step into backwards"),
+            (new[] { "F12" }, "Step out"),
+            (new[] { "Shift", "F12" }, "Step out backwards"),
+        }),
+        new("Bonzomatic mode", new (string[], string)[]
+        {
+            (new[] { "F10" }, "Toggle editor visibility"),
+        }),
+    };
+}
