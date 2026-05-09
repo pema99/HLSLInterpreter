@@ -872,7 +872,7 @@ namespace HLSL
 
         // Upper bound on meaningful LOD for a resource, used to clamp computed LODs.
         private static float MaxLodForResource(ResourceValue rv)
-            => (float)(Math.Log(MathF.Max(rv.SizeX, MathF.Max(rv.SizeY, rv.SizeZ))) / Math.Log(2)) + 1;
+            => MathF.Max(0, rv.MipCount - 1);
 
         // Returns face-local UV in [0, 1] per thread. Used by CalculateRho to get face-space derivatives.
         private static VectorValue CubeDirectionToFaceUV(VectorValue dir)

@@ -398,7 +398,9 @@ void Sampler_CalculateLevelOfDetail()
     SamplerState s { Filter = MIN_MAG_MIP_LINEAR; };
     uint tid = WaveGetLaneIndex();
     float lod = g_samplerTex.CalculateLevelOfDetail(s, float(tid % 2) * 0.5);
-    ASSERT(lod == 1.0);
+    // MockSampler1D has MipCount=1, so the clamped LOD is 0 (only base level available).
+    // CalculateLevelOfDetailUnclamped below still returns the gradient-based 1.0.
+    ASSERT(lod == 0.0);
 }
 
 [Test]
