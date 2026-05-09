@@ -772,9 +772,15 @@ a.topbar-title:focus-visible {
 }
 
 .example-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 4px;
     max-height: 60vh;
     overflow-y: auto;
+}
+
+.example-list > .example-loading {
+    grid-column: 1 / -1;
 }
 
 .example-item {
@@ -932,7 +938,8 @@ a.topbar-title:focus-visible {
     border-bottom-width: 2px;
     border-radius: 3px;
     color: #e6e6e6;
-    font: 11px Consolas, monospace;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace;
     line-height: 16px;
 }
 
@@ -1038,7 +1045,8 @@ a.topbar-title:focus-visible {
     border: 1px solid #3c3c3c;
     border-radius: 3px;
     padding: 4px 8px;
-    font: 12px Consolas, monospace;
+    font-size: 13px;
+    font-family: 'JetBrains Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace;
 }
 
 .tex-pick, .btn-tex-add {
@@ -1047,7 +1055,7 @@ a.topbar-title:focus-visible {
     border: 1px solid #3c3c3c;
     border-radius: 3px;
     padding: 4px 10px;
-    font: 12px sans-serif;
+    font-size: 13px;
     cursor: pointer;
 }
 
@@ -1066,7 +1074,7 @@ a.topbar-title:focus-visible {
     border: 1px solid #3c3c3c;
     border-radius: 3px;
     padding: 3px 6px;
-    font: 12px sans-serif;
+    font-size: 13px;
 }
 
 .btn-tex-remove {

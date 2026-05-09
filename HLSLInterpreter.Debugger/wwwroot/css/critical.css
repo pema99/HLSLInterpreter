@@ -156,6 +156,7 @@ html, body {
     display: flex;
     flex-direction: column;
     gap: 10px;
+    font-size: 13px;
 }
 .modal-footer {
     padding: 12px 16px;

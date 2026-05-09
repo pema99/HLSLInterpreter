@@ -4,7 +4,7 @@
 @if (IsOpen)
 {
     <div class="modal-overlay" @onclick="Close">
-        <div class="modal-dialog" @onclick:stopPropagation="true">
+        <div class="modal-dialog" @onclick:stopPropagation="true" style="max-width: 480px; width: 90vw;">
             <div class="modal-header">Example shaders</div>
             <div class="modal-body example-list">
                 @if (_examples == null)
