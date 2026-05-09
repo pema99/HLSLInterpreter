@@ -58,7 +58,7 @@ public static class ShaderReflection
             sb.AppendLine("    return v2f;");
             sb.AppendLine("}");
             return new AssembledShader(
-                CBufferPreamble + "\n" + sb + "\n#line 1\n" + userSource,
+                CBufferPreamble + "\n" + sb + "\n" + userSource,
                 "_dbgVertex", null);
         }
 
@@ -75,7 +75,7 @@ public static class ShaderReflection
                 throw new InvalidOperationException("Vertex input leaf is missing a semantic.");
             inputs.Add(new VertexInput(semantic.Base, semantic.Index, dim));
         });
-        return new AssembledShader(CBufferPreamble + "\n#line 1\n" + userSource, vertEntry, inputs);
+        return new AssembledShader(CBufferPreamble + "\n" + userSource, vertEntry, inputs);
     }
 
     #region General reflection
