@@ -25,6 +25,7 @@ builder.Services.AddSingleton<FileDialogService, WpfFileDialogService>();
 builder.Services.AddScoped<DebuggerAppState>();
 builder.Services.AddScoped<RunController>();
 builder.Services.AddScoped<DebugController>();
+builder.Services.AddScoped<ImageLibrary>();
 
 builder.Window.UseTitle("HLSL Interpreter");
 builder.Window.UseWidth(1600);

@@ -1,5 +1,7 @@
 @using HLSL
 @using HLSLInterpreter.Debugger.Core
+@using TextureBinding = HLSLInterpreter.Debugger.Core.TextureBinding
+@using SamplerBinding = HLSLInterpreter.Debugger.Core.SamplerBinding
 @implements IDisposable
 @inject IJSRuntime JS
 @inject FileDialogService FileDialogs
@@ -59,6 +61,8 @@
         public string FragEntry;
         public int GroupOffsetX, GroupOffsetY;
         public int WarpX, WarpY;
+        public List<TextureBinding> Textures;
+        public List<SamplerBinding> Samplers;
     }
 
     private sealed class EditorTab
@@ -182,6 +186,8 @@
         GroupOffsetY = State.GroupOffsetY,
         WarpX = State.WarpX,
         WarpY = State.WarpY,
+        Textures = State.Textures,
+        Samplers = State.Samplers,
     };
 
     private void ApplyTabSettings(TabSettings s)
@@ -194,6 +200,8 @@
         State.GroupOffsetY = s.GroupOffsetY;
         State.WarpX = s.WarpX;
         State.WarpY = s.WarpY;
+        State.Textures = s.Textures ?? new();
+        State.Samplers = s.Samplers ?? new();
     }
 
     private int draggedTabIndex = -1;

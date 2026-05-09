@@ -18,6 +18,20 @@ public sealed class DebuggerAppState : INotifyPropertyChanged
         set => Set(ref _currentMesh, value);
     }
 
+    private List<TextureBinding> _textures = new();
+    public List<TextureBinding> Textures
+    {
+        get => _textures;
+        set => Set(ref _textures, value);
+    }
+
+    private List<SamplerBinding> _samplers = new();
+    public List<SamplerBinding> Samplers
+    {
+        get => _samplers;
+        set => Set(ref _samplers, value);
+    }
+
     private string _fragmentEntryPoint = "frag";
     public string FragmentEntryPoint
     {

@@ -165,7 +165,8 @@ public sealed class RunController : INotifyPropertyChanged
             }
             await _js.InvokeVoidAsync("gpuRender", "color-canvas-gpu", assembled.Source,
                 _state.FragmentEntryPoint, wx, wy, dotNetRef, mode, assembled.VertexEntry,
-                assembled.VertexInputs, meshVertices, meshIndices, initialTime);
+                assembled.VertexInputs, meshVertices, meshIndices, initialTime,
+                _state.Textures, _state.Samplers);
         }
         catch (Exception ex)
         {
@@ -207,7 +208,9 @@ public sealed class RunController : INotifyPropertyChanged
             View: view,
             Projection: projection,
             Mouse: mouse,
-            DebugVertexIndex: _state.DebugVertexIndex);
+            DebugVertexIndex: _state.DebugVertexIndex,
+            Textures: _state.Textures,
+            Samplers: _state.Samplers);
     }
 
     public bool TryExtractImage(HLSLValue result, int wx, int wy)

@@ -1,0 +1,162 @@
+@using HLSLInterpreter.Debugger.Core
+@using HLSLInterpreter.Debugger.Services
+@inject IJSRuntime JS
+@inject ImageLibrary Library
+@inject DebuggerAppState State
+
+@if (IsOpen)
+{
+    <div class="modal-overlay" @onclick="Close">
+        <div class="modal-dialog" @onclick:stopPropagation="true" style="max-width: 480px; width: 90vw; max-height: 85vh;">
+            <div class="modal-header">Textures</div>
+            <div class="modal-body" style="overflow-y: auto; min-height: 0;">
+                <div class="modal-section-title">Textures</div>
+                @if (textures.Count == 0)
+                {
+                    <div class="tex-empty">No textures.</div>
+                }
+                @for (int i = 0; i < textures.Count; i++)
+                {
+                    var idx = i;
+                    var t = textures[idx];
+                    <div class="tex-row">
+                        @if (!string.IsNullOrEmpty(t.PreviewDataUrl))
+                        {
+                            <div class="tex-thumb"><img src="@t.PreviewDataUrl" alt="@t.FileName" /></div>
+                        }
+                        else
+                        {
+                            <div class="tex-thumb tex-thumb-empty"></div>
+                        }
+                        <div class="tex-row-stack">
+                            <input class="tex-name" type="text" placeholder="_Tex"
+                                   value="@t.Name"
+                                   @oninput="@(e => t.Name = e.Value?.ToString() ?? "")" />
+                            <div class="tex-pick-row">
+                                <button class="tex-pick" @onclick="@(() => PickImage(idx))">@(t.Width > 0 ? "Replace" : "Upload")</button>
+                                <button class="tex-pick" @onclick="@(() => OpenLibrary(idx))">Library</button>
+                            </div>
+                        </div>
+                        <button class="btn-tex-remove" @onclick="@(() => textures.RemoveAt(idx))" title="Remove">&#x2715;</button>
+                    </div>
+                }
+                <button class="btn-tex-add" @onclick="AddTexture">+ Add texture</button>
+
+                <div class="modal-section-title">Samplers</div>
+                @if (samplers.Count == 0)
+                {
+                    <div class="tex-empty">No samplers.</div>
+                }
+                @for (int i = 0; i < samplers.Count; i++)
+                {
+                    var idx = i;
+                    var s = samplers[idx];
+                    <div class="tex-row">
+                        <input class="tex-name" type="text" placeholder="_Samp"
+                               value="@s.Name"
+                               @oninput="@(e => s.Name = e.Value?.ToString() ?? "")" />
+                        <select class="tex-select"
+                                value="@s.Filter"
+                                @onchange="@(e => s.Filter = Enum.Parse<TextureFilter>(e.Value?.ToString() ?? "Linear"))">
+                            @foreach (var f in Enum.GetValues<TextureFilter>())
+                            {
+                                <option value="@f">@f</option>
+                            }
+                        </select>
+                        <select class="tex-select"
+                                value="@s.Address"
+                                @onchange="@(e => s.Address = Enum.Parse<TextureAddress>(e.Value?.ToString() ?? "Wrap"))">
+                            @foreach (var a in Enum.GetValues<TextureAddress>())
+                            {
+                                <option value="@a">@a</option>
+                            }
+                        </select>
+                        <button class="btn-tex-remove" @onclick="@(() => samplers.RemoveAt(idx))" title="Remove">&#x2715;</button>
+                    </div>
+                }
+                <button class="btn-tex-add" @onclick="AddSampler">+ Add sampler</button>
+
+                @if (!string.IsNullOrEmpty(_error))
+                {
+                    <div class="tex-error">@_error</div>
+                }
+            </div>
+            <div class="modal-footer">
+                <button class="btn-modal-save" @onclick="Close">Cancel</button>
+                <button class="btn-modal-save" @onclick="Save">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <LibraryPickerModal @bind-IsOpen="_libraryOpen" OnPicked="OnLibraryPicked" />
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+
+    private List<TextureBinding> textures = new();
+    private List<SamplerBinding> samplers = new();
+    private string _error = "";
+    private bool _wasOpen;
+    private bool _libraryOpen;
+    private int _libraryTargetIdx = -1;
+
+    protected override void OnParametersSet()
+    {
+        if (IsOpen && !_wasOpen)
+        {
+            textures = State.Textures?.Select(t => t.Clone()).ToList() ?? new();
+            samplers = State.Samplers?.Select(s => s.Clone()).ToList() ?? new();
+            _error = "";
+        }
+        _wasOpen = IsOpen;
+    }
+
+    private void AddTexture() => textures.Add(new TextureBinding());
+    private void AddSampler() => samplers.Add(new SamplerBinding());
+
+    private async Task PickImage(int idx)
+    {
+        try
+        {
+            var picked = await JS.InvokeAsync<PickedImage>("dbgPickImage");
+            if (picked == null) return;
+            var binding = picked.ToTextureBinding();
+            ApplyPicked(idx, binding);
+            Library.AddRecent(binding.Clone());
+        }
+        catch (Exception ex) { _error = "Image load failed: " + ex.Message; }
+    }
+
+    private void OpenLibrary(int idx)
+    {
+        _libraryTargetIdx = idx;
+        _libraryOpen = true;
+    }
+
+    private void OnLibraryPicked(TextureBinding picked)
+    {
+        if (_libraryTargetIdx < 0 || _libraryTargetIdx >= textures.Count || picked == null) return;
+        ApplyPicked(_libraryTargetIdx, picked);
+    }
+
+    private void ApplyPicked(int idx, TextureBinding src)
+    {
+        var t = textures[idx];
+        t.FileName = src.FileName;
+        t.Width = src.Width;
+        t.Height = src.Height;
+        t.Rgba8 = src.Rgba8;
+        t.PreviewDataUrl = src.PreviewDataUrl;
+    }
+
+    private Task Close() => IsOpenChanged.InvokeAsync(false);
+
+    private async Task Save()
+    {
+        State.Textures = textures;
+        State.Samplers = samplers;
+        await IsOpenChanged.InvokeAsync(false);
+    }
+}

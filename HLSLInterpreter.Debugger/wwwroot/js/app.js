@@ -885,6 +885,61 @@ window.glsl2hlslTranspile = async function (glsl) {
     return mod.transpile(glsl);
 };
 
+async function decodeImageBlob(fileName, blob) {
+    const bitmap = await createImageBitmap(blob);
+    const w = bitmap.width;
+    const h = bitmap.height;
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(bitmap, 0, 0);
+    const data = ctx.getImageData(0, 0, w, h);
+    const previewBlob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+    const blobUrl = URL.createObjectURL(previewBlob);
+    bitmap.close && bitmap.close();
+    let bin = '';
+    const u8 = data.data;
+    const CHUNK = 0x8000;
+    for (let i = 0; i < u8.length; i += CHUNK) {
+        bin += String.fromCharCode.apply(null, u8.subarray(i, i + CHUNK));
+    }
+    return {
+        fileName: fileName,
+        width: w,
+        height: h,
+        rgba8Base64: btoa(bin),
+        dataUrl: blobUrl,
+    };
+}
+
+window.dbgPickImage = function () {
+    return new Promise((resolve, reject) => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.addEventListener('change', async () => {
+            const file = input.files && input.files[0];
+            if (!file) { resolve(null); return; }
+            try { resolve(await decodeImageBlob(file.name, file)); }
+            catch (e) { reject(e); }
+        });
+        input.click();
+    });
+};
+
+window.dbgRevokeBlobUrl = function (url) {
+    if (url && typeof url === 'string' && url.startsWith('blob:')) URL.revokeObjectURL(url);
+};
+
+window.dbgFetchImage = async function (url) {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('HTTP ' + response.status + ' fetching ' + url);
+    const blob = await response.blob();
+    const fileName = (() => { try { return new URL(url, document.baseURI).pathname.split('/').pop() || url; } catch (_) { return url; } })();
+    return await decodeImageBlob(fileName, blob);
+};
+
 window.downloadTextFile = function (filename, content) {
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);

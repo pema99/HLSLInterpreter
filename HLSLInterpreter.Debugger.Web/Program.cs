@@ -15,5 +15,6 @@ builder.Services.AddSingleton<FileDialogService>();
 builder.Services.AddScoped<DebuggerAppState>();
 builder.Services.AddScoped<RunController>();
 builder.Services.AddScoped<DebugController>();
+builder.Services.AddScoped<ImageLibrary>();
 
 await builder.Build().RunAsync();

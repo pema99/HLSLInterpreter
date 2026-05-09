@@ -19,7 +19,9 @@ public sealed record ShaderInvocation(
     float[] View,
     float[] Projection,
     float[] Mouse,
-    int DebugVertexIndex)
+    int DebugVertexIndex,
+    IReadOnlyList<TextureBinding> Textures,
+    IReadOnlyList<SamplerBinding> Samplers)
 {
     public void SetUniforms(HLSLRunner runner)
     {
@@ -34,6 +36,83 @@ public sealed record ShaderInvocation(
         }
     }
 
+    private void BindTexturesAndSamplers(HLSLRunner runner)
+    {
+        var texByName = new Dictionary<string, TextureBinding>();
+        if (Textures != null)
+            foreach (var t in Textures)
+                if (!string.IsNullOrEmpty(t.Name)) texByName[t.Name] = t;
+
+        var sampByName = new Dictionary<string, SamplerBinding>();
+        if (Samplers != null)
+            foreach (var s in Samplers)
+                if (!string.IsNullOrEmpty(s.Name)) sampByName[s.Name] = s;
+
+        foreach (var kvp in runner.GetGlobalVariables().ToList())
+        {
+            if (kvp.Value is ResourceValue tv && tv.IsTexture)
+            {
+                if (texByName.TryGetValue(kvp.Key, out var tex) && tex.Rgba8 != null && tex.Width > 0 && tex.Height > 0)
+                    runner.SetVariable(kvp.Key, BuildTextureResource(tv, tex));
+                else
+                    runner.SetVariable(kvp.Key, new ResourceValue(tv.Type, tv.TemplateArguments, tv.Stride,
+                        sizeX: 1, sizeY: 1, sizeZ: 1, mipCount: 1,
+                        get: (x, y, z, sample, mip) => new VectorValue(ScalarType.Float, new HLSLRegister<RawValue[]>([1f, 0f, 1f, 1f])),
+                        set: null));
+            }
+            else if (kvp.Value is SamplerStateValue)
+            {
+                runner.SetVariable(kvp.Key, sampByName.TryGetValue(kvp.Key, out var s) ? BuildSampler(s) : new SamplerStateValue
+                {
+                    Filter = SamplerStateValue.FilterMode.MinMagMipLinear,
+                    AddressU = SamplerStateValue.TextureAddressMode.Wrap,
+                    AddressV = SamplerStateValue.TextureAddressMode.Wrap,
+                    AddressW = SamplerStateValue.TextureAddressMode.Wrap,
+                });
+            }
+        }
+    }
+
+    private static ResourceValue BuildTextureResource(ResourceValue template, TextureBinding tex)
+    {
+        int w = tex.Width, h = tex.Height;
+        byte[] data = tex.Rgba8;
+        ResourceGetter get = (x, y, z, sample, mip) =>
+        {
+            int xc = Math.Clamp(x, 0, w - 1);
+            int yc = Math.Clamp(y, 0, h - 1);
+            int o = (yc * w + xc) * 4;
+            float r = data[o + 0] / 255f;
+            float g = data[o + 1] / 255f;
+            float b = data[o + 2] / 255f;
+            float a = data[o + 3] / 255f;
+            return new VectorValue(ScalarType.Float, new HLSLRegister<RawValue[]>([r, g, b, a]));
+        };
+        return new ResourceValue(template.Type, template.TemplateArguments, template.Stride,
+            sizeX: w, sizeY: h, sizeZ: 1, mipCount: 1, get: get, set: null);
+    }
+
+    private static SamplerStateValue BuildSampler(SamplerBinding s)
+    {
+        var addr = s.Address switch
+        {
+            TextureAddress.Wrap => SamplerStateValue.TextureAddressMode.Wrap,
+            TextureAddress.Clamp => SamplerStateValue.TextureAddressMode.Clamp,
+            TextureAddress.Mirror => SamplerStateValue.TextureAddressMode.Mirror,
+            _ => SamplerStateValue.TextureAddressMode.Wrap,
+        };
+        var filter = s.Filter == TextureFilter.Linear
+            ? SamplerStateValue.FilterMode.MinMagMipLinear
+            : SamplerStateValue.FilterMode.MinMagMipPoint;
+        return new SamplerStateValue
+        {
+            Filter = filter,
+            AddressU = addr,
+            AddressV = addr,
+            AddressW = addr,
+        };
+    }
+
     private static MatrixValue BuildMatrix(float[] m)
     {
         var raws = new RawValue[16];
@@ -43,6 +122,7 @@ public sealed record ShaderInvocation(
 
     public HLSLValue Execute(HLSLRunner runner)
     {
+        BindTexturesAndSamplers(runner);
         int threadCount = WarpX * WarpY;
         if (Mode == ShaderRenderMode.VertFrag)
         {

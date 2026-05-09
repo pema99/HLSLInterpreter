@@ -35,4 +35,14 @@
                       Overwrite="true" />
   </Target>
 
+  <!-- LibraryPickerModal fetches index.txt to enumerate available example textures. -->
+  <Target Name="GenerateExampleTexturesIndex" BeforeTargets="ResolveStaticWebAssetsInputs;BeforeBuild">
+    <ItemGroup>
+      <_ExampleTexture Include="wwwroot\ExampleTextures\*.png;wwwroot\ExampleTextures\*.jpg;wwwroot\ExampleTextures\*.jpeg" />
+    </ItemGroup>
+    <WriteLinesToFile File="wwwroot\ExampleTextures\index.txt"
+                      Lines="@(_ExampleTexture -> '%(Filename)%(Extension)')"
+                      Overwrite="true" />
+  </Target>
+
 </Project>

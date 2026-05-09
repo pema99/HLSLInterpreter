@@ -556,7 +556,88 @@ function buildMeshAttributes(vertexInputs) {
     });
 }
 
-window.gpuRender = async function (canvasId, hlslSource, entryPoint, warpX, warpY, dotNetRef, renderMode, vertexEntryName, vertexInputs, meshVertices, meshIndices, initialTime) {
+function parseGroup0Resources(wgsl) {
+    const re = /@(group|binding)\((\d+)\)\s*@(group|binding)\((\d+)\)\s*var(?:<[^>]*>)?\s+(\w+)\s*:\s*([A-Za-z_][\w<>,\s]*?)\s*;/g;
+    const out = [];
+    let m;
+    while ((m = re.exec(wgsl)) !== null) {
+        let group, binding;
+        if (m[1] === 'group') { group = parseInt(m[2], 10); binding = parseInt(m[4], 10); }
+        else                  { binding = parseInt(m[2], 10); group = parseInt(m[4], 10); }
+        if (group !== 0) continue;
+        const name = m[5];
+        const typeStr = m[6].trim();
+        let kind = 'other';
+        if (/^texture_2d\b/.test(typeStr)) kind = 'texture_2d';
+        else if (/^sampler_comparison/.test(typeStr)) kind = 'sampler_comparison';
+        else if (/^sampler\b/.test(typeStr)) kind = 'sampler';
+        out.push({ binding, name, kind, typeStr });
+    }
+    return out;
+}
+
+function stripSlangSuffix(name) {
+    return name.replace(/_\d+$/, '');
+}
+
+function rgba8ToBytes(value) {
+    if (!value) return null;
+    if (value instanceof Uint8Array) return value;
+    if (Array.isArray(value)) return new Uint8Array(value);
+    if (typeof value === 'string') {
+        const bin = atob(value);
+        const u8 = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+        return u8;
+    }
+    return null;
+}
+
+const MAGENTA_PIXEL = new Uint8Array([255, 0, 255, 255]);
+
+function createTextureFromBinding(device, binding) {
+    const w = Math.max(1, binding && binding.width | 0);
+    const h = Math.max(1, binding && binding.height | 0);
+    const bytes = (binding && rgba8ToBytes(binding.rgba8)) || MAGENTA_PIXEL;
+    const tw = bytes === MAGENTA_PIXEL ? 1 : w;
+    const th = bytes === MAGENTA_PIXEL ? 1 : h;
+    const tex = device.createTexture({
+        size: [tw, th, 1],
+        format: 'rgba8unorm',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+    device.queue.writeTexture(
+        { texture: tex },
+        bytes,
+        { bytesPerRow: tw * 4, rowsPerImage: th },
+        { width: tw, height: th, depthOrArrayLayers: 1 }
+    );
+    return tex;
+}
+
+function addressModeFromString(s) {
+    switch ((s || '').toLowerCase()) {
+        case 'clamp': return 'clamp-to-edge';
+        case 'mirror': return 'mirror-repeat';
+        case 'wrap':
+        default: return 'repeat';
+    }
+}
+
+function createSamplerFromBinding(device, binding) {
+    const filter = binding && (binding.filter || '').toLowerCase() === 'point' ? 'nearest' : 'linear';
+    const addr = addressModeFromString(binding && binding.address);
+    return device.createSampler({
+        magFilter: filter,
+        minFilter: filter,
+        mipmapFilter: filter,
+        addressModeU: addr,
+        addressModeV: addr,
+        addressModeW: addr,
+    });
+}
+
+window.gpuRender = async function (canvasId, hlslSource, entryPoint, warpX, warpY, dotNetRef, renderMode, vertexEntryName, vertexInputs, meshVertices, meshIndices, initialTime, texturePayload, samplerPayload) {
     if (!('gpu' in navigator)) throw new Error('WebGPU is not supported in this browser.');
 
     const canvas = document.getElementById(canvasId);
@@ -571,6 +652,7 @@ window.gpuRender = async function (canvasId, hlslSource, entryPoint, warpX, warp
         try { active.depthTexture?.destroy?.(); } catch (_) {}
         try { active.meshVB?.destroy?.(); } catch (_) {}
         try { active.meshIB?.destroy?.(); } catch (_) {}
+        if (active.ownedTextures) for (const t of active.ownedTextures) { try { t.destroy(); } catch (_) {} }
     }
 
     const wgsl = await compileToWgsl(hlslSource, vsName, entryPoint);
@@ -614,13 +696,44 @@ window.gpuRender = async function (canvasId, hlslSource, entryPoint, warpX, warp
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
-    const bindGroupLayout = device.createBindGroupLayout({
-        entries: [{
-            binding: 0,
-            visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-            buffer: { type: 'uniform' },
-        }],
-    });
+    const parsedResources = parseGroup0Resources(wgsl);
+    const textureMap = new Map();
+    if (texturePayload) for (const t of texturePayload) if (t && t.name) textureMap.set(t.name, t);
+    const samplerMap = new Map();
+    if (samplerPayload) for (const s of samplerPayload) if (s && s.name) samplerMap.set(s.name, s);
+
+    const layoutEntries = [{
+        binding: 0,
+        visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+        buffer: { type: 'uniform' },
+    }];
+    const bindEntries = [];
+    const ownedTextures = [];
+
+    for (const r of parsedResources) {
+        if (r.binding === 0) continue;
+        const userName = stripSlangSuffix(r.name);
+        if (r.kind === 'texture_2d') {
+            layoutEntries.push({
+                binding: r.binding,
+                visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+                texture: { sampleType: 'float', viewDimension: '2d' },
+            });
+            const tex = createTextureFromBinding(device, textureMap.get(userName));
+            ownedTextures.push(tex);
+            bindEntries.push({ binding: r.binding, resource: tex.createView() });
+        } else if (r.kind === 'sampler') {
+            layoutEntries.push({
+                binding: r.binding,
+                visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+                sampler: { type: 'filtering' },
+            });
+            const samp = createSamplerFromBinding(device, samplerMap.get(userName));
+            bindEntries.push({ binding: r.binding, resource: samp });
+        }
+    }
+
+    const bindGroupLayout = device.createBindGroupLayout({ entries: layoutEntries });
     const pipelineLayout = device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] });
 
     let pipeline, meshVB = null, meshIB = null, meshIndexCount = 0;
@@ -657,7 +770,7 @@ window.gpuRender = async function (canvasId, hlslSource, entryPoint, warpX, warp
 
     const bindGroup = device.createBindGroup({
         layout: bindGroupLayout,
-        entries: [{ binding: 0, resource: { buffer: uniformBuffer } }],
+        entries: [{ binding: 0, resource: { buffer: uniformBuffer } }, ...bindEntries],
     });
 
     active = {
@@ -665,6 +778,7 @@ window.gpuRender = async function (canvasId, hlslSource, entryPoint, warpX, warp
         warpX, warpY, dotNetRef,
         renderMode: mode,
         meshVB, meshIB, meshIndexCount,
+        ownedTextures,
         depthTexture: null,
         startTimeMs: performance.now() - (initialTime || 0) * 1000,
         lastTime: initialTime || 0,

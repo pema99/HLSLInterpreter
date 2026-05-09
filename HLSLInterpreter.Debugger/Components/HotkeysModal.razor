@@ -6,7 +6,7 @@
             <div class="modal-body">
                 @foreach (var group in Groups)
                 {
-                    <div class="hotkeys-group-title">@group.Title</div>
+                    <div class="modal-section-title">@group.Title</div>
                     <table class="hotkeys-table">
                         @foreach (var (keys, desc) in group.Items)
                         {

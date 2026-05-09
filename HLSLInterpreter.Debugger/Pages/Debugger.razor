@@ -10,6 +10,8 @@
 @using HLSL
 @using UnityShaderParser.HLSL
 @using HLSLInterpreter.Debugger.Core
+@using TextureBinding = HLSLInterpreter.Debugger.Core.TextureBinding
+@using SamplerBinding = HLSLInterpreter.Debugger.Core.SamplerBinding
 @* Razor's generated cast for `@ref` on EditorPanel writes the bare path
    `HLSLInterpreter.Debugger.Components.EditorPanel`. With `@using HLSL`
    in scope, `HLSLInterpreter` resolves to the parser's class instead of
@@ -45,6 +47,7 @@
                         <button class="menu-item" @onclick="MenuDownloadCurrentFile">Download current file</button>
                         <div class="menu-divider"></div>
                         <button class="menu-item" @onclick="MenuOpenHotkeys">Hotkeys</button>
+                        <button class="menu-item" @onclick="MenuOpenTextures">Textures</button>
                         <button class="menu-item" @onclick="MenuOpenSettings">Settings</button>
                     </div>
                 }
@@ -154,6 +157,8 @@
 
 <HotkeysModal @bind-IsOpen="showHotkeys" />
 
+<TexturesModal @bind-IsOpen="showTextures" />
+
 <ExamplesModal @bind-IsOpen="showExamples" OnSelected="OnExampleSelected" />
 
 <ShaderToyImportModal @bind-IsOpen="showShaderToyImport" OnImported="OnShaderToyImported" />
@@ -233,6 +238,7 @@ float4 frag(float4 position : SV_Position) : SV_Target
 
     private bool showSettings = false;
     private bool showHotkeys = false;
+    private bool showTextures = false;
     private bool showExamples = false;
     private bool showShaderToyImport = false;
     private bool showNewFile = false;
@@ -555,6 +561,12 @@ float4 frag(float4 position : SV_Position) : SV_Target
     {
         menuOpen = false;
         showHotkeys = true;
+    }
+
+    private void MenuOpenTextures()
+    {
+        menuOpen = false;
+        showTextures = true;
     }
 
     private async Task MenuDownloadCurrentFile()
