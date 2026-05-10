@@ -610,6 +610,17 @@ float4 frag(float4 position : SV_Position) : SV_Target
         await editorPanel.LoadContent(r.Name, r.Hlsl);
         State.ShaderRenderMode = ShaderRenderMode.Pixel;
         State.FragmentEntryPoint = "frag";
+
+        var slots = new List<TextureBinding>();
+        for (int i = 0; i < 4; i++)
+        {
+            string name = $"iChannel{i}";
+            if (System.Text.RegularExpressions.Regex.IsMatch(r.Hlsl, $@"\b{name}\b"))
+                slots.Add(new TextureBinding { Name = name });
+        }
+        State.Textures = slots;
+        State.Samplers = new();
+
         await Run();
     }
 

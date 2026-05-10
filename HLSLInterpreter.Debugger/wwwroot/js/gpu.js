@@ -284,7 +284,7 @@ async function compileToWgsl(hlslSource, vertEntryName, fragEntryName) {
         if (!linked) throw new Error('Slang: link failed: ' + (slang.getLastError()?.message || ''));
         const wgsl = linked.getTargetCode(0);
         if (!wgsl) throw new Error('Slang: getTargetCode returned empty: ' + (slang.getLastError()?.message || ''));
-        return wgsl;
+        return 'diagnostic(off, derivative_uniformity);\n' + wgsl;
     } finally {
         const tryDelete = h => { try { h && h.delete && h.delete(); } catch (_) {} };
         tryDelete(linked);
