@@ -187,16 +187,19 @@ namespace HLSL
             promotedType = type;
 
             int maxThreadCount = scalars.Max(x => x.ThreadCount);
+            ScalarValue[] castScalars = new ScalarValue[scalars.Length];
+            for (int channel = 0; channel < scalars.Length; channel++)
+            {
+                castScalars[channel] = (ScalarValue)scalars[channel].Cast(type);
+            }
+
             RawValue[][] result = new RawValue[maxThreadCount][];
             for (int threadIndex = 0; threadIndex < maxThreadCount; threadIndex++)
             {
                 result[threadIndex] = new RawValue[scalars.Length];
                 for (int channel = 0; channel < scalars.Length; channel++)
                 {
-                    var scalar = scalars[channel];
-                    if (scalar.Type != type)
-                        scalar = (ScalarValue)scalar.Cast(type);
-                    result[threadIndex][channel] = scalar.Value.Get(threadIndex);
+                    result[threadIndex][channel] = castScalars[channel].Value.Get(threadIndex);
                 }
             }
 
@@ -237,11 +240,61 @@ namespace HLSL
 
         public static HLSLValue MergeThreadValues(HLSLValue[] threadValues)
         {
-            if (threadValues.Length == 1)
+            int threadCount = threadValues.Length;
+            if (threadCount == 1)
                 return threadValues[0];
 
-            HLSLValue result = Vectorize(threadValues[0], threadValues.Length);
-            for (int threadIndex = 1; threadIndex < threadValues.Length; threadIndex++)
+            // Fast path. SetThreadValue is O(threadCount), so we really want to avoid doing it in a loop.
+            if (threadValues[0] is ScalarValue sv0)
+            {
+                var arr = new RawValue[threadCount];
+                for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
+                    arr[threadIndex] = ((ScalarValue)threadValues[threadIndex]).Value.Get(0);
+                return new ScalarValue(sv0.Type, new HLSLRegister<RawValue>(arr));
+            }
+            if (threadValues[0] is VectorValue vv0)
+            {
+                var arr = new RawValue[threadCount][];
+                for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
+                    arr[threadIndex] = ((VectorValue)threadValues[threadIndex]).Values.Get(0);
+                return new VectorValue(vv0.Type, new HLSLRegister<RawValue[]>(arr));
+            }
+            if (threadValues[0] is MatrixValue mv0)
+            {
+                var arr = new RawValue[threadCount][];
+                for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
+                    arr[threadIndex] = ((MatrixValue)threadValues[threadIndex]).Values.Get(0);
+                return new MatrixValue(mv0.Type, mv0.Rows, mv0.Columns, new HLSLRegister<RawValue[]>(arr));
+            }
+            if (threadValues[0] is StructValue st0)
+            {
+                var merged = new Dictionary<string, HLSLValue>();
+                foreach (var key in st0.Members.Keys)
+                {
+                    var fieldVals = new HLSLValue[threadCount];
+                    for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
+                        fieldVals[threadIndex] = ((StructValue)threadValues[threadIndex]).Members[key];
+                    merged[key] = MergeThreadValues(fieldVals);
+                }
+                return new StructValue(st0.Name, merged);
+            }
+            if (threadValues[0] is ArrayValue av0)
+            {
+                int len = av0.Values.Length;
+                var merged = new HLSLValue[len];
+                for (int elem = 0; elem < len; elem++)
+                {
+                    var elemVals = new HLSLValue[threadCount];
+                    for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
+                        elemVals[threadIndex] = ((ArrayValue)threadValues[threadIndex]).Values[elem];
+                    merged[elem] = MergeThreadValues(elemVals);
+                }
+                return new ArrayValue(merged);
+            }
+
+            // Slow fallback path
+            HLSLValue result = Vectorize(threadValues[0], threadCount);
+            for (int threadIndex = 1; threadIndex < threadCount; threadIndex++)
             {
                 result = SetThreadValue(result, threadIndex, threadValues[threadIndex]);
             }

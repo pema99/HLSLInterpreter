@@ -55,7 +55,7 @@ namespace HLSL
 
                 // Call function
                 context.PushScope(isFunction: true, functionName: name);
-                context.PushReturn();
+                context.PushReturn(ScalarValue.Null);
                 executionState.PushExecutionMask(ExecutionScope.Function);
 
                 var inoutCopyoutRefs = BindFunctionParameters(func.Parameters, args);
@@ -334,13 +334,13 @@ namespace HLSL
                     else
                     {
                         int threadCount = executionState.GetThreadCount();
-                        HLSLValue result = HLSLValueUtils.Vectorize(array.Values[indexVal.AsInt()], threadCount);
+                        HLSLValue[] values = new HLSLValue[threadCount];
                         for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
                         {
                             int index = indexVal.AsInt(threadIndex);
-                            result = HLSLValueUtils.SetThreadValue(result, threadIndex, array.Values[index]);
+                            values[threadIndex] = HLSLValueUtils.Scalarize(array.Values[index], threadIndex);
                         }
-                        return result;
+                        return HLSLValueUtils.MergeThreadValues(values);
                     }
                 },
                 val => {
@@ -384,13 +384,13 @@ namespace HLSL
                     else
                     {
                         int threadCount = executionState.GetThreadCount();
-                        HLSLValue result = HLSLValueUtils.Vectorize(vec[indexVal.AsInt()], threadCount);
+                        HLSLValue[] values = new HLSLValue[threadCount];
                         for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
                         {
                             int channel = indexVal.AsInt(threadIndex);
-                            result = HLSLValueUtils.SetThreadValue(result, threadIndex, vec[channel]);
+                            values[threadIndex] = HLSLValueUtils.Scalarize(vec[channel], threadIndex);
                         }
-                        return result;
+                        return HLSLValueUtils.MergeThreadValues(values);
                     }
                 },
                 val => {
@@ -411,13 +411,16 @@ namespace HLSL
                     }
                     else
                     {
-                        vec = (VectorValue)vec.Vectorize(executionState.GetThreadCount());
-                        for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
+                        int threadCount = executionState.GetThreadCount();
+                        vec = (VectorValue)vec.Vectorize(threadCount);
+                        HLSLValue[] values = new HLSLValue[threadCount];
+                        for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
                         {
                             int channel = indexVal.AsInt(threadIndex);
-                            vec = (VectorValue)HLSLValueUtils.SetThreadValue(vec, threadIndex, vec.ChannelAssign(channel, (NumericValue)val));
+                            var threadVec = (VectorValue)HLSLValueUtils.Scalarize(vec, threadIndex);
+                            values[threadIndex] = threadVec.ChannelAssign(channel, (NumericValue)HLSLValueUtils.Scalarize(val, threadIndex));
                         }
-                        parentRef.Set(vec);
+                        parentRef.Set(HLSLValueUtils.MergeThreadValues(values));
                     }
                 });
         }
@@ -555,15 +558,14 @@ namespace HLSL
 
         private HLSLValue SplatActiveThreadValues(HLSLValue prevValue, HLSLValue value)
         {
-            HLSLValue newValue = HLSLValueUtils.Vectorize(prevValue, executionState.GetThreadCount());
-            for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
+            int threadCount = executionState.GetThreadCount();
+            HLSLValue[] values = new HLSLValue[threadCount];
+            for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
             {
-                if (executionState.IsThreadActive(threadIndex))
-                {
-                    newValue = HLSLValueUtils.SetThreadValue(newValue, threadIndex, value);
-                }
+                bool active = executionState.IsThreadActive(threadIndex);
+                values[threadIndex] = HLSLValueUtils.Scalarize(active ? value : prevValue, threadIndex);
             }
-            return newValue;
+            return HLSLValueUtils.MergeThreadValues(values);
         }
 
         private HLSLValue SetValueSimpleNamed(string name, HLSLValue value)
@@ -645,7 +647,7 @@ namespace HLSL
             args = AppendDefaultParameterInitializers(method.Parameters, args, method.Name.GetName());
 
             context.PushScope(isFunction: true, functionName: method.Name.GetName());
-            context.PushReturn();
+            context.PushReturn(ScalarValue.Null);
             executionState.PushExecutionMask(ExecutionScope.Function);
 
             // If this is an instance method, push the fields as local variables, alongside 'this'.
@@ -1183,12 +1185,7 @@ namespace HLSL
                         int index = scalarTarget.AsInt(threadIndex);
                         values[threadIndex] = HLSLValueUtils.Scalarize(arrValue.Values[index], threadIndex);
                     }
-                    HLSLValue result = HLSLValueUtils.Vectorize(values[0], executionState.GetThreadCount());
-                    for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
-                    {
-                        result = HLSLValueUtils.SetThreadValue(result, threadIndex, values[threadIndex]);
-                    }
-                    return result;
+                    return HLSLValueUtils.MergeThreadValues(values);
                 }
                 else
                 {
@@ -1205,12 +1202,7 @@ namespace HLSL
                         int index = scalarTarget.AsInt(threadIndex);
                         values[threadIndex] = HLSLValueUtils.Scalarize(vec[index], threadIndex);
                     }
-                    HLSLValue result = HLSLValueUtils.Vectorize(values[0], executionState.GetThreadCount());
-                    for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
-                    {
-                        result = HLSLValueUtils.SetThreadValue(result, threadIndex, values[threadIndex]);
-                    }
-                    return result;
+                    return HLSLValueUtils.MergeThreadValues(values);
                 }
                 else
                 {
@@ -1221,21 +1213,17 @@ namespace HLSL
             {
                 if (scalarTarget.Value.IsVarying)
                 {
-                    HLSLValue[] values = new HLSLValue[executionState.GetThreadCount()];
-                    for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
+                    int threadCount = executionState.GetThreadCount();
+                    HLSLValue[] values = new HLSLValue[threadCount];
+                    for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
                     {
                         int index = scalarTarget.AsInt(threadIndex);
-                        ScalarValue[] rowVec = new ScalarValue[mat.Columns];
-                        for (int i = 0; i < mat.Columns; i++)
-                            rowVec[i] = mat[index, i];
-                        values[threadIndex] = HLSLValueUtils.Scalarize(VectorValue.FromScalars(rowVec), threadIndex);
+                        var threadData = mat.Values.Get(threadIndex);
+                        RawValue[] row = new RawValue[mat.Columns];
+                        Array.Copy(threadData, index * mat.Columns, row, 0, mat.Columns);
+                        values[threadIndex] = new VectorValue(mat.Type, HLSLValueUtils.MakeVectorSGPR(row));
                     }
-                    HLSLValue result = HLSLValueUtils.Vectorize(values[0], executionState.GetThreadCount());
-                    for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
-                    {
-                        result = HLSLValueUtils.SetThreadValue(result, threadIndex, values[threadIndex]);
-                    }
-                    return result;
+                    return HLSLValueUtils.MergeThreadValues(values);
                 }
                 else
                 {

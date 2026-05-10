@@ -428,26 +428,14 @@ namespace HLSL
             return false;
         }
 
-        public void PushReturn()
+        public void PushReturn(HLSLValue value)
         {
-            // We don't know the type yet, so just put a dummy object
-            returnStack.Push(ScalarValue.Null);
+            returnStack.Push(value);
         }
 
-        public void SetReturn(int threadIndex, HLSLValue value)
+        public HLSLValue PeekReturn()
         {
-            var oldReturn = returnStack.Pop();
-            // If this is the first return, just use it directly.
-            if (oldReturn is ScalarValue sv && sv.Type == ScalarType.Void)
-            {
-                returnStack.Push(value);
-            }
-            // Otherwise splat the thread value
-            else
-            {
-                var newReturn = HLSLValueUtils.SetThreadValue(oldReturn, threadIndex, value);
-                returnStack.Push(newReturn);
-            }
+            return returnStack.Peek();
         }
 
         public HLSLValue PopReturn()

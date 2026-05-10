@@ -421,6 +421,11 @@ namespace HLSL
         {
             var scalarOff = CastToScalar(byteOffset.Cast(ScalarType.Int));
             var vec = CastToVector(value.Cast(ScalarType.Uint), count);
+            ScalarValue[] components = new ScalarValue[count];
+            for (int i = 0; i < count; i++)
+            {
+                components[i] = vec[i];
+            }
             int threadCount = scalarOff.ThreadCount;
             for (int thread = 0; thread < threadCount; thread++)
             {
@@ -428,7 +433,7 @@ namespace HLSL
                 int baseOff = scalarOff.AsInt(thread);
                 for (int i = 0; i < count; i++)
                 {
-                    var raw = vec[i].Value.Get(thread);
+                    var raw = components[i].Value.Get(thread);
                     rv.Set(baseOff + i * 4, 0, 0, 0, 0, new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR(raw)));
                 }
             }
@@ -482,6 +487,8 @@ namespace HLSL
         {
             var scalarOff = CastToScalar(((NumericValue)args[0]).Cast(ScalarType.Int));
             var valVec = CastToVector(((NumericValue)args[1]).Cast(ScalarType.Uint), 2);
+            var valLo = valVec[0];
+            var valHi = valVec[1];
             int threadCount = scalarOff.ThreadCount;
             bool hasOut = args.Length > 2 && args[2] is ReferenceValue;
             var originals = hasOut ? new HLSLValue[threadCount] : null;
@@ -489,8 +496,7 @@ namespace HLSL
             {
                 int off = scalarOff.AsInt(thread);
                 ulong old = ReadUint64(rv, off);
-                ulong val = valVec[0].AsUint(thread) |
-                             ((ulong)valVec[1].AsUint(thread) << 32);
+                ulong val = valLo.AsUint(thread) | ((ulong)valHi.AsUint(thread) << 32);
                 if (originals is not null)
                     originals[thread] = VectorValue.FromScalars(
                         new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR((uint)(old & 0xFFFFFFFF))),
@@ -547,6 +553,10 @@ namespace HLSL
             var scalarOff = CastToScalar(((NumericValue)args[0]).Cast(ScalarType.Int));
             var cmpVec = CastToVector(((NumericValue)args[1]).Cast(ScalarType.Uint), 2);
             var valVec = CastToVector(((NumericValue)args[2]).Cast(ScalarType.Uint), 2);
+            var cmpLo = cmpVec[0];
+            var cmpHi = cmpVec[1];
+            var valLo = valVec[0];
+            var valHi = valVec[1];
             int threadCount = scalarOff.ThreadCount;
             bool hasOut = args.Length > 3 && args[3] is ReferenceValue;
             var originals = hasOut ? new HLSLValue[threadCount] : null;
@@ -554,8 +564,8 @@ namespace HLSL
             {
                 int off = scalarOff.AsInt(thread);
                 ulong old = ReadUint64(rv, off);
-                ulong cmp = cmpVec[0].AsUint(thread) | ((ulong)cmpVec[1].AsUint(thread) << 32);
-                ulong val = valVec[0].AsUint(thread) | ((ulong)valVec[1].AsUint(thread) << 32);
+                ulong cmp = cmpLo.AsUint(thread) | ((ulong)cmpHi.AsUint(thread) << 32);
+                ulong val = valLo.AsUint(thread) | ((ulong)valHi.AsUint(thread) << 32);
                 if (originals is not null)
                     originals[thread] = VectorValue.FromScalars(
                         new ScalarValue(ScalarType.Uint, HLSLValueUtils.MakeScalarSGPR((uint)(old & 0xFFFFFFFF))),
@@ -811,19 +821,24 @@ namespace HLSL
             int threadCount = dir.ThreadCount;
             HLSLValue[] results = new HLSLValue[threadCount];
 
+            ScalarValue dirX = dir.x;
+            ScalarValue dirY = dir.y;
+            ScalarValue dirZ = dir.z;
+            ScalarValue dirArrSlice = rv.IsArray ? dir[3] : null;
+
             for (int thread = 0; thread < threadCount; thread++)
             {
                 ProjectCubeDirection(
-                    dir.x.AsFloat(thread),
-                    dir.y.AsFloat(thread),
-                    dir.z.AsFloat(thread),
+                    dirX.AsFloat(thread),
+                    dirY.AsFloat(thread),
+                    dirZ.AsFloat(thread),
                     out int face, out float u, out float v);
 
                 float lodClamped = MathF.Max(0f, scalarLod.AsFloat(thread));
                 float faceSize = MathF.Max(1f, rv.SizeX / MathF.Pow(2f, lodClamped));
                 int mip = (int)lodClamped;
                 int maxC = (int)faceSize - 1;
-                int arraySlice = rv.IsArray ? dir[3].AsInt(thread) : 0;
+                int arraySlice = dirArrSlice is not null ? dirArrSlice.AsInt(thread) : 0;
 
                 float texelU = u * faceSize - 0.5f;
                 float texelV = v * faceSize - 0.5f;
@@ -880,12 +895,15 @@ namespace HLSL
         {
             int threadCount = dir.ThreadCount;
             HLSLValue[] results = new HLSLValue[threadCount];
+            ScalarValue dirX = dir.x;
+            ScalarValue dirY = dir.y;
+            ScalarValue dirZ = dir.z;
             for (int thread = 0; thread < threadCount; thread++)
             {
                 ProjectCubeDirection(
-                    dir.x.AsFloat(thread),
-                    dir.y.AsFloat(thread),
-                    dir.z.AsFloat(thread),
+                    dirX.AsFloat(thread),
+                    dirY.AsFloat(thread),
+                    dirZ.AsFloat(thread),
                     out _, out float u, out float v);
                 results[thread] = VectorValue.FromScalars(u, v);
             }
@@ -1025,11 +1043,33 @@ namespace HLSL
             int threadCount = loc.ThreadCount;
             HLSLValue[] results = new HLSLValue[threadCount];
 
+            // Hoisted to avoid O(n^2)
+            ScalarValue locU = loc[0];
+            ScalarValue locV = spatialDim >= 2 ? loc[1] : null;
+            ScalarValue locArrSlice = rv.IsArray ? loc[spatialDim] : null;
+            ScalarValue[] cornerOx = new ScalarValue[4];
+            ScalarValue[] cornerOy = new ScalarValue[4];
+            for (int i = 0; i < 4; i++)
+            {
+                NumericValue offSrc = cornerOffsets is not null ? cornerOffsets[i] : uniformOffset;
+                if (offSrc is null) continue;
+                if (spatialDim >= 2)
+                {
+                    var ov = CastToVector(offSrc.Cast(ScalarType.Int), 2);
+                    cornerOx[i] = ov.x;
+                    cornerOy[i] = ov.y;
+                }
+                else
+                {
+                    cornerOx[i] = CastToScalar(offSrc.Cast(ScalarType.Int));
+                }
+            }
+
             for (int thread = 0; thread < threadCount; thread++)
             {
-                float u = loc[0].AsFloat(thread);
-                float v = spatialDim >= 2 ? loc[1].AsFloat(thread) : 0f;
-                int arraySlice = rv.IsArray ? loc[spatialDim].AsInt(thread) : 0;
+                float u = locU.AsFloat(thread);
+                float v = locV is not null ? locV.AsFloat(thread) : 0f;
+                int arraySlice = locArrSlice is not null ? locArrSlice.AsInt(thread) : 0;
 
                 int baseX = (int)MathF.Floor(u * rv.SizeX - 0.5f);
                 int baseY = (int)MathF.Floor(v * rv.SizeY - 0.5f);
@@ -1043,21 +1083,8 @@ namespace HLSL
                 float[] components = new float[4];
                 for (int i = 0; i < 4; i++)
                 {
-                    NumericValue offSrc = cornerOffsets is not null ? cornerOffsets[i] : uniformOffset;
-                    int ox = 0, oy = 0;
-                    if (offSrc is not null)
-                    {
-                        if (spatialDim >= 2)
-                        {
-                            var ov = CastToVector(offSrc.Cast(ScalarType.Int), 2);
-                            ox = ov.x.AsInt(thread);
-                            oy = ov.y.AsInt(thread);
-                        }
-                        else
-                        {
-                            ox = CastToScalar(offSrc).AsInt(thread);
-                        }
-                    }
+                    int ox = cornerOx[i] is not null ? cornerOx[i].AsInt(thread) : 0;
+                    int oy = cornerOy[i] is not null ? cornerOy[i].AsInt(thread) : 0;
 
                     int x = WrapTexelCoord(cornerX[i] + ox, rv.SizeX, addrU);
                     int y, z;

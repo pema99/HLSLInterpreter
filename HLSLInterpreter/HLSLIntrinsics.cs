@@ -1253,20 +1253,17 @@ namespace HLSL
                 return;
             }
 
-            ScalarValue retLow = 0u;
-            retLow = (ScalarValue)retLow.Vectorize(d.ThreadCount);
-            ScalarValue retHigh = 0u;
-            retHigh = (ScalarValue)retHigh.Vectorize(d.ThreadCount);
-            for (int threadIndex = 0; threadIndex < d.ThreadCount; threadIndex++)
+            int threadCount = d.ThreadCount;
+            var lowArr = new RawValue[threadCount];
+            var highArr = new RawValue[threadCount];
+            for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
             {
                 long bits = d.Value.Get(threadIndex).Long;
-                uint low = (uint)(bits & 0xFFFFFFFFu);
-                uint high = (uint)((bits >> 32) & 0xFFFFFFFFu);
-                retLow = (ScalarValue)retLow.SetThreadValue(threadIndex, low);
-                retHigh = (ScalarValue)retHigh.SetThreadValue(threadIndex, high);
+                lowArr[threadIndex] = (uint)(bits & 0xFFFFFFFFu);
+                highArr[threadIndex] = (uint)((bits >> 32) & 0xFFFFFFFFu);
             }
-            lowbits.Set(retLow);
-            highbits.Set(retHigh);
+            lowbits.Set(new ScalarValue(ScalarType.Uint, new HLSLRegister<RawValue>(lowArr)));
+            highbits.Set(new ScalarValue(ScalarType.Uint, new HLSLRegister<RawValue>(highArr)));
         }
         #endregion
 
@@ -1713,14 +1710,14 @@ namespace HLSL
                 return perWarp[0];
 
             // Multi-warp
-            NumericValue result = expr.Vectorize(threadCount);
+            var fallback = expr.Vectorize(threadCount);
+            HLSLValue[] values = new HLSLValue[threadCount];
             for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
             {
                 var value = perWarp[executionState.GetWarpIndexOfThread(threadIndex)];
-                if (value is not null)
-                    result = (NumericValue)HLSLValueUtils.SetThreadValue(result, threadIndex, value);
+                values[threadIndex] = HLSLValueUtils.Scalarize(value ?? fallback, threadIndex);
             }
-            return result;
+            return (NumericValue)HLSLValueUtils.MergeThreadValues(values);
         }
 
         public static NumericValue WaveActiveBitAnd(HLSLExecutionState executionState, NumericValue expr) =>
@@ -1777,7 +1774,13 @@ namespace HLSL
             int warpCount = executionState.GetWarpCount();
             int warpSize = executionState.GetWarpThreadCount();
             int threadCount = executionState.GetThreadCount();
-            NumericValue result = expr.Vectorize(threadCount);
+            var fallback = expr.Vectorize(threadCount);
+            HLSLValue[] values = new HLSLValue[threadCount];
+            for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
+            {
+                values[threadIndex] = HLSLValueUtils.Scalarize(fallback, threadIndex);
+            }
+
             for (int warp = 0; warp < warpCount; warp++)
             {
                 int start = executionState.GetFirstThreadIndexInWarp(warp);
@@ -1789,11 +1792,11 @@ namespace HLSL
                         continue;
                     if (acc is null)
                         acc = identity.Scalarize(threadIndex);
-                    result = (NumericValue)HLSLValueUtils.SetThreadValue(result, threadIndex, acc);
+                    values[threadIndex] = acc;
                     acc = op(acc, expr.Scalarize(threadIndex));
                 }
             }
-            return result;
+            return (NumericValue)HLSLValueUtils.MergeThreadValues(values);
         }
 
         public static NumericValue WavePrefixProduct(HLSLExecutionState executionState, NumericValue expr) =>

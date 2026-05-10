@@ -676,17 +676,49 @@ namespace HLSL
             if (node.Expression != null)
             {
                 var returnValue = expressionEvaluator.Visit(node.Expression);
+                int threadCount = executionState.GetThreadCount();
 
-                // If we are in varying control flow, vectorize the value so we can splat each active thread.
                 if (executionState.IsVaryingExecution())
-                    returnValue = HLSLValueUtils.Vectorize(returnValue, executionState.GetThreadCount());
+                {
+                    returnValue = HLSLValueUtils.Vectorize(returnValue, threadCount);
+                    var existing = context.PeekReturn();
+                    HLSLValue merged;
+                    // Check if nothing returned yet - just use the return value as-is.
+                    if (existing is ScalarValue ssv && ssv.Type == ScalarType.Void)
+                    {
+                        merged = returnValue;
+                    }
+                    else
+                    {
+                        // Make sure type matches what we expect
+                        if (existing is NumericValue existingNum && returnValue is NumericValue returnNum)
+                        {
+                            (existingNum, returnNum) = HLSLTypeUtils.Promote(existingNum, returnNum, false);
+                            existing = existingNum;
+                            returnValue = returnNum;
+                        }
+                        // Get value per active thread, splat, and merge the results
+                        var values = new HLSLValue[threadCount];
+                        for (int t = 0; t < threadCount; t++)
+                        {
+                            bool active = executionState.IsThreadActive(t);
+                            values[t] = HLSLValueUtils.Scalarize(active ? returnValue : existing, t);
+                        }
+                        merged = HLSLValueUtils.MergeThreadValues(values);
+                    }
+                    context.PopReturn();
+                    context.PushReturn(merged);
+                }
+                else
+                {
+                    context.PopReturn();
+                    context.PushReturn(returnValue);
+                }
 
-                // For each active thread, kill the thread and splat the return.
-                for (int threadIndex = 0; threadIndex < executionState.GetThreadCount(); threadIndex++)
+                for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
                 {
                     if (executionState.IsThreadActive(threadIndex))
                     {
-                        context.SetReturn(threadIndex, returnValue);
                         executionState.KillThreadInFunction(threadIndex);
                     }
                 }
