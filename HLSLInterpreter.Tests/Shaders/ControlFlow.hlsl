@@ -562,6 +562,52 @@ void ControlFlow_ForLoopVarying_ConditionalContinue()
 
 [Test]
 [WarpSize(4, 1)]
+void ControlFlow_OuterContinueDoesNotAffectInnerLoop()
+{
+    uint lane = WaveGetLaneIndex();
+    int counter = 0;
+    for (int i = 0; i < 1; i++)
+    {
+        if (lane < 2)
+            continue;
+        for (int j = 0; j < 3; j++)
+            counter++;
+    }
+    ASSERT(WaveReadLaneAt(counter, 0) == 0);
+    ASSERT(WaveReadLaneAt(counter, 1) == 0);
+    ASSERT(WaveReadLaneAt(counter, 2) == 3);
+    ASSERT(WaveReadLaneAt(counter, 3) == 3);
+}
+
+[Test]
+[WarpSize(4, 1)]
+void ControlFlow_NestedLoopWithBothContinues()
+{
+    uint lane = WaveGetLaneIndex();
+    int counter = 0;
+    for (int i = 0; i < 3; i++)
+    {
+        if (lane == 0 && i == 1)                    // outer continue: lane 0 at i==1
+            continue;
+        for (int j = 0; j < 3; j++)
+        {
+            if ((lane == 0 || lane == 2) && j == 1) // inner continue: lanes 0 and 2 at j==1
+                continue;
+            counter++;
+        }
+    }
+    // Lane 0: outer continue skips i=1 entirely; in i=0 and i=2, inner skips j=1 -> 2 * 2 = 4
+    // Lane 1: no continues -> 3 * 3 = 9
+    // Lane 2: inner skips j=1 each outer iter -> 3 * 2 = 6
+    // Lane 3: no continues -> 9
+    ASSERT(WaveReadLaneAt(counter, 0) == 4);
+    ASSERT(WaveReadLaneAt(counter, 1) == 9);
+    ASSERT(WaveReadLaneAt(counter, 2) == 6);
+    ASSERT(WaveReadLaneAt(counter, 3) == 9);
+}
+
+[Test]
+[WarpSize(4, 1)]
 void ControlFlow_ForLoopVarying_NestedWithDivergence()
 {
     uint lane = WaveGetLaneIndex();

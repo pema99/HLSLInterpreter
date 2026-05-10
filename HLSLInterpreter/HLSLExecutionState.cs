@@ -76,7 +76,16 @@ namespace HLSL
         public void PushExecutionMask(ExecutionScope scope)
         {
             var top = executionMask.Peek();
-            executionMask.Push(new(scope, (ThreadState[])top.Mask.Clone(), top.ActiveCount));
+            var clonedMask = (ThreadState[])top.Mask.Clone();
+
+            // Don't inherit suspended state, continue should only continue in innermost loop.
+            for (int threadIndex = 0; threadIndex < clonedMask.Length; threadIndex++)
+            {
+                if (clonedMask[threadIndex] == ThreadState.Suspended)
+                    clonedMask[threadIndex] = ThreadState.Inactive;
+            }
+
+            executionMask.Push(new(scope, clonedMask, top.ActiveCount));
         }
 
         public void PopExecutionMask()
