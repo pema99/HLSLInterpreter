@@ -673,6 +673,7 @@ namespace HLSL
         {
             lod = ToFloatLike(lod) + sampler.MipLodBias;
             lod = Clamp(lod, sampler.MinimumLod, sampler.MaximumLod);
+            lod = Clamp(lod, 0.0f, MaxLodForResource(rv));
 
             if (rv.IsCube)
                 return SampleLevelCube(rv, sampler, location, lod, perTexel);
