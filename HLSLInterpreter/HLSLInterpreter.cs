@@ -673,6 +673,9 @@ namespace HLSL
 
         public override void VisitReturnStatementNode(ReturnStatementNode node)
         {
+            if (executionState.GetActiveThreadCount() == 0)
+                return;
+
             if (node.Expression != null)
             {
                 var returnValue = expressionEvaluator.Visit(node.Expression);

@@ -22,12 +22,25 @@ namespace HLSL
             Suspended, // Disabled by continue
         }
 
+        private sealed class Frame
+        {
+            public readonly ExecutionScope Scope;
+            public readonly ThreadState[] Mask;
+            public int ActiveCount;
+            public Frame(ExecutionScope scope, ThreadState[] mask, int activeCount)
+            {
+                Scope = scope;
+                Mask = mask;
+                ActiveCount = activeCount;
+            }
+        }
+
         private int warpSizeX, warpSizeY;
         private int warpSizeInThreads;
         private int groupSizeX, groupSizeY, groupSizeZ;
         private int warpsPerGroupX, warpsPerGroupY;
         private int groupSizeInThreads;
-        private Stack<(ExecutionScope scope, ThreadState[] mask)> executionMask;
+        private Stack<Frame> executionMask;
 
         public HLSLExecutionState(int warpSizeX, int warpSizeY)
             : this(warpSizeX, warpSizeY, warpSizeX, warpSizeY, 1) { }
@@ -44,22 +57,26 @@ namespace HLSL
             warpsPerGroupY = (groupSizeY + warpSizeY - 1) / warpSizeY;
             groupSizeInThreads = warpsPerGroupX * warpsPerGroupY * groupSizeZ * warpSizeInThreads;
 
-            executionMask = new Stack<(ExecutionScope, ThreadState[])>();
+            executionMask = new Stack<Frame>();
 
             // Padding threads, when warps don't tile the group exactly:
             var initial = new ThreadState[groupSizeInThreads];
+            int activeCount = 0;
             for (int threadIndex = 0; threadIndex < groupSizeInThreads; threadIndex++)
             {
                 var (tx, ty, tz) = GetThreadPosition(threadIndex);
                 bool inGroup = tx < groupSizeX && ty < groupSizeY && tz < groupSizeZ;
                 initial[threadIndex] = inGroup ? ThreadState.Active : ThreadState.Inactive;
+                if (inGroup)
+                    activeCount++;
             }
-            executionMask.Push((ExecutionScope.Function, initial));
+            executionMask.Push(new(ExecutionScope.Function, initial, activeCount));
         }
 
         public void PushExecutionMask(ExecutionScope scope)
         {
-            executionMask.Push((scope, executionMask.Peek().mask.ToArray()));
+            var top = executionMask.Peek();
+            executionMask.Push(new(scope, (ThreadState[])top.Mask.Clone(), top.ActiveCount));
         }
 
         public void PopExecutionMask()
@@ -69,17 +86,23 @@ namespace HLSL
 
         public bool IsThreadActive(int threadIndex)
         {
-            return executionMask.Peek().mask[threadIndex] == ThreadState.Active;
+            return executionMask.Peek().Mask[threadIndex] == ThreadState.Active;
         }
 
         public void DisableThread(int threadIndex)
         {
-            executionMask.Peek().mask[threadIndex] = ThreadState.Inactive;
+            var top = executionMask.Peek();
+            if (top.Mask[threadIndex] == ThreadState.Active)
+                top.ActiveCount--;
+            top.Mask[threadIndex] = ThreadState.Inactive;
         }
 
         public void EnableThread(int threadIndex)
         {
-            executionMask.Peek().mask[threadIndex] = ThreadState.Active;
+            var top = executionMask.Peek();
+            if (top.Mask[threadIndex] != ThreadState.Active)
+                top.ActiveCount++;
+            top.Mask[threadIndex] = ThreadState.Active;
         }
 
         // Kill thread for the entire execution, i.e. 'discard'
@@ -87,7 +110,9 @@ namespace HLSL
         {
             foreach (var level in executionMask)
             {
-                level.mask[threadIndex] = ThreadState.Inactive;
+                if (level.Mask[threadIndex] == ThreadState.Active)
+                    level.ActiveCount--;
+                level.Mask[threadIndex] = ThreadState.Inactive;
             }
         }
 
@@ -96,8 +121,10 @@ namespace HLSL
         {
             foreach (var level in executionMask)
             {
-                level.mask[threadIndex] = ThreadState.Inactive;
-                if (level.scope == scope)
+                if (level.Mask[threadIndex] == ThreadState.Active)
+                    level.ActiveCount--;
+                level.Mask[threadIndex] = ThreadState.Inactive;
+                if (level.Scope == scope)
                     break;
             }
         }
@@ -116,10 +143,13 @@ namespace HLSL
         {
             foreach (var level in executionMask)
             {
-                if (level.mask[threadIndex] == ThreadState.Active)
-                    level.mask[threadIndex] = ThreadState.Suspended;
+                if (level.Mask[threadIndex] == ThreadState.Active)
+                {
+                    level.Mask[threadIndex] = ThreadState.Suspended;
+                    level.ActiveCount--;
+                }
 
-                if (level.scope == ExecutionScope.Loop)
+                if (level.Scope == ExecutionScope.Loop)
                     break;
             }
         }
@@ -131,17 +161,21 @@ namespace HLSL
             {
                 for (int threadIndex = 0; threadIndex < GetThreadCount(); threadIndex++)
                 {
-                    if (level.mask[threadIndex] == ThreadState.Suspended)
-                        level.mask[threadIndex] = ThreadState.Active;
+                    if (level.Mask[threadIndex] == ThreadState.Suspended)
+                    {
+                        level.Mask[threadIndex] = ThreadState.Active;
+                        level.ActiveCount++;
+                    }
                 }
 
-                if (level.scope == ExecutionScope.Loop)
+                if (level.Scope == ExecutionScope.Loop)
                     break;
             }
         }
 
-        public bool IsAnyThreadActive() => executionMask.Peek().mask.Any(x => x == ThreadState.Active);
-        public bool IsUniformExecution() => executionMask.Peek().mask.All(x => x == ThreadState.Active);
+        public int GetActiveThreadCount() => executionMask.Peek().ActiveCount;
+        public bool IsAnyThreadActive() => executionMask.Peek().ActiveCount > 0;
+        public bool IsUniformExecution() => executionMask.Peek().ActiveCount == groupSizeInThreads;
         public bool IsVaryingExecution() => !IsUniformExecution();
 
         // Warp helpers:
@@ -177,7 +211,7 @@ namespace HLSL
         public int GetWarpCount() => warpsPerGroupX * warpsPerGroupY * groupSizeZ;
 
         // Debug API:
-        public ThreadState[] GetThreadStates() => executionMask.Peek().mask.ToArray();
+        public ThreadState[] GetThreadStates() => (ThreadState[])executionMask.Peek().Mask.Clone();
         public ThreadState[][] GetThreadStatesPerFrame()
         {
             var frames = new List<ThreadState[]>();
@@ -186,14 +220,14 @@ namespace HLSL
             if (stack.Length == 0)
                 return Array.Empty<ThreadState[]>();
 
-            frames.Add(stack[0].mask.ToArray());
+            frames.Add((ThreadState[])stack[0].Mask.Clone());
 
             var functionScopes = stack
-                .Where(e => e.scope == ExecutionScope.Function)
+                .Where(e => e.Scope == ExecutionScope.Function)
                 .ToArray();
 
             for (int i = 0; i < functionScopes.Length - 2; i++)
-                frames.Add(functionScopes[i].mask.ToArray());
+                frames.Add((ThreadState[])functionScopes[i].Mask.Clone());
 
             return frames.ToArray();
         }
