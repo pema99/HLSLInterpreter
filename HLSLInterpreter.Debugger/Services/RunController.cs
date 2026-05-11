@@ -183,6 +183,11 @@ public sealed class RunController : INotifyPropertyChanged
     {
         var (canvasW, canvasH) = await GetCpuCanvasSizeAsync(wx, wy);
         var invocation = (await BuildShaderInvocationAsync()) with { CanvasW = canvasW, CanvasH = canvasH };
+        if (_state.ShaderRenderMode == ShaderRenderMode.VertFrag)
+        {
+            var projection = await _js.InvokeAsync<float[]>("gpuProjection", canvasW, canvasH);
+            invocation = invocation with { Projection = projection };
+        }
         Runner.DebugHook = null;
 
         int tilesX = (canvasW + wx - 1) / wx;
