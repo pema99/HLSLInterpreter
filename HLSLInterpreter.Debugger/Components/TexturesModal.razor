@@ -94,6 +94,7 @@
 @code {
     [Parameter] public bool IsOpen { get; set; }
     [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public EventCallback OnApplied { get; set; }
 
     private List<TextureBinding> textures = new();
     private List<SamplerBinding> samplers = new();
@@ -158,5 +159,6 @@
         State.Textures = textures;
         State.Samplers = samplers;
         await IsOpenChanged.InvokeAsync(false);
+        await OnApplied.InvokeAsync();
     }
 }
