@@ -110,6 +110,7 @@
                      InitialCodeName="@(InitialCode.Name ?? "new.hlsl")"
                      InitialCodePath="@InitialCode.Path"
                      OnTabSwitched="@OnEditorTabSwitched"
+                     OnTabClosed="@OnEditorTabClosed"
                      OnReady="@OnEditorReady" />
 
         <div class="resize-h-handle" title="Drag to resize"></div>
@@ -215,6 +216,20 @@ float4 frag(float4 position : SV_Position) : SV_Target
     {
         if (DebugCtl.IsDebugging && newIndex == DebugCtl.DebugTabIndex && editorPanel != null)
             await editorPanel.HighlightLine(DebugCtl.CurrentDebugLine);
+    }
+
+    private int? _pendingDebugTabIndex;
+
+    private async Task OnEditorTabClosed(int closedIndex)
+    {
+        if (_pendingDebugTabIndex.HasValue)
+        {
+            if (closedIndex == _pendingDebugTabIndex.Value) _pendingDebugTabIndex = null;
+            else if (closedIndex < _pendingDebugTabIndex.Value) _pendingDebugTabIndex--;
+        }
+        if (!DebugCtl.IsDebugging) return;
+        if (closedIndex == DebugCtl.DebugTabIndex) await ExitDebug();
+        else if (closedIndex < DebugCtl.DebugTabIndex) DebugCtl.DebugTabIndex--;
     }
 
     private CallStackPanel.DebugBottomMode debugBottomMode = CallStackPanel.DebugBottomMode.ThreadStates;
@@ -498,9 +513,12 @@ float4 frag(float4 position : SV_Position) : SV_Target
 
         await JS.InvokeVoidAsync("saveSectionHeights");
 
+        _pendingDebugTabIndex = editorPanel.ActiveTabIndex;
         bool entered = await DebugCtl.StartSessionAsync(
             getCode: () => editorPanel.GetCode().AsTask(),
             parserConfig: MakeParserConfig());
+        int? targetTabIndex = _pendingDebugTabIndex;
+        _pendingDebugTabIndex = null;
         needsImageRender = RunCtl.HasImage;
 
         if (!entered)
@@ -509,8 +527,14 @@ float4 frag(float4 position : SV_Position) : SV_Target
             return;
         }
 
+        if (targetTabIndex == null)
+        {
+            await ExitDebug();
+            return;
+        }
+
         await editorPanel.SetReadOnly(true);
-        DebugCtl.DebugTabIndex = editorPanel.ActiveTabIndex;
+        DebugCtl.DebugTabIndex = targetTabIndex.Value;
         imageCollapsed = true;
         if (DebugCtl.CurrentSession?.Trace.Count > 0)
             await editorPanel.HighlightLine(DebugCtl.CurrentDebugLine);

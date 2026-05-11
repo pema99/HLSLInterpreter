@@ -49,6 +49,7 @@
     [Parameter] public string InitialCodeName { get; set; } = "new.hlsl";
     [Parameter] public string InitialCodePath { get; set; }
     [Parameter] public EventCallback<int> OnTabSwitched { get; set; }
+    [Parameter] public EventCallback<int> OnTabClosed { get; set; }
     [Parameter] public EventCallback OnReady { get; set; }
 
     private DotNetObjectReference<EditorPanel> _selfRef;
@@ -254,6 +255,7 @@
         }
         tabs.RemoveAt(index);
         if (activeTabIndex > index) activeTabIndex--;
+        await OnTabClosed.InvokeAsync(index);
     }
 
     public async Task OpenFileDialog()
