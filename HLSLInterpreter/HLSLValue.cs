@@ -264,6 +264,9 @@ namespace HLSL
         public static implicit operator NumericValue(double v) => (ScalarValue)v;
         public static implicit operator NumericValue(bool v) => (ScalarValue)v;
         public static implicit operator NumericValue(char v) => (ScalarValue)v;
+
+        public override bool Equals(object obj) => ReferenceEquals(this, obj);
+        public override int GetHashCode() => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(this);
     }
 
     public sealed class StructValue : HLSLValue
@@ -437,6 +440,9 @@ namespace HLSL
         public static implicit operator ScalarValue(char v) => new ScalarValue(ScalarType.Char, new HLSLRegister<RawValue>(v));
 
         public static ScalarValue Null => new ScalarValue(ScalarType.Void, new HLSLRegister<RawValue>(0));
+
+        public override bool Equals(object obj) => ReferenceEquals(this, obj);
+        public override int GetHashCode() => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(this);
     }
 
     public sealed class VectorValue : NumericValue
@@ -685,6 +691,9 @@ namespace HLSL
         public static VectorValue operator ~(VectorValue left) => (VectorValue)(~(NumericValue)left);
         public static VectorValue operator !(VectorValue left) => (VectorValue)(!(NumericValue)left);
         public static VectorValue operator -(VectorValue left) => (VectorValue)(-(NumericValue)left);
+
+        public override bool Equals(object obj) => ReferenceEquals(this, obj);
+        public override int GetHashCode() => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(this);
     }
 
     public sealed class MatrixValue : NumericValue
@@ -900,6 +909,9 @@ namespace HLSL
         public static MatrixValue operator ~(MatrixValue left) => (MatrixValue)(~(NumericValue)left);
         public static MatrixValue operator !(MatrixValue left) => (MatrixValue)(!(NumericValue)left);
         public static MatrixValue operator -(MatrixValue left) => (MatrixValue)(-(NumericValue)left);
+
+        public override bool Equals(object obj) => ReferenceEquals(this, obj);
+        public override int GetHashCode() => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(this);
     }
 
     public class PredefinedObjectValue : HLSLValue
