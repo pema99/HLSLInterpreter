@@ -110,7 +110,7 @@
                      InitialCodeName="@(InitialCode.Name ?? "new.hlsl")"
                      InitialCodePath="@InitialCode.Path"
                      OnTabSwitched="@OnEditorTabSwitched"
-                     OnTabClosed="@OnEditorTabClosed"
+                     OnTabClosed="@(i => OnEditorTabClosed(i))"
                      OnReady="@OnEditorReady" />
 
         <div class="resize-h-handle" title="Drag to resize"></div>

@@ -87,7 +87,7 @@ public class Program
         }
     }
 
-    private static void RunShader(string shaderPath, ColorRGBA[,] outputColors)
+    private static void RunShader(string shaderPath, ColorRGBA[,]? outputColors)
     {
         string shaderSource = File.ReadAllText(shaderPath);
 
