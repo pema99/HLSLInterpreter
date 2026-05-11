@@ -13,7 +13,8 @@ public sealed record PermalinkSettings(
     int GroupOffsetY,
     bool GpuPreviewEnabled,
     ShaderRenderMode ShaderRenderMode,
-    string VertexEntryPoint);
+    string VertexEntryPoint,
+    bool CpuFullFrameEnabled);
 
 public static class PermalinkCodec
 {
@@ -70,7 +71,8 @@ public static class PermalinkCodec
             + $"&gx={settings.GroupOffsetX}&gy={settings.GroupOffsetY}"
             + $"&g={(settings.GpuPreviewEnabled ? 1 : 0)}"
             + $"&m={(settings.ShaderRenderMode == ShaderRenderMode.VertFrag ? "vf" : "p")}"
-            + $"&ev={Uri.EscapeDataString(settings.VertexEntryPoint)}";
+            + $"&ev={Uri.EscapeDataString(settings.VertexEntryPoint)}"
+            + $"&cf={(settings.CpuFullFrameEnabled ? 1 : 0)}";
     }
 
     public static PermalinkSettings ApplyToSettings(string url, PermalinkSettings current)
@@ -87,6 +89,8 @@ public static class PermalinkCodec
         ShaderRenderMode mode = m == "vf" ? ShaderRenderMode.VertFrag : m == "p" ? ShaderRenderMode.Pixel : current.ShaderRenderMode;
         var evp = GetQueryParam(url, "ev");
         string vertEntry = !string.IsNullOrEmpty(evp) ? evp : current.VertexEntryPoint;
-        return new PermalinkSettings(entryPoint, warpX, warpY, groupOffsetX, groupOffsetY, gpu, mode, vertEntry);
+        var cf = GetQueryParam(url, "cf");
+        bool cpuFull = cf == "1" ? true : cf == "0" ? false : current.CpuFullFrameEnabled;
+        return new PermalinkSettings(entryPoint, warpX, warpY, groupOffsetX, groupOffsetY, gpu, mode, vertEntry, cpuFull);
     }
 }

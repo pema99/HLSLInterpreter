@@ -323,7 +323,7 @@
                 const px = Math.floor(s.hoverPixel.x);
                 const py = Math.floor(s.hoverPixel.y);
                 if (px >= 0 && py >= 0 && px < s.imgW && py < s.imgH) {
-                    if (s.mode === 'gpu') {
+                    if (s.mode === 'gpu' || s.mode === 'cpu') {
                         const wx = Math.floor(px / s.warpX) * s.warpX;
                         const wy = Math.floor(py / s.warpY) * s.warpY;
                         drawHighlight(ctx, dpr, s, wx, wy, s.warpX, s.warpY, '#fff');

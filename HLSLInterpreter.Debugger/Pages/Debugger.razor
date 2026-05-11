@@ -81,7 +81,9 @@
                     <span class="permalink-toast" @key="permalinkToastKey">Permalink copied to clipboard</span>
                 }
             </div>
-            <button class="btn-run" @onclick="Run" disabled="@(RunCtl.IsRunning || DebugCtl.IsDebugging)" title="Run">
+            <button class="btn-run" @onclick="RunOrCancel"
+                    disabled="@((RunCtl.IsRunning && !RunCtl.IsCancellableRun) || DebugCtl.IsDebugging)"
+                    title="@(RunCtl.IsCancellableRun ? "Stop" : "Run")">
                 @if (RunCtl.IsRunning)
                 {
                     <span class="spinner"></span>
@@ -398,6 +400,16 @@ float4 frag(float4 position : SV_Position) : SV_Target
         }
     }
 
+    private Task RunOrCancel()
+    {
+        if (RunCtl.IsCancellableRun)
+        {
+            RunCtl.RequestCancel();
+            return Task.CompletedTask;
+        }
+        return Run();
+    }
+
     private async Task Run()
     {
         if (editorPanel == null) return;
@@ -544,6 +556,7 @@ float4 frag(float4 position : SV_Position) : SV_Target
         await JS.InvokeVoidAsync("disposeThreadGridResize");
         needsSectionHeightRestore = true;
         if (State.GpuPreviewEnabled) await Run();
+        else needsImageRender = RunCtl.HasImage;
     }
 
     private async Task MenuCopyPermalink()

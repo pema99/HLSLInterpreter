@@ -80,6 +80,15 @@
                         }
                     </select>
                 </div>
+                <div class="settings-row">
+                    <label class="settings-label">CPU full frame</label>
+                    <label class="settings-toggle" title="When on, CPU mode renders the entire frame tile by tile. When off, CPU mode renders just the selected warp tile.">
+                        <input type="checkbox" checked="@State.CpuFullFrameEnabled"
+                               @onchange="@(e => State.CpuFullFrameEnabled = e.Value is bool b && b)"
+                               disabled="@IsLocked" />
+                        <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
+                    </label>
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="btn-modal-save" @onclick="Close">Close</button>

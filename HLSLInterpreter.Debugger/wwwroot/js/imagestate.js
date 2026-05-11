@@ -87,7 +87,7 @@
                 window.dbgSetClickHandler(id, (px, py) => {
                     if (!window._dotNetDebugRef) return;
                     window._dotNetDebugRef.invokeMethodAsync('StartDebugAtPixel',
-                        px, py, 0, wx, wy);
+                        px, py, 0, state.width || wx, state.height || wy);
                 });
             } else if (target === 'debug' && state.debugClickActive) {
                 window.dbgSetClickHandler(id, (px, py) => {
@@ -115,6 +115,10 @@
     }).observe(document.body, { childList: true, subtree: true });
 
     window.imgSetPixels = function (pixels, width, height) {
+        // Wrap into a writable typed array so imgSetPixelsRect can mutate in place.
+        if (pixels && !(pixels instanceof Uint8ClampedArray)) {
+            pixels = new Uint8ClampedArray(pixels);
+        }
         state.pixels = pixels;
         state.width = width;
         state.height = height;
@@ -122,6 +126,45 @@
         document.querySelectorAll('.image-container[data-mode-target]').forEach(c => {
             if (typeof window.dbgResetView === 'function') window.dbgResetView(c.id);
         });
+    };
+
+    window.imgSetPixelsRect = function (pixels, x, y, rectW, rectH) {
+        if (!state.pixels || state.width <= 0 || state.height <= 0) return;
+        const fullW = state.width;
+        const fullH = state.height;
+        // Alias the incoming buffer without copying so putImageData can read it directly.
+        let src;
+        if (pixels instanceof Uint8ClampedArray) src = pixels;
+        else if (ArrayBuffer.isView(pixels)) src = new Uint8ClampedArray(pixels.buffer, pixels.byteOffset, pixels.byteLength);
+        else src = new Uint8ClampedArray(pixels);
+        for (let row = 0; row < rectH; row++) {
+            const dstY = y + row;
+            if (dstY < 0 || dstY >= fullH) continue;
+            const copyW = Math.min(rectW, fullW - x);
+            if (copyW <= 0) continue;
+            const srcStart = row * rectW * 4;
+            const dstStart = (dstY * fullW + x) * 4;
+            state.pixels.set(src.subarray(srcStart, srcStart + copyW * 4), dstStart);
+        }
+        document.querySelectorAll('.image-container[data-mode-target] .color-canvas-2d').forEach(canvas => {
+            if (!canvas || canvas.width !== fullW || canvas.height !== fullH) return;
+            canvas.getContext('2d').putImageData(new ImageData(src, rectW, rectH), x, y);
+        });
+    };
+
+    window.imgAllocPixels = function (width, height) {
+        const pixels = new Uint8ClampedArray(width * height * 4);
+        for (let i = 3; i < pixels.length; i += 4) pixels[i] = 255;
+        window.imgSetPixels(pixels, width, height);
+    };
+
+    window.cpuCanvasSize = function () {
+        const el = document.getElementById('image-container');
+        if (!el) return [256, 256];
+        const dpr = window.devicePixelRatio || 1;
+        const cw = Math.max(1, Math.floor(el.clientWidth * dpr));
+        const ch = Math.max(1, Math.floor(el.clientHeight * dpr));
+        return [cw, ch];
     };
 
     window.imgSetWarp = function (warpX, warpY) {

@@ -61,7 +61,9 @@ public sealed class DebugController : INotifyPropertyChanged
 
         await _run.SnapshotGpuIfNeededAsync();
         await _run.PauseGpuRendererAsync();
+        _run.SaveImageForRestore();
         CurrentSession = null;
+        RunController.ReclaimMemory();
 
         string code = await getCode();
         DebugCode = code;
@@ -108,6 +110,7 @@ public sealed class DebugController : INotifyPropertyChanged
             _state.GroupOffsetY = _savedGroupOffsets.Value.Y;
             _savedGroupOffsets = null;
         }
+        _run.RestoreImageFromSnapshot();
     }
 
     public void StepForward()      => Navigate(s => s.StepForward());

@@ -108,6 +108,13 @@ public sealed class DebuggerAppState : INotifyPropertyChanged
         set => Set(ref _gpuPreviewEnabled, value);
     }
 
+    private bool _cpuFullFrameEnabled = false;
+    public bool CpuFullFrameEnabled
+    {
+        get => _cpuFullFrameEnabled;
+        set => Set(ref _cpuFullFrameEnabled, value);
+    }
+
     private int _inspectedThread = 0;
     public int InspectedThread
     {
@@ -137,7 +144,7 @@ public sealed class DebuggerAppState : INotifyPropertyChanged
     }
 
     public PermalinkSettings ToPermalinkSettings() =>
-        new(FragmentEntryPoint, WarpX, WarpY, GroupOffsetX, GroupOffsetY, GpuPreviewEnabled, ShaderRenderMode, VertexEntryPoint);
+        new(FragmentEntryPoint, WarpX, WarpY, GroupOffsetX, GroupOffsetY, GpuPreviewEnabled, ShaderRenderMode, VertexEntryPoint, CpuFullFrameEnabled);
 
     public void ApplyFromUrl(string url)
     {
@@ -150,6 +157,7 @@ public sealed class DebuggerAppState : INotifyPropertyChanged
         GpuPreviewEnabled = s.GpuPreviewEnabled;
         ShaderRenderMode = s.ShaderRenderMode;
         VertexEntryPoint = s.VertexEntryPoint;
+        CpuFullFrameEnabled = s.CpuFullFrameEnabled;
     }
 
     private bool Set<T>(ref T field, T value, [CallerMemberName] string name = null)
