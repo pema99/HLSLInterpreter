@@ -411,25 +411,6 @@ public sealed class RunController : INotifyPropertyChanged
         return true;
     }
 
-    private (byte[] Pixels, int W, int H, bool HasImage)? _imageSnapshot;
-
-    public void SaveImageForRestore()
-    {
-        _imageSnapshot = (ImagePixels, ImageWidth, ImageHeight, HasImage);
-    }
-
-    public bool RestoreImageFromSnapshot()
-    {
-        if (!_imageSnapshot.HasValue) return false;
-        var snap = _imageSnapshot.Value;
-        ImagePixels = snap.Pixels;
-        ImageWidth = snap.W;
-        ImageHeight = snap.H;
-        HasImage = snap.HasImage;
-        _imageSnapshot = null;
-        return true;
-    }
-
     public async Task ToggleGpuPauseAsync()
     {
         if (GpuPaused)

@@ -555,8 +555,7 @@ float4 frag(float4 position : SV_Position) : SV_Target
         imageCollapsed = false;
         await JS.InvokeVoidAsync("disposeThreadGridResize");
         needsSectionHeightRestore = true;
-        if (State.GpuPreviewEnabled) await Run();
-        else needsImageRender = RunCtl.HasImage;
+        await Run();
     }
 
     private async Task MenuCopyPermalink()
