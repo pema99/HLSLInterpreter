@@ -190,8 +190,9 @@ namespace HLSL
             bool isArray = decl.ArrayRanks.Count > 0;
             bool hasImplicitSize = isArray && decl.ArrayRanks[0].Dimension == null;
             int arrayLength = (isArray && !hasImplicitSize) ? ((ScalarValue)EvaluateNumeric(decl.ArrayRanks[0].Dimension)).AsInt() : 0;
-            
-            if (decl.Initializer is ValueInitializerNode initializer)
+
+            if (decl.Initializer is ValueInitializerNode initializer &&
+                executionState.IsAnyThreadActive())
             {
                 HLSLValue initializerValue;
                 if (type is NumericTypeNode numericType && !isArray)
@@ -770,6 +771,8 @@ namespace HLSL
 
         public override void VisitExpressionStatementNode(ExpressionStatementNode node)
         {
+            if (!executionState.IsAnyThreadActive())
+                return;
             expressionEvaluator.Visit(node.Expression);
         }
 
