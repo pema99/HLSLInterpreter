@@ -145,7 +145,10 @@
                                   IsCollapsedChanged="@(c => imageCollapsed = c)"
                                   OnExpand="@OnImageSectionExpanded"
                                   OnToggleGpuPause="@RunCtl.ToggleGpuPauseAsync"
-                                  OnRestartGpuTime="@RunCtl.RestartGpuTimeAsync" />
+                                  OnRestartGpuTime="@RunCtl.RestartGpuTimeAsync"
+                                  Metrics="@RunCtl.Metrics"
+                                  ViewMode="@RunCtl.ViewMode"
+                                  ViewModeChanged="@OnViewModeChanged" />
 
                 <ConsolePanel Variant="ConsolePanel.ConsoleVariant.Run"
                               HasError="@RunCtl.HasError" ErrorMessage="@RunCtl.ErrorMessage"
@@ -251,6 +254,31 @@ float4 frag(float4 position : SV_Position) : SV_Target
     private void OnImageSectionExpanded()
     {
         if (RunCtl.HasImage && RunCtl.ImagePixels != null) needsImageRender = true;
+    }
+
+    private async Task OnViewModeChanged(DebugViewMode mode)
+    {
+        RunCtl.ViewMode = mode;
+        await PushCurrentImageAsync();
+    }
+
+    private async Task PushCurrentImageAsync()
+    {
+        bool overlayActive = RunCtl.ViewMode != DebugViewMode.Color
+            && RunCtl.Metrics != null
+            && !RunCtl.IsGpuMode
+            && !DebugCtl.IsDebugging;
+        if (overlayActive)
+        {
+            var m = RunCtl.Metrics;
+            byte[] pixels = m.Render(RunCtl.ViewMode);
+            if (pixels == null) return;
+            await JS.InvokeVoidAsync("imgSetPixels", pixels, m.CanvasW, m.CanvasH);
+        }
+        else if (RunCtl.ImagePixels != null)
+        {
+            await JS.InvokeVoidAsync("imgSetPixels", RunCtl.ImagePixels, RunCtl.ImageWidth, RunCtl.ImageHeight);
+        }
     }
 
 
@@ -363,7 +391,7 @@ float4 frag(float4 position : SV_Position) : SV_Target
         {
             needsImageRender = false;
             await JS.InvokeVoidAsync("restoreImageSectionHeight");
-            await JS.InvokeVoidAsync("imgSetPixels", RunCtl.ImagePixels, RunCtl.ImageWidth, RunCtl.ImageHeight);
+            await PushCurrentImageAsync();
         }
 
         await JS.InvokeVoidAsync("imgSetRegularMode", RunCtl.IsGpuMode ? "gpu" : "cpu");

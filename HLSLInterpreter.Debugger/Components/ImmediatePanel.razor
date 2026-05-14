@@ -93,7 +93,7 @@
             int stepCount = 0;
             int targetStep = Session.StepIndex;
 
-            evalRunner.DebugHook = _ =>
+            evalRunner.DebugHookBeforeStatement = _ =>
             {
                 if (stepCount == targetStep)
                 {

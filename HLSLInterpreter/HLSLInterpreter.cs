@@ -68,7 +68,8 @@ namespace HLSL
         }
 
         // Debug API
-        public Action<HLSLSyntaxNode> DebugHook { get; set; }
+        public Action<HLSLSyntaxNode> DebugHookBeforeStatement { get; set; }
+        public Action<HLSLSyntaxNode> DebugHookAfterStatement { get; set; }
         public Dictionary<string, HLSLValue> GetVisibleVariables() => context.GetVisibleVariables();
         public Dictionary<string, HLSLValue>[] GetVariablesPerFrame() => context.GetVariablesPerFrame();
         public Dictionary<string, HLSLValue> GetGlobalVariables() => context.GetGlobalVariables();
@@ -387,16 +388,27 @@ namespace HLSL
         [DebuggerStepThrough]
         public override void Visit(HLSLSyntaxNode node)
         {
-            if (DebugHook != null
+            if (DebugHookBeforeStatement != null
                 && node is StatementNode
                 && node is not BlockNode
                 && node is not StructDefinitionNode
                 && node is not InterfaceDefinitionNode
                 && node is not TypedefNode)
             {
-                DebugHook(node);
+                DebugHookBeforeStatement(node);
             }
+
             base.Visit(node);
+
+            if (DebugHookAfterStatement != null
+                && node is StatementNode
+                && node is not BlockNode
+                && node is not StructDefinitionNode
+                && node is not InterfaceDefinitionNode
+                && node is not TypedefNode)
+            {
+                DebugHookAfterStatement(node);
+            }
         }
 
         protected override void DefaultVisit(HLSLSyntaxNode node)

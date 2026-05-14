@@ -283,6 +283,13 @@
     display: flex;
     align-items: center;
     gap: 6px;
+    min-width: 0;
+    flex-shrink: 1;
+}
+
+.panel-header-actions > select.settings-text-input {
+    flex: 0 1 auto;
+    min-width: 60px;
 }
 
 .footer-select {

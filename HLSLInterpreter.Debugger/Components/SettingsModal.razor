@@ -81,13 +81,16 @@
                     </select>
                 </div>
                 <div class="settings-row">
-                    <label class="settings-label">CPU full frame</label>
-                    <label class="settings-toggle" title="When on, CPU mode renders the entire frame tile by tile. When off, CPU mode renders just the selected warp tile.">
-                        <input type="checkbox" checked="@State.CpuFullFrameEnabled"
-                               @onchange="@(e => State.CpuFullFrameEnabled = e.Value is bool b && b)"
-                               disabled="@IsLocked" />
-                        <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
-                    </label>
+                    <label class="settings-label">CPU run mode</label>
+                    <select class="settings-text-input"
+                            value="@State.CpuMode"
+                            @onchange="OnCpuModeChanged"
+                            disabled="@IsLocked"
+                            title="Single warp: render just the selected warp tile. Full frame: render the entire frame tile by tile. Full frame with execution metrics: also record per-warp and per-pixel stats for the heatmap views (slower).">
+                        <option value="@CpuMode.SingleWarp">Single warp</option>
+                        <option value="@CpuMode.FullFrame">Full frame</option>
+                        <option value="@CpuMode.FullFrameWithMetrics">Full frame with execution metrics</option>
+                    </select>
                 </div>
             </div>
             <div class="modal-footer">
@@ -114,6 +117,11 @@
     private void SetShaderRenderMode(string value)
     {
         if (Enum.TryParse<ShaderRenderMode>(value, out var mode)) State.ShaderRenderMode = mode;
+    }
+
+    private void OnCpuModeChanged(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<CpuMode>(e.Value?.ToString(), out var mode)) State.CpuMode = mode;
     }
 
     private Task PickMesh() => JS.InvokeVoidAsync("dbgPickObj").AsTask();

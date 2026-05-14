@@ -57,6 +57,12 @@ public sealed class RunController : INotifyPropertyChanged
     private bool _hasImage;
     public bool HasImage { get => _hasImage; set => Set(ref _hasImage, value); }
 
+    private ExecutionMetrics _metrics;
+    public ExecutionMetrics Metrics { get => _metrics; set => Set(ref _metrics, value); }
+
+    private DebugViewMode _viewMode = DebugViewMode.Color;
+    public DebugViewMode ViewMode { get => _viewMode; set => Set(ref _viewMode, value); }
+
     private bool _isCancellableRun;
     public bool IsCancellableRun { get => _isCancellableRun; private set => Set(ref _isCancellableRun, value); }
 
@@ -139,6 +145,8 @@ public sealed class RunController : INotifyPropertyChanged
         GpuCaptured = null;
         HasImage = false;
         IsGpuMode = false;
+        Metrics = null;
+        ViewMode = DebugViewMode.Color;
     }
 
     private async Task RunCpuInternal(Func<Task<string>> getCode, HLSLParserConfig parserConfig)
@@ -152,14 +160,15 @@ public sealed class RunController : INotifyPropertyChanged
             int wx = Math.Max(1, _state.WarpX);
             int wy = Math.Max(1, _state.WarpY);
 
-            if (_state.CpuFullFrameEnabled)
+            if (_state.CpuMode != CpuMode.SingleWarp)
             {
                 await RunCpuFullFrame(code, parserConfig, wx, wy);
             }
             else
             {
                 var invocation = await BuildShaderInvocationAsync();
-                Runner.DebugHook = null;
+                Runner.DebugHookBeforeStatement = null;
+                Runner.DebugHookAfterStatement = null;
                 Runner.Reset();
                 Runner.SetWarpSize(wx, wy);
                 invocation.SetUniforms(Runner);
@@ -188,7 +197,8 @@ public sealed class RunController : INotifyPropertyChanged
             var projection = await _js.InvokeAsync<float[]>("gpuProjection", canvasW, canvasH);
             invocation = invocation with { Projection = projection };
         }
-        Runner.DebugHook = null;
+        Runner.DebugHookBeforeStatement = null;
+        Runner.DebugHookAfterStatement = null;
 
         int tilesX = (canvasW + wx - 1) / wx;
         int tilesY = (canvasH + wy - 1) / wy;
@@ -201,25 +211,28 @@ public sealed class RunController : INotifyPropertyChanged
         HasImage = true;
         await _js.InvokeVoidAsync("imgAllocPixels", canvasW, canvasH);
 
+        var metrics = _state.CpuMode == CpuMode.FullFrameWithMetrics ? new ExecutionMetrics(canvasW, canvasH, wx, wy) : null;
+
         _cancelRequested = false;
         IsCancellableRun = true;
         try
         {
             if (OperatingSystem.IsBrowser())
-                await RunTilesSerial(code, parserConfig, invocation, wx, wy, canvasW, canvasH, tilesX, tilesY, fullPixels);
+                await RunTilesSerial(code, parserConfig, invocation, wx, wy, canvasW, canvasH, tilesX, tilesY, fullPixels, metrics);
             else
-                await RunTilesParallel(code, parserConfig, invocation, wx, wy, canvasW, canvasH, tilesX, tilesY, fullPixels);
+                await RunTilesParallel(code, parserConfig, invocation, wx, wy, canvasW, canvasH, tilesX, tilesY, fullPixels, metrics);
         }
         finally
         {
             IsCancellableRun = false;
             _cancelRequested = false;
         }
+        Metrics = metrics;
     }
 
     // Each tile re-visits the AST after a fresh Reset so interpreter state cannot leak between warps.
     private async Task RunTilesSerial(string code, HLSLParserConfig parserConfig, ShaderInvocation invocation,
-        int wx, int wy, int canvasW, int canvasH, int tilesX, int tilesY, byte[] fullPixels)
+        int wx, int wy, int canvasW, int canvasH, int tilesX, int tilesY, byte[] fullPixels, ExecutionMetrics metrics)
     {
         var parsedNodes = ShaderParser.ParseTopLevelDeclarations(code, parserConfig);
         Runner.SetWarpSize(wx, wy);
@@ -228,7 +241,7 @@ public sealed class RunController : INotifyPropertyChanged
             for (int tx = 0; tx < tilesX; tx++)
             {
                 if (_cancelRequested) return;
-                var tilePixels = RenderTile(Runner, parsedNodes, invocation, tx, ty, wx, wy);
+                var tilePixels = RenderTile(Runner, parsedNodes, invocation, tx, ty, wx, wy, metrics);
                 if (tilePixels == null) continue;
                 BlitTile(tilePixels, tx * wx, ty * wy, wx, wy, canvasW, canvasH, fullPixels);
                 await _js.InvokeVoidAsync("imgSetPixelsRect", tilePixels, tx * wx, ty * wy, wx, wy);
@@ -238,7 +251,7 @@ public sealed class RunController : INotifyPropertyChanged
     }
 
     private async Task RunTilesParallel(string code, HLSLParserConfig parserConfig, ShaderInvocation invocation,
-        int wx, int wy, int canvasW, int canvasH, int tilesX, int tilesY, byte[] fullPixels)
+        int wx, int wy, int canvasW, int canvasH, int tilesX, int tilesY, byte[] fullPixels, ExecutionMetrics metrics)
     {
         var workQueue = Channel.CreateUnbounded<(int tx, int ty)>();
         for (int ty = 0; ty < tilesY; ty++)
@@ -260,7 +273,7 @@ public sealed class RunController : INotifyPropertyChanged
                 await foreach (var (tx, ty) in workQueue.Reader.ReadAllAsync())
                 {
                     if (_cancelRequested) break;
-                    var pixels = RenderTile(runner, parsedNodes, invocation, tx, ty, wx, wy);
+                    var pixels = RenderTile(runner, parsedNodes, invocation, tx, ty, wx, wy, metrics);
                     await results.Writer.WriteAsync((tx, ty, pixels));
                 }
             });
@@ -277,14 +290,47 @@ public sealed class RunController : INotifyPropertyChanged
         await allWorkers;
     }
 
-    private static byte[] RenderTile(HLSLRunner runner, IEnumerable<UnityShaderParser.HLSL.HLSLSyntaxNode> parsedNodes,
-        ShaderInvocation invocation, int tx, int ty, int wx, int wy)
+    private static byte[] RenderTile(HLSLRunner runner, IEnumerable<HLSLSyntaxNode> parsedNodes,
+        ShaderInvocation invocation, int tx, int ty, int wx, int wy, ExecutionMetrics metrics)
     {
         runner.Reset();
         invocation.SetUniforms(runner);
         runner.ProcessCode(parsedNodes);
         var tileInvocation = invocation with { GroupOffsetX = tx, GroupOffsetY = ty };
-        var result = tileInvocation.Execute(runner);
+        if (metrics != null)
+        {
+            runner.DebugHookBeforeStatement = metrics.MakeBeforeStatementHook(runner, tx, ty);
+            runner.DebugHookAfterStatement = metrics.MakeAfterStatementHook(runner, tx, ty);
+            int threadCount = metrics.WarpX * metrics.WarpY;
+            int warpW = metrics.WarpX, warpH = metrics.WarpY;
+            int canvasW = metrics.CanvasW, canvasH = metrics.CanvasH;
+            tileInvocation = tileInvocation with
+            {
+                OnTextureFetch = () =>
+                {
+                    var state = runner.GetExecutionState();
+                    for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
+                    {
+                        if (!state.IsThreadActive(threadIndex))
+                            continue;
+                        int px = tx * warpW + (threadIndex % warpW);
+                        int py = ty * warpH + (threadIndex / warpW);
+                        if (px < canvasW && py < canvasH)
+                            metrics.PixelFetches[py * canvasW + px]++;
+                    }
+                }
+            };
+        }
+        HLSLValue result;
+        try
+        {
+            result = tileInvocation.Execute(runner);
+        }
+        finally
+        {
+            runner.DebugHookBeforeStatement = null;
+            runner.DebugHookAfterStatement = null;
+        }
         return ValueImageRenderer.TryExtractImage(result, wx, wy);
     }
 

@@ -25,14 +25,17 @@ public static class SoftwareRenderer
         var vertFunc = runner.GetFunction(vertEntry) ?? throw new InvalidOperationException($"Vertex function '{vertEntry}' not found.");
 
         // Don't debug vertex stage for fragment-debug runs.
-        var savedHook = runner.DebugHook;
-        runner.DebugHook = null;
+        var savedBefore = runner.DebugHookBeforeStatement;
+        var savedAfter = runner.DebugHookAfterStatement;
+        runner.DebugHookBeforeStatement = null;
+        runner.DebugHookAfterStatement = null;
 
         // Run vertex function.
         var vertOutputs = RunVertOnly(runner, mesh, vertEntry, warpX, warpY, 0, mesh.VertexCount);
 
         // Start debugging.
-        runner.DebugHook = savedHook;
+        runner.DebugHookBeforeStatement = savedBefore;
+        runner.DebugHookAfterStatement = savedAfter;
 
         // Get flattened vertex positions.
         int svPosOffset = ShaderReflection.LocateSemanticOffset(runner, vertFunc, "SV_POSITION");

@@ -6,6 +6,7 @@ namespace HLSLInterpreter.Debugger.Services;
 
 public enum ShaderRenderMode { Pixel, VertFrag }
 public enum DebugTarget { Pixel, Vertex }
+public enum CpuMode { SingleWarp, FullFrame, FullFrameWithMetrics }
 
 public sealed class DebuggerAppState : INotifyPropertyChanged
 {
@@ -108,11 +109,11 @@ public sealed class DebuggerAppState : INotifyPropertyChanged
         set => Set(ref _gpuPreviewEnabled, value);
     }
 
-    private bool _cpuFullFrameEnabled = false;
-    public bool CpuFullFrameEnabled
+    private CpuMode _cpuMode = CpuMode.SingleWarp;
+    public CpuMode CpuMode
     {
-        get => _cpuFullFrameEnabled;
-        set => Set(ref _cpuFullFrameEnabled, value);
+        get => _cpuMode;
+        set => Set(ref _cpuMode, value);
     }
 
     private int _inspectedThread = 0;
@@ -144,7 +145,7 @@ public sealed class DebuggerAppState : INotifyPropertyChanged
     }
 
     public PermalinkSettings ToPermalinkSettings() =>
-        new(FragmentEntryPoint, WarpX, WarpY, GroupOffsetX, GroupOffsetY, GpuPreviewEnabled, ShaderRenderMode, VertexEntryPoint, CpuFullFrameEnabled);
+        new(FragmentEntryPoint, WarpX, WarpY, GroupOffsetX, GroupOffsetY, GpuPreviewEnabled, ShaderRenderMode, VertexEntryPoint, CpuMode);
 
     public void ApplyFromUrl(string url)
     {
@@ -157,7 +158,7 @@ public sealed class DebuggerAppState : INotifyPropertyChanged
         GpuPreviewEnabled = s.GpuPreviewEnabled;
         ShaderRenderMode = s.ShaderRenderMode;
         VertexEntryPoint = s.VertexEntryPoint;
-        CpuFullFrameEnabled = s.CpuFullFrameEnabled;
+        CpuMode = s.CpuMode;
     }
 
     private bool Set<T>(ref T field, T value, [CallerMemberName] string name = null)

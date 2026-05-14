@@ -23,6 +23,8 @@ public sealed record ShaderInvocation(
     IReadOnlyList<TextureBinding> Textures,
     IReadOnlyList<SamplerBinding> Samplers)
 {
+    public Action OnTextureFetch { get; set; }
+
     public void SetUniforms(HLSLRunner runner)
     {
         runner.SetVariable("_WarpSize", new VectorValue(ScalarType.Float, new HLSLRegister<RawValue[]>([(float)WarpX, (float)WarpY])));
@@ -53,11 +55,11 @@ public sealed record ShaderInvocation(
             if (kvp.Value is ResourceValue tv && tv.IsTexture)
             {
                 if (texByName.TryGetValue(kvp.Key, out var tex) && tex.Rgba8 != null && tex.Width > 0 && tex.Height > 0)
-                    runner.SetVariable(kvp.Key, BuildTextureResource(tv, tex));
+                    runner.SetVariable(kvp.Key, BuildTextureResource(tv, tex, OnTextureFetch));
                 else
                     runner.SetVariable(kvp.Key, new ResourceValue(tv.Type, tv.TemplateArguments, tv.Stride,
                         sizeX: 1, sizeY: 1, sizeZ: 1, mipCount: 1,
-                        get: (x, y, z, sample, mip) => new VectorValue(ScalarType.Float, new HLSLRegister<RawValue[]>([1f, 0f, 1f, 1f])),
+                        get: (x, y, z, sample, mip) => { OnTextureFetch?.Invoke(); return new VectorValue(ScalarType.Float, new HLSLRegister<RawValue[]>([1f, 0f, 1f, 1f])); },
                         set: null));
             }
             else if (kvp.Value is SamplerStateValue)
@@ -73,12 +75,13 @@ public sealed record ShaderInvocation(
         }
     }
 
-    private static ResourceValue BuildTextureResource(ResourceValue template, TextureBinding tex)
+    private static ResourceValue BuildTextureResource(ResourceValue template, TextureBinding tex, Action onFetch)
     {
         int w = tex.Width, h = tex.Height;
         byte[] data = tex.Rgba8;
         ResourceGetter get = (x, y, z, sample, mip) =>
         {
+            onFetch?.Invoke();
             int xc = Math.Clamp(x, 0, w - 1);
             int yc = Math.Clamp(y, 0, h - 1);
             int o = (yc * w + xc) * 4;

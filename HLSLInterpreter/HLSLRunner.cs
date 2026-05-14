@@ -495,10 +495,15 @@ namespace HLSL
         public TypeNode ResolveType(TypeNode type) => interpreter.ResolveType(type);
 
         // Debug API
-        public Action<HLSLSyntaxNode> DebugHook
+        public Action<HLSLSyntaxNode> DebugHookBeforeStatement
         {
-            get => interpreter.DebugHook;
-            set => interpreter.DebugHook = value;
+            get => interpreter.DebugHookBeforeStatement;
+            set => interpreter.DebugHookBeforeStatement = value;
+        }
+        public Action<HLSLSyntaxNode> DebugHookAfterStatement
+        {
+            get => interpreter.DebugHookAfterStatement;
+            set => interpreter.DebugHookAfterStatement = value;
         }
         public Dictionary<string, HLSLValue> GetVisibleVariables() => interpreter.GetVisibleVariables();
         public Dictionary<string, HLSLValue>[] GetVariablesPerFrame() => interpreter.GetVariablesPerFrame();
@@ -506,6 +511,7 @@ namespace HLSL
         public HLSLExecutionState.ThreadState[] GetThreadStates() => interpreter.GetThreadStates();
         public HLSLExecutionState.ThreadState[][] GetThreadStatesPerFrame() => interpreter.GetThreadStatesPerFrame();
         public string[] GetCallStack() => interpreter.GetCallStack();
+        public HLSLValue EvaluateExpression(ExpressionNode node) => interpreter.EvaluateExpression(node);
         public HLSLValue EvaluateExpression(string source) => interpreter.EvaluateExpression(source);
 
         public TestRun[] DiscoverTests(string testFilter = null)

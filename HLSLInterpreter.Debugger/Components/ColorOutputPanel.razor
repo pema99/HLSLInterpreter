@@ -1,4 +1,5 @@
 @using HLSLInterpreter.Debugger.Services
+@using HLSLInterpreter.Debugger.Core
 @inherits StateAwareComponent
 
 <div class="debug-section debug-section-image @(IsCollapsed ? "section-collapsed" : "")">
@@ -8,6 +9,19 @@
             <span>Color Output</span>
         </div>
         <div class="panel-header-actions" @onclick:stopPropagation="true">
+            @if (Metrics != null && !IsGpuMode && !IsDebugging)
+            {
+                <select class="settings-text-input" value="@ViewMode"
+                        @onchange="@(e => OnViewModeChanged(e))">
+                    <option value="@DebugViewMode.Color">Color</option>
+                    <option value="@DebugViewMode.WarpExecutionDivergence">Warp execution divergence</option>
+                    <option value="@DebugViewMode.WarpInstructionCount">Warp instruction count</option>
+                    <option value="@DebugViewMode.WarpAverageUtilization">Warp average utilization</option>
+                    <option value="@DebugViewMode.PixelActiveInstructionCount">Pixel active instruction count</option>
+                    <option value="@DebugViewMode.NanDetection">NaN detection</option>
+                    <option value="@DebugViewMode.TextureFetches">Texture fetches</option>
+                </select>
+            }
             @if (State.ShaderRenderMode == ShaderRenderMode.VertFrag)
             {
                 <div class="segmented-toggle" role="radiogroup" aria-label="Debug target">
@@ -65,6 +79,16 @@
     [Parameter] public EventCallback OnExpand { get; set; }
     [Parameter] public EventCallback OnToggleGpuPause { get; set; }
     [Parameter] public EventCallback OnRestartGpuTime { get; set; }
+    [Parameter] public ExecutionMetrics Metrics { get; set; }
+    [Parameter] public DebugViewMode ViewMode { get; set; }
+    [Parameter] public EventCallback<DebugViewMode> ViewModeChanged { get; set; }
+
+    private Task OnViewModeChanged(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<DebugViewMode>(e.Value?.ToString(), out var mode))
+            return ViewModeChanged.InvokeAsync(mode);
+        return Task.CompletedTask;
+    }
 
     private async Task ToggleCollapsed()
     {

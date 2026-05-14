@@ -91,7 +91,7 @@ public sealed class DebuggerSession
             runner.SetWarpSize(wx, wy);
             invocation.SetUniforms(runner);
 
-            runner.DebugHook = node =>
+            runner.DebugHookBeforeStatement = node =>
             {
                 var frameCopies = runner.GetVariablesPerFrame().Select(CopyFrame).ToArray();
                 var globalCopy = CopyFrame(runner.GetGlobalVariables());
@@ -125,7 +125,7 @@ public sealed class DebuggerSession
         }
         finally
         {
-            runner.DebugHook = null;
+            runner.DebugHookBeforeStatement = null;
             Console.SetOut(oldOut);
         }
 

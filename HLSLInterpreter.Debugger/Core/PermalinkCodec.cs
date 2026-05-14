@@ -14,7 +14,7 @@ public sealed record PermalinkSettings(
     bool GpuPreviewEnabled,
     ShaderRenderMode ShaderRenderMode,
     string VertexEntryPoint,
-    bool CpuFullFrameEnabled);
+    CpuMode CpuMode);
 
 public static class PermalinkCodec
 {
@@ -72,8 +72,23 @@ public static class PermalinkCodec
             + $"&g={(settings.GpuPreviewEnabled ? 1 : 0)}"
             + $"&m={(settings.ShaderRenderMode == ShaderRenderMode.VertFrag ? "vf" : "p")}"
             + $"&ev={Uri.EscapeDataString(settings.VertexEntryPoint)}"
-            + $"&cf={(settings.CpuFullFrameEnabled ? 1 : 0)}";
+            + $"&cpu={CpuModeToCode(settings.CpuMode)}";
     }
+
+    private static string CpuModeToCode(CpuMode m) => m switch
+    {
+        CpuMode.FullFrame => "ff",
+        CpuMode.FullFrameWithMetrics => "ffm",
+        _ => "sw",
+    };
+
+    private static CpuMode? CodeToCpuMode(string code) => code switch
+    {
+        "sw" => CpuMode.SingleWarp,
+        "ff" => CpuMode.FullFrame,
+        "ffm" => CpuMode.FullFrameWithMetrics,
+        _ => null,
+    };
 
     public static PermalinkSettings ApplyToSettings(string url, PermalinkSettings current)
     {
@@ -89,8 +104,7 @@ public static class PermalinkCodec
         ShaderRenderMode mode = m == "vf" ? ShaderRenderMode.VertFrag : m == "p" ? ShaderRenderMode.Pixel : current.ShaderRenderMode;
         var evp = GetQueryParam(url, "ev");
         string vertEntry = !string.IsNullOrEmpty(evp) ? evp : current.VertexEntryPoint;
-        var cf = GetQueryParam(url, "cf");
-        bool cpuFull = cf == "1" ? true : cf == "0" ? false : current.CpuFullFrameEnabled;
-        return new PermalinkSettings(entryPoint, warpX, warpY, groupOffsetX, groupOffsetY, gpu, mode, vertEntry, cpuFull);
+        CpuMode cpuMode = CodeToCpuMode(GetQueryParam(url, "cpu")) ?? current.CpuMode;
+        return new PermalinkSettings(entryPoint, warpX, warpY, groupOffsetX, groupOffsetY, gpu, mode, vertEntry, cpuMode);
     }
 }
