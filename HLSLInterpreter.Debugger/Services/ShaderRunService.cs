@@ -57,7 +57,7 @@ public sealed class ShaderRunService
     {
         var config = _store.State.Editor.ActiveDocument?.Config ?? new ShaderConfig();
         var parserConfig = _invocationBuilder.MakeParserConfig();
-        float initialTime = _store.State.Run.GpuCaptured?.Time ?? 0f;
+        float initialTime = _store.State.Run.CapturedFrame?.Time ?? 0f;
 
         _store.BeginRun();
         RuntimeMemory.Reclaim();
@@ -294,7 +294,7 @@ public sealed class ShaderRunService
 
     private async Task<(int W, int H)> GetCanvasSizeAsync(int wx, int wy)
     {
-        var captured = _store.State.Run.GpuCaptured;
+        var captured = _store.State.Run.CapturedFrame;
         if (captured != null) return (captured.CanvasW, captured.CanvasH);
         try
         {
@@ -382,12 +382,12 @@ public sealed class ShaderRunService
 
     public async Task SnapshotGpuIfNeededAsync()
     {
-        if (!_store.State.Run.GpuPreviewEnabled || _store.State.Run.GpuCaptured != null) return;
+        if (!_store.State.Run.GpuPreviewEnabled || _store.State.Run.CapturedFrame != null) return;
         try
         {
             var snap = await _gpu.Snapshot();
             if (snap != null && snap.Length >= 3 && snap[1] > 0 && snap[2] > 0)
-                _store.SetGpuCaptured(new GpuCapture(snap[0], (int)snap[1], (int)snap[2]));
+                _store.SetCapturedFrame(new FrameCapture(snap[0], (int)snap[1], (int)snap[2]));
         }
         catch { }
     }

@@ -9,7 +9,7 @@ public enum ModalKind { None, Settings, Hotkeys, Textures, Examples, ShaderToyIm
 
 public sealed record ShaderImage(byte[] Pixels, int Width, int Height);
 public sealed record RunError(string Message, Exception Exception);
-public sealed record GpuCapture(float Time, int CanvasW, int CanvasH);
+public sealed record FrameCapture(float Time, int CanvasW, int CanvasH);
 
 public sealed record EditorState
 {
@@ -27,7 +27,7 @@ public sealed record RunState
     public RunBackend Backend { get; init; } = RunBackend.Cpu;
     public bool GpuPreviewEnabled { get; init; }
     public bool GpuPaused { get; init; }
-    public GpuCapture GpuCaptured { get; init; }
+    public FrameCapture CapturedFrame { get; init; }
     public ShaderImage Image { get; init; }
     public ExecutionMetrics Metrics { get; init; }
     public DebugViewMode ViewMode { get; init; } = DebugViewMode.Color;

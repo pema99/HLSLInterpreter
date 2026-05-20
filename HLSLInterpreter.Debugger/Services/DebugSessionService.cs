@@ -48,11 +48,11 @@ public sealed class DebugSessionService
         int wx = Math.Max(1, config.WarpX);
         int wy = Math.Max(1, config.WarpY);
 
-        // BeginRun clears GpuCaptured, but the click that opened this debug
+        // BeginRun clears CapturedFrame, but the click that opened this debug
         // session stored the canvas size there. Keep it across the reset.
-        var captured = _store.State.Run.GpuCaptured;
+        var captured = _store.State.Run.CapturedFrame;
         _store.BeginRun();
-        if (captured != null) _store.SetGpuCaptured(captured);
+        if (captured != null) _store.SetCapturedFrame(captured);
         await _runService.SnapshotGpuIfNeededAsync();
         await _runService.PauseGpuRendererAsync();
         RuntimeMemory.Reclaim();

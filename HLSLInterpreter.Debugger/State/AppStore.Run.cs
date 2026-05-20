@@ -13,7 +13,7 @@ public partial class AppStore
             Output = "",
             Image = null,
             Metrics = null,
-            GpuCaptured = null,
+            CapturedFrame = null,
             ViewMode = DebugViewMode.Color,
         });
 
@@ -36,7 +36,7 @@ public partial class AppStore
 
     public void SetGpuPaused(bool paused) => UpdateRun(r => r with { GpuPaused = paused });
 
-    public void SetGpuCaptured(GpuCapture capture) => UpdateRun(r => r with { GpuCaptured = capture });
+    public void SetCapturedFrame(FrameCapture capture) => UpdateRun(r => r with { CapturedFrame = capture });
 
     public void SetGpuPreviewEnabled(bool enabled) => UpdateRun(r => r with { GpuPreviewEnabled = enabled });
 

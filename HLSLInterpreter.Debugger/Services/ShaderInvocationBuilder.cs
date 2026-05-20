@@ -23,7 +23,7 @@ public sealed class ShaderInvocationBuilder
         var config = _store.State.Editor.ActiveDocument?.Config ?? new ShaderConfig();
         int wx = Math.Max(1, config.WarpX);
         int wy = Math.Max(1, config.WarpY);
-        var captured = _store.State.Run.GpuCaptured;
+        var captured = _store.State.Run.CapturedFrame;
         int canvasW = captured?.CanvasW ?? wx;
         int canvasH = captured?.CanvasH ?? wy;
 

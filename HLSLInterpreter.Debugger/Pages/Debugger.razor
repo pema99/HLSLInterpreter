@@ -237,9 +237,9 @@
             && config.DebugTarget == DebugTarget.Vertex
             && Slice.Debug.DebugVertexIndex < 0)
         {
-            await StartDebugAtVertex(0, Slice.Run.GpuCaptured?.Time ?? 0f,
-                Slice.Run.GpuCaptured?.CanvasW ?? Math.Max(1, config.WarpX),
-                Slice.Run.GpuCaptured?.CanvasH ?? Math.Max(1, config.WarpY));
+            await StartDebugAtVertex(0, Slice.Run.CapturedFrame?.Time ?? 0f,
+                Slice.Run.CapturedFrame?.CanvasW ?? Math.Max(1, config.WarpX),
+                Slice.Run.CapturedFrame?.CanvasH ?? Math.Max(1, config.WarpY));
             return;
         }
         var document = Slice.Editor.ActiveDocument;
@@ -305,7 +305,7 @@
         DebugSession.SaveGroupOffsetsForRestore();
         Store.SetGroupOffset(px / wx, py / wy);
         Store.SetInspectedThread((py % wy) * wx + (px % wx));
-        Store.SetGpuCaptured(new GpuCapture(time, canvasW, canvasH));
+        Store.SetCapturedFrame(new FrameCapture(time, canvasW, canvasH));
         await StartDebug();
     }
 
@@ -316,7 +316,7 @@
         int warpSize = Math.Max(1, config.WarpX * config.WarpY);
         Store.SetInspectedThread(vertexIndex % warpSize);
         Store.SetDebugVertexIndex(vertexIndex);
-        Store.SetGpuCaptured(new GpuCapture(time, canvasW, canvasH));
+        Store.SetCapturedFrame(new FrameCapture(time, canvasW, canvasH));
         if (Slice.Debug.BottomMode != DebugBottomMode.ThreadStates)
             Store.SetBottomMode(DebugBottomMode.ThreadStates);
         await StartDebug();
