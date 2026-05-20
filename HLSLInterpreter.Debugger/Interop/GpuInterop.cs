@@ -36,35 +36,41 @@ public interface IGpuInterop
 
 public sealed class GpuInterop : IGpuInterop
 {
+    private const string ModulePath = "./_content/HLSLInterpreter.Debugger/js/gpu.js";
+
     private readonly IJSRuntime _js;
+    private IJSObjectReference _module;
 
     public GpuInterop(IJSRuntime js) => _js = js;
 
+    private async ValueTask<IJSObjectReference> Module() =>
+        _module ??= await _js.InvokeAsync<IJSObjectReference>("import", ModulePath);
+
     public async ValueTask<bool> IsAvailable()
     {
-        try { return await _js.InvokeAsync<bool>("gpuIsAvailable"); }
+        try { return await (await Module()).InvokeAsync<bool>("gpuIsAvailable"); }
         catch { return false; }
     }
 
-    public ValueTask Render(GpuRenderRequest r) =>
-        _js.InvokeVoidAsync("gpuRender", r.CanvasId, r.Source, r.FragmentEntryPoint,
+    public async ValueTask Render(GpuRenderRequest r) =>
+        await (await Module()).InvokeVoidAsync("gpuRender", r.CanvasId, r.Source, r.FragmentEntryPoint,
             r.WarpX, r.WarpY, r.DotNetRef, r.Mode, r.VertexEntryPoint, r.VertexInputs,
             r.MeshVertices, r.MeshIndices, r.Time, r.Textures, r.Samplers);
 
-    public ValueTask Stop() => _js.InvokeVoidAsync("gpuStop");
+    public async ValueTask Stop() => await (await Module()).InvokeVoidAsync("gpuStop");
 
-    public ValueTask Pause() => _js.InvokeVoidAsync("gpuPause");
+    public async ValueTask Pause() => await (await Module()).InvokeVoidAsync("gpuPause");
 
-    public ValueTask Resume() => _js.InvokeVoidAsync("gpuResume");
+    public async ValueTask Resume() => await (await Module()).InvokeVoidAsync("gpuResume");
 
-    public ValueTask Restart() => _js.InvokeVoidAsync("gpuRestart");
+    public async ValueTask Restart() => await (await Module()).InvokeVoidAsync("gpuRestart");
 
-    public ValueTask<float[]> Snapshot() => _js.InvokeAsync<float[]>("gpuSnapshot");
+    public async ValueTask<float[]> Snapshot() => await (await Module()).InvokeAsync<float[]>("gpuSnapshot");
 
-    public ValueTask<float[]> View() => _js.InvokeAsync<float[]>("gpuView");
+    public async ValueTask<float[]> View() => await (await Module()).InvokeAsync<float[]>("gpuView");
 
-    public ValueTask<float[]> Projection(int canvasW, int canvasH) =>
-        _js.InvokeAsync<float[]>("gpuProjection", canvasW, canvasH);
+    public async ValueTask<float[]> Projection(int canvasW, int canvasH) =>
+        await (await Module()).InvokeAsync<float[]>("gpuProjection", canvasW, canvasH);
 
-    public ValueTask<float[]> Mouse() => _js.InvokeAsync<float[]>("gpuMouse");
+    public async ValueTask<float[]> Mouse() => await (await Module()).InvokeAsync<float[]>("gpuMouse");
 }

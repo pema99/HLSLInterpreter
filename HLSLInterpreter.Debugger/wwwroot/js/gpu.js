@@ -1,4 +1,5 @@
 // GPU preview + click-to-debug. ES module so it can import slang-wasm.js.
+import { dbgInitViewport, dbgSetViewportImageSize, dbgRefreshViewportOverlay } from './viewport.js';
 
 const SLANG_STAGE_VERTEX = 1;
 const SLANG_STAGE_FRAGMENT = 5;
@@ -192,29 +193,29 @@ window.addEventListener('mouseup', e => {
     if (e.button === 2) mouseRightHeld = false;
 });
 
-window.gpuMouse = function () {
+export function gpuMouse() {
     return [mouseX, mouseY, mouseRight, mouseLeft];
-};
+}
 
-window.gpuView = function () {
+export function gpuView() {
     const cp = Math.cos(cameraPitch), sp = Math.sin(cameraPitch);
     const cy = Math.cos(cameraYaw),   sy = Math.sin(cameraYaw);
     const ex = sy * cp * cameraDistance;
     const ey = sp * cameraDistance;
     const ez = cy * cp * cameraDistance;
     return matLookAt(ex, ey, ez, 0, 0, 0, 0, 1, 0);
-};
+}
 
-window.gpuProjection = function (canvasW, canvasH) {
+export function gpuProjection(canvasW, canvasH) {
     const aspect = Math.max(1e-4, canvasW / Math.max(1, canvasH));
     return matPerspective(CAMERA_FOV_Y, aspect, 0.1, 100);
-};
+}
 
-window.gpuViewProjection = function (canvasW, canvasH) {
-    return matMul(window.gpuProjection(canvasW, canvasH), window.gpuView());
-};
+export function gpuViewProjection(canvasW, canvasH) {
+    return matMul(gpuProjection(canvasW, canvasH), gpuView());
+}
 
-window.gpuPickRay = function (imgX, imgY, imgW, imgH) {
+export function gpuPickRay(imgX, imgY, imgW, imgH) {
     const cp = Math.cos(cameraPitch), sp = Math.sin(cameraPitch);
     const cy = Math.cos(cameraYaw),   sy = Math.sin(cameraYaw);
     const ox = sy * cp * cameraDistance;
@@ -242,7 +243,7 @@ window.gpuPickRay = function (imgX, imgY, imgW, imgH) {
     const dl = Math.hypot(dx, dy, dz) || 1;
     dx /= dl; dy /= dl; dz /= dl;
     return [ox, oy, oz, dx, dy, dz];
-};
+}
 
 // globalSession is heavy, so we cache it
 let slangGlobalPromise = null;
@@ -305,9 +306,7 @@ function attachResizeObserver(canvas) {
         if (!active || active.canvas !== canvas) return;
         if (!active.running && !active.paused) return;
         fitCanvas(canvas);
-        if (typeof window.dbgSetViewportImageSize === 'function') {
-            window.dbgSetViewportImageSize('image-container', canvas.width, canvas.height);
-        }
+        dbgSetViewportImageSize('image-container', canvas.width, canvas.height);
         if (active.paused) redrawIfPaused();
     });
     ro.observe(canvas.parentElement || canvas);
@@ -332,9 +331,8 @@ function ensureDepthTexture(r) {
 function drawFrame(r, now) {
     const prevW = r.canvas.width, prevH = r.canvas.height;
     fitCanvas(r.canvas);
-    if ((r.canvas.width !== prevW || r.canvas.height !== prevH)
-            && typeof window.dbgSetViewportImageSize === 'function') {
-        window.dbgSetViewportImageSize('image-container', r.canvas.width, r.canvas.height);
+    if (r.canvas.width !== prevW || r.canvas.height !== prevH) {
+        dbgSetViewportImageSize('image-container', r.canvas.width, r.canvas.height);
     }
 
     const t = (now - r.startTimeMs) / 1000;
@@ -347,9 +345,9 @@ function drawFrame(r, now) {
     u[3] = r.canvas.height;
     u[4] = t;
 
-    const viewMat = r.renderMode === 'vertfrag' ? window.gpuView() : matIdentity();
+    const viewMat = r.renderMode === 'vertfrag' ? gpuView() : matIdentity();
     const projMat = r.renderMode === 'vertfrag'
-        ? window.gpuProjection(r.canvas.width, r.canvas.height)
+        ? gpuProjection(r.canvas.width, r.canvas.height)
         : matIdentity();
     writeMat4(u, 8, viewMat);
     writeMat4(u, 24, projMat);
@@ -408,54 +406,54 @@ function renderFrame(now) {
     scheduleFrame();
 }
 
-window.gpuIsAvailable = function () {
+export function gpuIsAvailable() {
     return 'gpu' in navigator;
-};
+}
 
-window.gpuStop = function () {
+export function gpuStop() {
     if (!active) return;
     active.running = false;
     active.paused = false;
     if (active.animFrameId) cancelAnimationFrame(active.animFrameId);
     active.animFrameId = null;
-};
+}
 
-window.gpuPause = function () {
+export function gpuPause() {
     if (!active || !active.running) return;
     active.running = false;
     active.paused = true;
     if (active.animFrameId) cancelAnimationFrame(active.animFrameId);
     active.animFrameId = null;
-};
+}
 
-window.gpuResume = function () {
+export function gpuResume() {
     if (!active || active.running) return;
     // Rebase startTimeMs so _Time picks up where it left off.
     active.startTimeMs = performance.now() - (active.lastTime || 0) * 1000;
     active.running = true;
     active.paused = false;
     scheduleFrame();
-};
+}
 
-window.gpuRestart = function () {
+export function gpuRestart() {
     if (!active) return;
     active.startTimeMs = performance.now();
     active.lastTime = 0;
     // If paused, draw one frame at t=0 so the user sees the reset without
     // changing the pause state.
     if (!active.running) drawFrame(active, active.startTimeMs);
-};
+}
 
 // Live canvas size, time, and camera state so a Debug-button entry can
 // reproduce the _Resolution, _Time, and view-projection matrix the GPU saw.
-window.gpuSnapshot = function () {
+export function gpuSnapshot() {
     if (!active) return null;
     return [
         active.lastTime || 0,
         active.canvas.width,
         active.canvas.height,
     ];
-};
+}
 
 function createMeshBuffers(device, meshVertices, meshIndices) {
     const verts = meshVertices instanceof Float32Array
@@ -504,7 +502,7 @@ function attachCameraInput() {
         cameraYaw -= dx * 0.01;
         cameraPitch = Math.max(-1.4, Math.min(1.4, cameraPitch + dy * 0.01));
         redrawIfPaused();
-        window.dbgRefreshViewportOverlay?.('image-container');
+        dbgRefreshViewportOverlay('image-container');
     });
 
     // Stop rotate
@@ -524,7 +522,7 @@ function attachCameraInput() {
         const k = Math.exp(e.deltaY * 0.0015);
         cameraDistance = Math.max(0.5, Math.min(100, cameraDistance * k));
         redrawIfPaused();
-        window.dbgRefreshViewportOverlay?.('image-container');
+        dbgRefreshViewportOverlay('image-container');
     }, { capture: true, passive: false });
 }
 
@@ -637,7 +635,7 @@ function createSamplerFromBinding(device, binding) {
     });
 }
 
-window.gpuRender = async function (canvasId, hlslSource, entryPoint, warpX, warpY, dotNetRef, renderMode, vertexEntryName, vertexInputs, meshVertices, meshIndices, initialTime, texturePayload, samplerPayload) {
+export async function gpuRender(canvasId, hlslSource, entryPoint, warpX, warpY, dotNetRef, renderMode, vertexEntryName, vertexInputs, meshVertices, meshIndices, initialTime, texturePayload, samplerPayload) {
     if (!('gpu' in navigator)) throw new Error('WebGPU is not supported in this browser.');
 
     const canvas = document.getElementById(canvasId);
@@ -646,7 +644,7 @@ window.gpuRender = async function (canvasId, hlslSource, entryPoint, warpX, warp
     const mode = renderMode === 'vertfrag' ? 'vertfrag' : 'pixel';
     const vsName = vertexEntryName || (mode === 'vertfrag' ? 'vert' : '_dbgVertex');
 
-    window.gpuStop();
+    gpuStop();
     if (active && active.canvas === canvas) {
         try { active.uniformBuffer?.destroy?.(); } catch (_) {}
         try { active.depthTexture?.destroy?.(); } catch (_) {}
@@ -676,10 +674,8 @@ window.gpuRender = async function (canvasId, hlslSource, entryPoint, warpX, warp
 
     // imagestate.js owns viewport mode and click handlers. We only push the
     // live canvas size, since we own the GPU render target's dimensions.
-    if (typeof window.dbgInitViewport === 'function')
-        window.dbgInitViewport('image-container');
-    if (typeof window.dbgSetViewportImageSize === 'function')
-        window.dbgSetViewportImageSize('image-container', canvas.width, canvas.height);
+    dbgInitViewport('image-container');
+    dbgSetViewportImageSize('image-container', canvas.width, canvas.height);
 
     const shaderModule = device.createShaderModule({ code: wgsl });
 

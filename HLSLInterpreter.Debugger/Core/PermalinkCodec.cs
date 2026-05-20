@@ -1,7 +1,6 @@
 using System.IO.Compression;
 using System.Text;
 using HLSLInterpreter.Debugger.Services;
-using Microsoft.JSInterop;
 
 namespace HLSLInterpreter.Debugger.Core;
 
@@ -54,12 +53,6 @@ public static class PermalinkCodec
                 return Uri.UnescapeDataString(kv[1]);
         }
         return null;
-    }
-
-    public static async Task CopyToClipboardAsync(IJSRuntime js, string code, string baseUrl, PermalinkSettings settings)
-    {
-        string url = BuildUrl(baseUrl, code, settings);
-        await js.InvokeVoidAsync("copyToClipboard", url);
     }
 
     public static string BuildUrl(string baseUrl, string code, PermalinkSettings settings)

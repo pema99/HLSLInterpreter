@@ -1,15 +1,26 @@
-window.monacoEditorInitialized = false;
-window._monacoEditor = null;
+let monacoEditorInitialized = false;
+let _monacoEditor = null;
+let dotNetEditorRef = null;
+let dotNetDebugRef = null;
+let _breakpointDecorationIds = [];
+let _debugLineDecorationIds = [];
+let _imageSectionHeight = null;
+let _savedSectionHeights = null;
+let _glsl2hlslPromise = null;
+let _threadGridCols = 1;
+let _threadGridRows = 1;
+let _threadGridResizeObserver = null;
 
-window.setDebuggerRef = function (ref) { window._dotNetDebugRef = ref; };
+export function setDebuggerRef(ref) { dotNetDebugRef = ref; }
+export function getDebuggerRef() { return dotNetDebugRef; }
 
-window.dbgFetchText = async function (url) {
+export async function dbgFetchText(url) {
     const r = await fetch(url);
     if (!r.ok) throw new Error('fetch ' + url + ' -> ' + r.status);
     return await r.text();
 };
 
-window.dbgIsTabDropAfter = function (tabIndex, clientX) {
+export function dbgIsTabDropAfter(tabIndex, clientX) {
     const tabs = document.querySelectorAll('.editor-tab');
     const el = tabs[tabIndex];
     if (!el) return false;
@@ -17,7 +28,7 @@ window.dbgIsTabDropAfter = function (tabIndex, clientX) {
     return clientX > r.left + r.width / 2;
 };
 
-window.dbgPickObj = function () {
+export function dbgPickObj() {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.obj';
@@ -26,16 +37,16 @@ window.dbgPickObj = function () {
         if (!file) return;
         const reader = new FileReader();
         reader.onload = ev => {
-            if (window._dotNetDebugRef)
-                window._dotNetDebugRef.invokeMethodAsync('LoadObjMesh', ev.target.result);
+            if (dotNetDebugRef)
+                dotNetDebugRef.invokeMethodAsync('LoadObjMesh', ev.target.result);
         };
         reader.readAsText(file);
     });
     input.click();
 };
 
-window.initMonaco = function (containerId, initialCode, editorRef) {
-    if (editorRef) window._dotNetEditorRef = editorRef;
+export function initMonaco(containerId, initialCode, editorRef) {
+    if (editorRef) dotNetEditorRef = editorRef;
     require.config({
         paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs' }
     });
@@ -382,10 +393,10 @@ window.initMonaco = function (containerId, initialCode, editorRef) {
 
             monaco.languages.registerHoverProvider('hlsl', {
                 provideHover: async function (model, position) {
-                    if (!window._dotNetEditorRef) return null;
+                    if (!dotNetEditorRef) return null;
                     var word = model.getWordAtPosition(position);
                     if (!word) return null;
-                    var info = await window._dotNetEditorRef.invokeMethodAsync('GetHoverInfo', word.word);
+                    var info = await dotNetEditorRef.invokeMethodAsync('GetHoverInfo', word.word);
                     if (info == null) return null;
                     var contents = [{ value: '```\n' + word.word + ' = ' + info.value + '\n```' }];
                     if (info.perThreadValues) {
@@ -477,7 +488,7 @@ window.initMonaco = function (containerId, initialCode, editorRef) {
             }
         });
 
-        window._monacoEditor = monaco.editor.create(document.getElementById(containerId), {
+        _monacoEditor = monaco.editor.create(document.getElementById(containerId), {
             value: initialCode,
             language: 'hlsl',
             theme: 'hlsl-dark',
@@ -496,7 +507,7 @@ window.initMonaco = function (containerId, initialCode, editorRef) {
             stickyScroll: { enabled: false },
         });
 
-        window._monacoEditor.addCommand(
+        _monacoEditor.addCommand(
             monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
             function () { document.querySelector('.btn-run').click(); }
         );
@@ -515,22 +526,22 @@ window.initMonaco = function (containerId, initialCode, editorRef) {
                 // On the web, read via FileReader since the filesystem path isn't available
                 var reader = new FileReader();
                 reader.onload = function (ev) {
-                    if (window._dotNetEditorRef)
-                        window._dotNetEditorRef.invokeMethodAsync('OpenFileInTab', file.name, ev.target.result, '');
+                    if (dotNetEditorRef)
+                        dotNetEditorRef.invokeMethodAsync('OpenFileInTab', file.name, ev.target.result, '');
                     else
-                        window._monacoEditor.setValue(ev.target.result);
+                        _monacoEditor.setValue(ev.target.result);
                 };
                 reader.readAsText(file);
             }
         });
 
         // Gutter click to toggle a breakpoint
-        window._monacoEditor.onMouseDown(function (e) {
+        _monacoEditor.onMouseDown(function (e) {
             var t = e.target.type;
             if ((t === monaco.editor.MouseTargetType.GUTTER_LINE_NUMBERS ||
                  t === monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) &&
-                e.target.position && window._dotNetEditorRef) {
-                window._dotNetEditorRef.invokeMethodAsync('ToggleBreakpoint', e.target.position.lineNumber);
+                e.target.position && dotNetEditorRef) {
+                dotNetEditorRef.invokeMethodAsync('ToggleBreakpoint', e.target.position.lineNumber);
             }
         });
 
@@ -550,31 +561,31 @@ window.initMonaco = function (containerId, initialCode, editorRef) {
             if (shell) shell.classList.toggle('editor-hidden');
         }
         function toggleBreakpointAtCursor() {
-            if (window._dotNetEditorRef) {
-                var pos = window._monacoEditor.getPosition();
-                if (pos) window._dotNetEditorRef.invokeMethodAsync('ToggleBreakpoint', pos.lineNumber);
+            if (dotNetEditorRef) {
+                var pos = _monacoEditor.getPosition();
+                if (pos) dotNetEditorRef.invokeMethodAsync('ToggleBreakpoint', pos.lineNumber);
             }
         }
-        window._monacoEditor.addCommand(monaco.KeyCode.F5, function () {
+        _monacoEditor.addCommand(monaco.KeyCode.F5, function () {
             var cont = document.querySelector('[data-dbg="continue"]');
             var run = document.querySelector('.btn-run');
             if (cont && !cont.disabled) cont.click();
             else if (run && !run.disabled) run.click();
         });
-        window._monacoEditor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F5, function () { clickDbg('continue-back'); });
-        window._monacoEditor.addCommand(monaco.KeyCode.F9, function () { toggleBreakpointAtCursor(); });
-        window._monacoEditor.addCommand(monaco.KeyCode.F10, function () { clickDbgOrToggleBonzomaticEditor('step-over'); });
-        window._monacoEditor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F10, function () { clickDbg('step-over-back'); });
-        window._monacoEditor.addCommand(monaco.KeyCode.F11, function () { clickDbg('step-in'); });
-        window._monacoEditor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F11, function () { clickDbg('step-in-back'); });
-        window._monacoEditor.addCommand(monaco.KeyCode.F12, function () { clickDbg('step-out'); });
-        window._monacoEditor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F12, function () { clickDbg('step-out-back'); });
+        _monacoEditor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F5, function () { clickDbg('continue-back'); });
+        _monacoEditor.addCommand(monaco.KeyCode.F9, function () { toggleBreakpointAtCursor(); });
+        _monacoEditor.addCommand(monaco.KeyCode.F10, function () { clickDbgOrToggleBonzomaticEditor('step-over'); });
+        _monacoEditor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F10, function () { clickDbg('step-over-back'); });
+        _monacoEditor.addCommand(monaco.KeyCode.F11, function () { clickDbg('step-in'); });
+        _monacoEditor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F11, function () { clickDbg('step-in-back'); });
+        _monacoEditor.addCommand(monaco.KeyCode.F12, function () { clickDbg('step-out'); });
+        _monacoEditor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F12, function () { clickDbg('step-out-back'); });
 
         document.fonts.ready.then(function () {
             monaco.editor.remeasureFonts();
         });
 
-        window.monacoEditorInitialized = true;
+        monacoEditorInitialized = true;
         resolve();
     });
     });
@@ -609,9 +620,9 @@ document.addEventListener('keydown', function (e) {
         clickDbgGlobal('continue-back');
     } else if (e.key === 'F9') {
         e.preventDefault();
-        if (window._monacoEditor && window._dotNetEditorRef) {
-            var pos = window._monacoEditor.getPosition();
-            if (pos) window._dotNetEditorRef.invokeMethodAsync('ToggleBreakpoint', pos.lineNumber);
+        if (_monacoEditor && dotNetEditorRef) {
+            var pos = _monacoEditor.getPosition();
+            if (pos) dotNetEditorRef.invokeMethodAsync('ToggleBreakpoint', pos.lineNumber);
         }
     } else if (e.key === 'F10' && !e.shiftKey) {
         e.preventDefault();
@@ -641,8 +652,8 @@ document.addEventListener('keydown', function (e) {
 });
 
 // Update breakpoint decorations in Monaco gutter
-window.setBreakpoints = function (lines) {
-    if (!window._monacoEditor) return;
+export function setBreakpoints(lines) {
+    if (!_monacoEditor) return;
     var decorations = (lines || []).map(function (line) {
         return {
             range: new monaco.Range(line, 1, line, 1),
@@ -653,14 +664,14 @@ window.setBreakpoints = function (lines) {
             }
         };
     });
-    window._breakpointDecorationIds = window._monacoEditor.deltaDecorations(
-        window._breakpointDecorationIds || [], decorations
+    _breakpointDecorationIds = _monacoEditor.deltaDecorations(
+        _breakpointDecorationIds || [], decorations
     );
 };
 
 // Highlight the current debug line (0 to clear)
-window.highlightDebugLine = function (lineNumber) {
-    if (!window._monacoEditor) return;
+export function highlightDebugLine(lineNumber) {
+    if (!_monacoEditor) return;
     var decorations = lineNumber > 0 ? [{
         range: new monaco.Range(lineNumber, 1, lineNumber, 1),
         options: {
@@ -670,10 +681,10 @@ window.highlightDebugLine = function (lineNumber) {
             overviewRuler: { color: '#ffcc00', position: monaco.editor.OverviewRulerLane.Center },
         }
     }] : [];
-    window._debugLineDecorationIds = window._monacoEditor.deltaDecorations(
-        window._debugLineDecorationIds || [], decorations
+    _debugLineDecorationIds = _monacoEditor.deltaDecorations(
+        _debugLineDecorationIds || [], decorations
     );
-    if (lineNumber > 0) window._monacoEditor.revealLineInCenter(lineNumber);
+    if (lineNumber > 0) _monacoEditor.revealLineInCenter(lineNumber);
 };
 
 // Paints a per-thread rgba grid onto `canvas`, upscaled with no smoothing,
@@ -716,53 +727,53 @@ function paintScaledRgbaToCanvas(canvas, rgbaBytes, width, height, inspectedX, i
     ringDraw(ix - 3, iy - 3, pxScale + 6, pxScale + 6, '#000');
 }
 
-window.rgbaToDataUrl = function (rgbaBytes, width, height, inspectedX, inspectedY, sizeScale) {
+export function rgbaToDataUrl(rgbaBytes, width, height, inspectedX, inspectedY, sizeScale) {
     var dst = document.createElement('canvas');
     paintScaledRgbaToCanvas(dst, rgbaBytes, width, height, inspectedX, inspectedY, sizeScale);
     return dst.toDataURL('image/png');
 };
 
-window.restoreImageSectionHeight = function () {
-    if (window._imageSectionHeight) {
+export function restoreImageSectionHeight() {
+    if (_imageSectionHeight) {
         const el = document.querySelector('.image-section, .debug-section-image');
-        if (el) el.style.setProperty('--section-h', window._imageSectionHeight);
+        if (el) el.style.setProperty('--section-h', _imageSectionHeight);
     }
 };
 
-window.copyToClipboard = function (text) {
+export function copyToClipboard(text) {
     return navigator.clipboard.writeText(text);
 };
 
-window.scrollImmediateToBottom = function () {
+export function scrollImmediateToBottom() {
     requestAnimationFrame(function () {
         var el = document.querySelector('.imm-body');
         if (el) el.scrollTop = el.scrollHeight;
     });
 };
 
-window.saveSectionHeights = function () {
-    window._savedSectionHeights = {};
+export function saveSectionHeights() {
+    _savedSectionHeights = {};
     document.querySelectorAll('[class*="debug-section-"]').forEach(function (el) {
         var key = Array.from(el.classList).find(function (c) { return c.startsWith('debug-section-'); });
         if (!key) return;
         var h = el.style.getPropertyValue('--section-h');
-        if (h) window._savedSectionHeights[key] = h;
+        if (h) _savedSectionHeights[key] = h;
     });
 };
 
-window.restoreSectionHeights = function () {
-    if (!window._savedSectionHeights) return;
-    Object.entries(window._savedSectionHeights).forEach(function ([cls, h]) {
+export function restoreSectionHeights() {
+    if (!_savedSectionHeights) return;
+    Object.entries(_savedSectionHeights).forEach(function ([cls, h]) {
         var el = document.querySelector('.' + cls);
         if (el) el.style.setProperty('--section-h', h);
     });
 };
 
-window._threadGridCols = 1;
-window._threadGridRows = 1;
-window._threadGridResizeObserver = null;
+_threadGridCols = 1;
+_threadGridRows = 1;
+_threadGridResizeObserver = null;
 
-window.fitThreadGrid = function (containerId, cols, rows) {
+function fitThreadGrid(containerId, cols, rows) {
     const container = document.getElementById(containerId);
     if (!container) return;
     const grid = container.querySelector('.thread-grid');
@@ -789,23 +800,23 @@ window.fitThreadGrid = function (containerId, cols, rows) {
     grid.style.gap = gap + 'px';
 };
 
-window.initThreadGridResize = function (containerId, cols, rows) {
-    window.disposeThreadGridResize();
-    window._threadGridCols = cols;
-    window._threadGridRows = rows;
+export function initThreadGridResize(containerId, cols, rows) {
+    disposeThreadGridResize();
+    _threadGridCols = cols;
+    _threadGridRows = rows;
     const container = document.getElementById(containerId);
     if (!container) return;
-    window.fitThreadGrid(containerId, cols, rows);
-    window._threadGridResizeObserver = new ResizeObserver(function () {
-        window.fitThreadGrid(containerId, cols, rows);
+    fitThreadGrid(containerId, cols, rows);
+    _threadGridResizeObserver = new ResizeObserver(function () {
+        fitThreadGrid(containerId, cols, rows);
     });
-    window._threadGridResizeObserver.observe(container);
+    _threadGridResizeObserver.observe(container);
 };
 
-window.disposeThreadGridResize = function () {
-    if (window._threadGridResizeObserver) {
-        window._threadGridResizeObserver.disconnect();
-        window._threadGridResizeObserver = null;
+export function disposeThreadGridResize() {
+    if (_threadGridResizeObserver) {
+        _threadGridResizeObserver.disconnect();
+        _threadGridResizeObserver = null;
     }
 };
 
@@ -843,52 +854,52 @@ window.disposeThreadGridResize = function () {
     });
 })();
 
-window.getMonacoValue = function () {
-    if (window._monacoEditor) {
-        return window._monacoEditor.getValue();
+export function getMonacoValue() {
+    if (_monacoEditor) {
+        return _monacoEditor.getValue();
     }
     return '';
 };
 
-window.setMonacoValue = function (value) {
-    if (window._monacoEditor) {
-        window._monacoEditor.setValue(value);
+export function setMonacoValue(value) {
+    if (_monacoEditor) {
+        _monacoEditor.setValue(value);
     }
 };
 
-window.setMonacoTheme = function (theme) {
-    if (window._monacoEditor) monaco.editor.setTheme(theme);
+export function setMonacoTheme(theme) {
+    if (_monacoEditor) monaco.editor.setTheme(theme);
 };
 
-window.setMonacoFontSize = function (size) {
-    if (window._monacoEditor) {
-        window._monacoEditor.updateOptions({ fontSize: size });
+export function setMonacoFontSize(size) {
+    if (_monacoEditor) {
+        _monacoEditor.updateOptions({ fontSize: size });
     }
 };
 
-window.setMonacoReadOnly = function (readOnly) {
-    if (window._monacoEditor) {
-        window._monacoEditor.updateOptions({
+export function setMonacoReadOnly(readOnly) {
+    if (_monacoEditor) {
+        _monacoEditor.updateOptions({
             readOnly: readOnly,
             readOnlyMessage: { value: 'Cannot edit code while debugging. Stop the debug session first.' }
         });
     }
 };
 
-window._glsl2hlslPromise = null;
+_glsl2hlslPromise = null;
 async function loadGlsl2Hlsl() {
-    if (!window._glsl2hlslPromise) {
-        window._glsl2hlslPromise = (async () => {
+    if (!_glsl2hlslPromise) {
+        _glsl2hlslPromise = (async () => {
             const base = new URL('_content/HLSLInterpreter.Debugger/lib/glsl2hlsl/', document.baseURI).href;
             const mod = await import(base + 'glsl2hlsl_wasm.js');
             await mod.default(base + 'glsl2hlsl_wasm_bg.wasm');
             return mod;
         })();
     }
-    return window._glsl2hlslPromise;
+    return _glsl2hlslPromise;
 }
 
-window.glsl2hlslTranspile = async function (glsl) {
+export async function glsl2hlslTranspile(glsl) {
     const mod = await loadGlsl2Hlsl();
     return mod.transpile(glsl);
 };
@@ -921,7 +932,7 @@ async function decodeImageBlob(fileName, blob) {
     };
 }
 
-window.dbgPickImage = function () {
+export function dbgPickImage() {
     return new Promise((resolve, reject) => {
         const input = document.createElement('input');
         input.type = 'file';
@@ -936,11 +947,11 @@ window.dbgPickImage = function () {
     });
 };
 
-window.dbgRevokeBlobUrl = function (url) {
+export function dbgRevokeBlobUrl(url) {
     if (url && typeof url === 'string' && url.startsWith('blob:')) URL.revokeObjectURL(url);
 };
 
-window.dbgFetchImage = async function (url) {
+export async function dbgFetchImage(url) {
     const response = await fetch(url);
     if (!response.ok) throw new Error('HTTP ' + response.status + ' fetching ' + url);
     const blob = await response.blob();
@@ -948,7 +959,7 @@ window.dbgFetchImage = async function (url) {
     return await decodeImageBlob(fileName, blob);
 };
 
-window.downloadTextFile = function (filename, content) {
+export function downloadTextFile(filename, content) {
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -1012,7 +1023,7 @@ window.downloadTextFile = function (filename, content) {
         if (activeHandle && activeHandle.type === 'vertical') {
             if (activeHandle.section.classList.contains('image-section') ||
                 activeHandle.section.classList.contains('debug-section-image')) {
-                window._imageSectionHeight = activeHandle.section.style.getPropertyValue('--section-h');
+                _imageSectionHeight = activeHandle.section.style.getPropertyValue('--section-h');
             }
         }
         activeHandle = null;

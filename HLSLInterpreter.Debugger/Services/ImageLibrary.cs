@@ -1,17 +1,17 @@
 using HLSLInterpreter.Debugger.Core;
-using Microsoft.JSInterop;
+using HLSLInterpreter.Debugger.Interop;
 
 namespace HLSLInterpreter.Debugger.Services;
 
 public sealed class ImageLibrary
 {
-    private readonly IJSRuntime _js;
+    private readonly IBrowserInterop _browser;
     private Task _examplesLoad;
 
     public List<TextureBinding> Examples { get; } = new();
     public List<TextureBinding> RecentUploads { get; } = new();
 
-    public ImageLibrary(IJSRuntime js) => _js = js;
+    public ImageLibrary(IBrowserInterop browser) => _browser = browser;
 
     public Task EnsureExamplesLoadingAsync() => _examplesLoad ??= LoadExamplesAsync();
 
@@ -19,7 +19,7 @@ public sealed class ImageLibrary
     {
         const string baseUrl = "_content/HLSLInterpreter.Debugger/ExampleTextures/";
         string index;
-        try { index = await _js.InvokeAsync<string>("dbgFetchText", baseUrl + "index.txt"); }
+        try { index = await _browser.FetchText(baseUrl + "index.txt"); }
         catch (Exception ex) { Console.WriteLine($"[examples-tex] index fetch failed: {ex.Message}"); return; }
 
         foreach (var line in index.Split('\n'))
@@ -47,7 +47,7 @@ public sealed class ImageLibrary
     {
         try
         {
-            var picked = await _js.InvokeAsync<PickedImage>("dbgFetchImage", url);
+            var picked = await _browser.FetchImage(url);
             if (picked == null) return;
             var img = picked.ToTextureBinding();
             if (img.Rgba8 == null || img.Rgba8.Length == 0) return;
@@ -80,6 +80,6 @@ public sealed class ImageLibrary
     private void Revoke(string url)
     {
         if (string.IsNullOrEmpty(url)) return;
-        _ = _js.InvokeVoidAsync("dbgRevokeBlobUrl", url);
+        _ = _browser.RevokeBlobUrl(url);
     }
 }

@@ -1,7 +1,6 @@
 @using HLSL
 @inherits StoreComponent<AppState>
 @inject DebugSessionService DebugSession
-@inject ICanvasInterop Canvas
 @inject IBrowserInterop Browser
 
 <div class="debug-section debug-section-immediate @(collapsed ? "section-collapsed" : "")">
@@ -98,7 +97,7 @@
             catch { }
             if (rgba != null)
             {
-                try { imageDataUrl = await Canvas.RgbaToDataUrl(rgba, wx, wy, inspected % wx, inspected / wx, 0.7); }
+                try { imageDataUrl = await Browser.RgbaToDataUrl(rgba, wx, wy, inspected % wx, inspected / wx, 0.7); }
                 catch { }
             }
         }

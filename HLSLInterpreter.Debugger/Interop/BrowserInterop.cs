@@ -3,8 +3,8 @@ using Microsoft.JSInterop;
 
 namespace HLSLInterpreter.Debugger.Interop;
 
-// Typed wrapper over the remaining host and document helpers in app.js: file IO,
-// clipboard, the glsl2hlsl transpiler, and DOM layout glue.
+// Typed wrapper over the host and document helpers in app.js: file IO,
+// clipboard, the glsl2hlsl transpiler, image rendering, and DOM layout glue.
 public interface IBrowserInterop
 {
     ValueTask SetDebuggerRef(object reference);
@@ -16,6 +16,8 @@ public interface IBrowserInterop
     ValueTask CopyToClipboard(string text);
     ValueTask DownloadTextFile(string fileName, string content);
     ValueTask<string> TranspileGlsl(string glsl);
+    ValueTask<string> RgbaToDataUrl(byte[] rgba, int width, int height,
+        int inspectedX, int inspectedY, double sizeScale);
     ValueTask ScrollImmediateToBottom();
     ValueTask SaveSectionHeights();
     ValueTask RestoreSectionHeights();
@@ -26,42 +28,62 @@ public interface IBrowserInterop
 
 public sealed class BrowserInterop : IBrowserInterop
 {
+    private const string ModulePath = "./_content/HLSLInterpreter.Debugger/js/app.js";
+
     private readonly IJSRuntime _js;
+    private IJSObjectReference _module;
 
     public BrowserInterop(IJSRuntime js) => _js = js;
 
-    public ValueTask SetDebuggerRef(object reference) =>
-        _js.InvokeVoidAsync("setDebuggerRef", reference);
+    private async ValueTask<IJSObjectReference> Module() =>
+        _module ??= await _js.InvokeAsync<IJSObjectReference>("import", ModulePath);
 
-    public ValueTask<string> FetchText(string url) => _js.InvokeAsync<string>("dbgFetchText", url);
+    public async ValueTask SetDebuggerRef(object reference) =>
+        await (await Module()).InvokeVoidAsync("setDebuggerRef", reference);
 
-    public ValueTask<PickedImage> FetchImage(string url) =>
-        _js.InvokeAsync<PickedImage>("dbgFetchImage", url);
+    public async ValueTask<string> FetchText(string url) =>
+        await (await Module()).InvokeAsync<string>("dbgFetchText", url);
 
-    public ValueTask<PickedImage> PickImage() => _js.InvokeAsync<PickedImage>("dbgPickImage");
+    public async ValueTask<PickedImage> FetchImage(string url) =>
+        await (await Module()).InvokeAsync<PickedImage>("dbgFetchImage", url);
 
-    public ValueTask PickObj() => _js.InvokeVoidAsync("dbgPickObj");
+    public async ValueTask<PickedImage> PickImage() =>
+        await (await Module()).InvokeAsync<PickedImage>("dbgPickImage");
 
-    public ValueTask RevokeBlobUrl(string url) => _js.InvokeVoidAsync("dbgRevokeBlobUrl", url);
+    public async ValueTask PickObj() => await (await Module()).InvokeVoidAsync("dbgPickObj");
 
-    public ValueTask CopyToClipboard(string text) => _js.InvokeVoidAsync("copyToClipboard", text);
+    public async ValueTask RevokeBlobUrl(string url) =>
+        await (await Module()).InvokeVoidAsync("dbgRevokeBlobUrl", url);
 
-    public ValueTask DownloadTextFile(string fileName, string content) =>
-        _js.InvokeVoidAsync("downloadTextFile", fileName, content);
+    public async ValueTask CopyToClipboard(string text) =>
+        await (await Module()).InvokeVoidAsync("copyToClipboard", text);
 
-    public ValueTask<string> TranspileGlsl(string glsl) =>
-        _js.InvokeAsync<string>("glsl2hlslTranspile", glsl);
+    public async ValueTask DownloadTextFile(string fileName, string content) =>
+        await (await Module()).InvokeVoidAsync("downloadTextFile", fileName, content);
 
-    public ValueTask ScrollImmediateToBottom() => _js.InvokeVoidAsync("scrollImmediateToBottom");
+    public async ValueTask<string> TranspileGlsl(string glsl) =>
+        await (await Module()).InvokeAsync<string>("glsl2hlslTranspile", glsl);
 
-    public ValueTask SaveSectionHeights() => _js.InvokeVoidAsync("saveSectionHeights");
+    public async ValueTask<string> RgbaToDataUrl(byte[] rgba, int width, int height,
+        int inspectedX, int inspectedY, double sizeScale) =>
+        await (await Module()).InvokeAsync<string>("rgbaToDataUrl", rgba, width, height,
+            inspectedX, inspectedY, sizeScale);
 
-    public ValueTask RestoreSectionHeights() => _js.InvokeVoidAsync("restoreSectionHeights");
+    public async ValueTask ScrollImmediateToBottom() =>
+        await (await Module()).InvokeVoidAsync("scrollImmediateToBottom");
 
-    public ValueTask RestoreImageSectionHeight() => _js.InvokeVoidAsync("restoreImageSectionHeight");
+    public async ValueTask SaveSectionHeights() =>
+        await (await Module()).InvokeVoidAsync("saveSectionHeights");
 
-    public ValueTask InitThreadGridResize(string containerId, int cols, int rows) =>
-        _js.InvokeVoidAsync("initThreadGridResize", containerId, cols, rows);
+    public async ValueTask RestoreSectionHeights() =>
+        await (await Module()).InvokeVoidAsync("restoreSectionHeights");
 
-    public ValueTask DisposeThreadGridResize() => _js.InvokeVoidAsync("disposeThreadGridResize");
+    public async ValueTask RestoreImageSectionHeight() =>
+        await (await Module()).InvokeVoidAsync("restoreImageSectionHeight");
+
+    public async ValueTask InitThreadGridResize(string containerId, int cols, int rows) =>
+        await (await Module()).InvokeVoidAsync("initThreadGridResize", containerId, cols, rows);
+
+    public async ValueTask DisposeThreadGridResize() =>
+        await (await Module()).InvokeVoidAsync("disposeThreadGridResize");
 }

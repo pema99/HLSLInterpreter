@@ -19,52 +19,56 @@ public interface ICanvasInterop
     ValueTask SetDebugClickHandler(bool active);
     ValueTask SetPickMode(string mode);
     ValueTask SetMeshData(float[] positions, uint[] indices);
-    ValueTask<string> RgbaToDataUrl(byte[] rgba, int width, int height,
-        int inspectedX, int inspectedY, double sizeScale);
 }
 
 public sealed class CanvasInterop : ICanvasInterop
 {
+    private const string ModulePath = "./_content/HLSLInterpreter.Debugger/js/imagestate.js";
+
     private readonly IJSRuntime _js;
+    private IJSObjectReference _module;
 
     public CanvasInterop(IJSRuntime js) => _js = js;
 
-    public ValueTask SetPixels(byte[] pixels, int width, int height) =>
-        _js.InvokeVoidAsync("imgSetPixels", pixels, width, height);
+    private async ValueTask<IJSObjectReference> Module() =>
+        _module ??= await _js.InvokeAsync<IJSObjectReference>("import", ModulePath);
 
-    public ValueTask SetPixelsRect(byte[] pixels, int x, int y, int width, int height) =>
-        _js.InvokeVoidAsync("imgSetPixelsRect", pixels, x, y, width, height);
+    public async ValueTask SetPixels(byte[] pixels, int width, int height) =>
+        await (await Module()).InvokeVoidAsync("imgSetPixels", pixels, width, height);
 
-    public ValueTask AllocPixels(int width, int height) =>
-        _js.InvokeVoidAsync("imgAllocPixels", width, height);
+    public async ValueTask SetPixelsRect(byte[] pixels, int x, int y, int width, int height) =>
+        await (await Module()).InvokeVoidAsync("imgSetPixelsRect", pixels, x, y, width, height);
 
-    public ValueTask<int[]> GetCpuCanvasSize() => _js.InvokeAsync<int[]>("cpuCanvasSize");
+    public async ValueTask AllocPixels(int width, int height) =>
+        await (await Module()).InvokeVoidAsync("imgAllocPixels", width, height);
 
-    public ValueTask SetWarp(int warpX, int warpY) =>
-        _js.InvokeVoidAsync("imgSetWarp", warpX, warpY);
+    public async ValueTask<int[]> GetCpuCanvasSize() =>
+        await (await Module()).InvokeAsync<int[]>("cpuCanvasSize");
 
-    public ValueTask SetRegularMode(string mode) => _js.InvokeVoidAsync("imgSetRegularMode", mode);
+    public async ValueTask SetWarp(int warpX, int warpY) =>
+        await (await Module()).InvokeVoidAsync("imgSetWarp", warpX, warpY);
 
-    public ValueTask SetDebugMode(string mode) => _js.InvokeVoidAsync("imgSetDebugMode", mode);
+    public async ValueTask SetRegularMode(string mode) =>
+        await (await Module()).InvokeVoidAsync("imgSetRegularMode", mode);
 
-    public ValueTask SetDebugPixel(int? x, int? y) =>
-        _js.InvokeVoidAsync("imgSetDebugPixel", x, y);
+    public async ValueTask SetDebugMode(string mode) =>
+        await (await Module()).InvokeVoidAsync("imgSetDebugMode", mode);
 
-    public ValueTask SetThreadStates(int[] states) =>
-        _js.InvokeVoidAsync("imgSetThreadStates", states);
+    public async ValueTask SetDebugPixel(int? x, int? y) =>
+        await (await Module()).InvokeVoidAsync("imgSetDebugPixel", x, y);
 
-    public ValueTask SetCpuClickHandler(int? warpX, int? warpY) =>
-        _js.InvokeVoidAsync("imgSetCpuClickHandler", warpX, warpY);
+    public async ValueTask SetThreadStates(int[] states) =>
+        await (await Module()).InvokeVoidAsync("imgSetThreadStates", states);
 
-    public ValueTask SetDebugClickHandler(bool active) =>
-        _js.InvokeVoidAsync("imgSetDebugClickHandler", active);
+    public async ValueTask SetCpuClickHandler(int? warpX, int? warpY) =>
+        await (await Module()).InvokeVoidAsync("imgSetCpuClickHandler", warpX, warpY);
 
-    public ValueTask SetPickMode(string mode) => _js.InvokeVoidAsync("imgSetPickMode", mode);
+    public async ValueTask SetDebugClickHandler(bool active) =>
+        await (await Module()).InvokeVoidAsync("imgSetDebugClickHandler", active);
 
-    public ValueTask SetMeshData(float[] positions, uint[] indices) =>
-        _js.InvokeVoidAsync("imgSetMeshData", positions, indices);
+    public async ValueTask SetPickMode(string mode) =>
+        await (await Module()).InvokeVoidAsync("imgSetPickMode", mode);
 
-    public ValueTask<string> RgbaToDataUrl(byte[] rgba, int width, int height,
-        int inspectedX, int inspectedY, double sizeScale) =>
-        _js.InvokeAsync<string>("rgbaToDataUrl", rgba, width, height, inspectedX, inspectedY, sizeScale);
+    public async ValueTask SetMeshData(float[] positions, uint[] indices) =>
+        await (await Module()).InvokeVoidAsync("imgSetMeshData", positions, indices);
 }

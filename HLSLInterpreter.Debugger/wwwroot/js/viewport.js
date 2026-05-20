@@ -1,8 +1,10 @@
 // Zoom/pan + overlay rectangles for the Color Output panel. The image canvas
 // is transformed in CSS for zoom/pan. The overlay canvas is drawn in device
 // pixels so its rings stay crisp at any DPR.
-(function () {
-    const states = new WeakMap();
+import { gpuViewProjection, gpuPickRay } from './gpu.js';
+import { getDebuggerRef } from './app.js';
+
+const states = new WeakMap();
 
     function getState(container) {
         let s = states.get(container);
@@ -115,7 +117,7 @@
     }
 
     function projectVertex(s, x, y, z) {
-        const vp = window.gpuViewProjection?.(s.imgW, s.imgH);
+        const vp = gpuViewProjection(s.imgW, s.imgH);
         if (!vp) return null;
         const cx = vp[0] * x + vp[1] * y + vp[2]  * z + vp[3];
         const cy = vp[4] * x + vp[5] * y + vp[6]  * z + vp[7];
@@ -155,7 +157,7 @@
 
     function nearestVertex(s, imgX, imgY) {
         if (!s.meshPositions || !s.meshIndices) return null;
-        const ray = window.gpuPickRay?.(imgX, imgY, s.imgW, s.imgH);
+        const ray = gpuPickRay(imgX, imgY, s.imgW, s.imgH);
         if (!ray) return null;
         const [ox, oy, oz, dx, dy, dz] = ray;
         const positions = s.meshPositions;
@@ -399,7 +401,7 @@
         refreshOverlay(container, s);
     }
 
-    window.dbgInitViewport = function (containerId) {
+    export function dbgInitViewport(containerId) {
         const container = document.getElementById(containerId);
         if (!container || container.__viewportInit) return;
         container.__viewportInit = true;
@@ -419,8 +421,9 @@
             e.preventDefault();
             const reader = new FileReader();
             reader.onload = ev => {
-                if (!window._dotNetDebugRef) return;
-                window._dotNetDebugRef.invokeMethodAsync('LoadObjMesh', ev.target.result);
+                const ref = getDebuggerRef();
+                if (!ref) return;
+                ref.invokeMethodAsync('LoadObjMesh', ev.target.result);
             };
             reader.readAsText(file);
         });
@@ -448,7 +451,7 @@
         applyLayout(container, s);
     };
 
-    window.dbgSetViewportImageSize = function (containerId, w, h) {
+    export function dbgSetViewportImageSize(containerId, w, h) {
         const container = document.getElementById(containerId);
         if (!container) return;
         const s = getState(container);
@@ -458,7 +461,7 @@
         applyLayout(container, s);
     };
 
-    window.dbgSetViewportWarp = function (containerId, wx, wy) {
+    export function dbgSetViewportWarp(containerId, wx, wy) {
         const container = document.getElementById(containerId);
         if (!container) return;
         const s = getState(container);
@@ -466,7 +469,7 @@
         s.warpY = Math.max(1, wy | 0);
     };
 
-    window.dbgSetViewportMode = function (containerId, mode) {
+    export function dbgSetViewportMode(containerId, mode) {
         const container = document.getElementById(containerId);
         if (!container) return;
         const s = getState(container);
@@ -476,7 +479,7 @@
         applyLayout(container, s);
     };
 
-    window.dbgSetDebugPixel = function (containerId, px, py) {
+    export function dbgSetDebugPixel(containerId, px, py) {
         const container = document.getElementById(containerId);
         if (!container) return;
         const s = getState(container);
@@ -484,7 +487,7 @@
         refreshOverlay(container, s);
     };
 
-    window.dbgSetViewportThreadStates = function (containerId, states) {
+    export function dbgSetViewportThreadStates(containerId, states) {
         const container = document.getElementById(containerId);
         if (!container) return;
         const s = getState(container);
@@ -492,14 +495,14 @@
         refreshOverlay(container, s);
     };
 
-    window.dbgSetClickHandler = function (containerId, handler) {
+    export function dbgSetClickHandler(containerId, handler) {
         const container = document.getElementById(containerId);
         if (!container) return;
         const s = getState(container);
         s.onClick = handler;
     };
 
-    window.dbgSetViewportPickMode = function (containerId, pickMode, positions, indices) {
+    export function dbgSetViewportPickMode(containerId, pickMode, positions, indices) {
         const container = document.getElementById(containerId);
         if (!container) return;
         const s = getState(container);
@@ -511,7 +514,7 @@
         refreshOverlay(container, s);
     };
 
-    window.dbgRefreshViewportOverlay = function (containerId) {
+    export function dbgRefreshViewportOverlay(containerId) {
         const container = document.getElementById(containerId);
         if (!container) return;
         const s = getState(container);
@@ -521,7 +524,7 @@
         refreshOverlay(container, s);
     };
 
-    window.dbgResetView = function (containerId) {
+    export function dbgResetView(containerId) {
         const container = document.getElementById(containerId);
         if (!container) return;
         const s = getState(container);
@@ -529,4 +532,3 @@
         s.box = fitImageBox(container, s);
         applyLayout(container, s);
     };
-})();
