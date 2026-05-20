@@ -2,7 +2,8 @@ namespace HLSLInterpreter.Debugger.State;
 
 // The single source of truth. Every mutation goes through Update, which swaps in
 // a new immutable AppState and notifies subscribers with the old and new values.
-public sealed class AppStore
+// Named operations live in the AppStore.* partial files.
+public sealed partial class AppStore
 {
     public AppState State { get; private set; } = AppState.Initial;
 

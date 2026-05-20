@@ -26,5 +26,10 @@ public sealed record ShaderDocument
     public int Id { get; init; }
     public string Name { get; init; } = "new.hlsl";
     public string Path { get; init; }
+
+    // Last-synced editor text. The active document's live text is in Monaco
+    // and synced into here on demand (tab switch, run, save).
+    public string Code { get; init; } = "";
+
     public ShaderConfig Config { get; init; } = new();
 }
