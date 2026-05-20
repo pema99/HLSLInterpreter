@@ -1,6 +1,7 @@
 using HLSLInterpreter.Debugger.Core;
 using HLSLInterpreter.Debugger.Interop;
 using HLSLInterpreter.Debugger.State;
+using UnityShaderParser.HLSL;
 
 namespace HLSLInterpreter.Debugger.Services;
 
@@ -56,5 +57,14 @@ public sealed class ShaderInvocationBuilder
             DebugVertexIndex: _store.State.Debug.DebugVertexIndex,
             Textures: config.Textures,
             Samplers: config.Samplers);
+    }
+
+    public HLSLParserConfig MakeParserConfig()
+    {
+        string path = _store.State.Editor.ActiveDocument?.Path;
+        return new HLSLParserConfig
+        {
+            BasePath = path != null ? System.IO.Path.GetDirectoryName(path) ?? "" : "",
+        };
     }
 }

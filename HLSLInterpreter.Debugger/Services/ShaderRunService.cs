@@ -56,7 +56,7 @@ public sealed class ShaderRunService
     private async Task RunInternal(string code)
     {
         var config = _store.State.Editor.ActiveDocument?.Config ?? new ShaderConfig();
-        var parserConfig = MakeParserConfig();
+        var parserConfig = _invocationBuilder.MakeParserConfig();
         float initialTime = _store.State.Run.GpuCaptured?.Time ?? 0f;
 
         _store.BeginRun();
@@ -390,14 +390,5 @@ public sealed class ShaderRunService
                 _store.SetGpuCaptured(new GpuCapture(snap[0], (int)snap[1], (int)snap[2]));
         }
         catch { }
-    }
-
-    private HLSLParserConfig MakeParserConfig()
-    {
-        string path = _store.State.Editor.ActiveDocument?.Path;
-        return new HLSLParserConfig
-        {
-            BasePath = path != null ? System.IO.Path.GetDirectoryName(path) ?? "" : "",
-        };
     }
 }
