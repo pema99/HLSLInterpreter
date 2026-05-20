@@ -1,0 +1,57 @@
+using HLSL;
+
+namespace HLSLInterpreter.Debugger.Core;
+
+// Runs one shader invocation on the CPU interpreter and returns a RunOutcome.
+// Single-warp runs, tiled full-frame runs, and trace recording all go through here.
+public sealed class ShaderExecutor
+{
+    public RunOutcome Execute(
+        HLSLRunner runner,
+        ShaderProgram program,
+        ShaderInvocation invocation,
+        ExecutionOptions options)
+    {
+        options ??= ExecutionOptions.None;
+        using var capture = new ConsoleCapture();
+
+        runner.Reset();
+        runner.SetWarpSize(Math.Max(1, invocation.WarpX), Math.Max(1, invocation.WarpY));
+        invocation.SetUniforms(runner);
+
+        void AttachHooks()
+        {
+            runner.DebugHookBeforeStatement = options.BeforeStatement is { } before
+                ? node => before(new StatementEvent(node, runner, capture.Length))
+                : null;
+            runner.DebugHookAfterStatement = options.AfterStatement is { } after
+                ? node => after(new StatementEvent(node, runner, capture.Length))
+                : null;
+        }
+
+        try
+        {
+            if (options.ObserveProgramLoad) AttachHooks();
+            var errors = program.LoadInto(runner);
+            if (errors.Count > 0)
+            {
+                string message = string.Join("\n", errors.Select(
+                    d => $"Line {d.Location.Line}, col {d.Location.Column}: {d.Text}"));
+                return RunOutcome.Failure(capture.ToString(), message, null);
+            }
+            if (!options.ObserveProgramLoad) AttachHooks();
+
+            var result = invocation.Execute(runner);
+            return RunOutcome.Success(result, capture.ToString());
+        }
+        catch (Exception ex)
+        {
+            return RunOutcome.Failure(capture.ToString(), ex.Message, ex);
+        }
+        finally
+        {
+            runner.DebugHookBeforeStatement = null;
+            runner.DebugHookAfterStatement = null;
+        }
+    }
+}
