@@ -67,7 +67,8 @@
             _lastReadOnly = debug.IsActive;
             await Editor.SetReadOnly(debug.IsActive);
         }
-        int line = debug.IsActive && debug.Trace != null ? debug.Trace.LineAt(debug.StepIndex) : 0;
+        bool onDebugDoc = debug.IsActive && Store.State.Editor.ActiveDocument?.Id == debug.DebugDocumentId;
+        int line = onDebugDoc && debug.Trace != null ? debug.Trace.LineAt(debug.StepIndex) : 0;
         if (_lastDebugLine != line)
         {
             _lastDebugLine = line;

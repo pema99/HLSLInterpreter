@@ -254,7 +254,26 @@
         await DoRun();
     }
 
-    private void Step(Action navigate) => navigate();
+    private async Task Step(Action navigate)
+    {
+        await EnsureDebugDocumentActive();
+        navigate();
+    }
+
+    private async Task EnsureDebugDocumentActive()
+    {
+        int debugId = Slice.Debug.DebugDocumentId;
+        if (debugId < 0 || Slice.Editor.ActiveDocument?.Id == debugId) return;
+        var documents = Slice.Editor.Documents;
+        for (int i = 0; i < documents.Count; i++)
+        {
+            if (documents[i].Id == debugId)
+            {
+                await EditorDoc.SwitchToAsync(i);
+                return;
+            }
+        }
+    }
 
     [JSInvokable]
     public async Task LoadObjMesh(string objText)
