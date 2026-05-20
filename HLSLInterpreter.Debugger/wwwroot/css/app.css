@@ -559,6 +559,64 @@
 .image-container.gpu-mode #color-canvas { display: none; }
 .image-container.gpu-mode #color-canvas-gpu { display: block; }
 
+.metric-legend-wrap {
+    position: relative;
+    display: flex;
+    flex-shrink: 0;
+}
+.metric-legend {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    width: 220px;
+    background: rgba(30, 30, 30, 0.95);
+    border: 1px solid #3c3c3c;
+    border-radius: 4px;
+    padding: 10px;
+    color: #ddd;
+    font-size: 12px;
+    text-transform: none;
+    letter-spacing: normal;
+    z-index: 10;
+}
+.metric-legend-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: #fff;
+}
+.metric-legend-blurb {
+    line-height: 1.4;
+    margin-bottom: 8px;
+    color: #bbb;
+}
+.metric-legend-bar {
+    height: 12px;
+    border-radius: 2px;
+}
+.metric-legend-scale {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 3px;
+    color: #999;
+}
+.metric-legend-swatches {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.metric-legend-swatch {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.metric-legend-swatch span {
+    width: 14px;
+    height: 14px;
+    border-radius: 2px;
+    border: 1px solid #555;
+    display: inline-block;
+}
+
 /* Debug controls in topbar */
 .debug-controls {
     display: flex;

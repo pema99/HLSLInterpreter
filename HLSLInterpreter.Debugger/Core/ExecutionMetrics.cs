@@ -212,6 +212,28 @@ public sealed class ExecutionMetrics
         _ => ((byte)0, (byte)0, (byte)0),
     };
 
+    public static string TurboCssGradient()
+    {
+        var sb = new System.Text.StringBuilder("linear-gradient(to right");
+        for (int i = 0; i <= 16; i++)
+        {
+            var (r, g, b) = TurboGradient(i / 16f);
+            sb.Append($", rgb({r},{g},{b})");
+        }
+        sb.Append(')');
+        return sb.ToString();
+    }
+
+    public (string Low, string High) ScaleLabels(DebugViewMode mode) => mode switch
+    {
+        DebugViewMode.WarpExecutionDivergence => ("0%", "100%"),
+        DebugViewMode.WarpAverageUtilization => ("0%", "100%"),
+        DebugViewMode.WarpInstructionCount => ("0", WarpTotal.Max().ToString()),
+        DebugViewMode.PixelActiveInstructionCount => ("0", PixelActive.Max().ToString()),
+        DebugViewMode.TextureFetches => ("0", PixelFetches.Max().ToString()),
+        _ => ("", ""),
+    };
+
     // https://gist.github.com/mikhailov-work/ee72ba4191942acecc03fe6da94fc73f
     private static (byte R, byte G, byte B) TurboGradient(float x)
     {
