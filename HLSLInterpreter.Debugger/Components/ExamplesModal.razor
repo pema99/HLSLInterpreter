@@ -1,51 +1,40 @@
-@inherits StateAwareComponent
-@inject IJSRuntime JS
+@inject AppStore Store
+@inject IBrowserInterop Browser
+@inject ImageLibrary Library
+@inject EditorDocumentService EditorDoc
+@inject DebugSessionService DebugSession
+@inject ShaderRunService Run
 
-@if (IsOpen)
-{
-    <div class="modal-overlay" @onclick="Close">
-        <div class="modal-dialog" @onclick:stopPropagation="true" style="max-width: 480px; width: 90vw;">
-            <div class="modal-header">Example shaders</div>
-            <div class="modal-body example-list">
-                @if (_examples == null)
+<div class="modal-overlay" @onclick="Close">
+    <div class="modal-dialog" @onclick:stopPropagation="true" style="max-width: 480px; width: 90vw;">
+        <div class="modal-header">Example shaders</div>
+        <div class="modal-body example-list">
+            @if (_examples == null)
+            {
+                <div class="example-loading">Loading...</div>
+            }
+            else if (_examples.Count == 0)
+            {
+                <div class="example-loading">No examples found.</div>
+            }
+            else
+            {
+                @foreach (var ex in _examples)
                 {
-                    <div class="example-loading">Loading...</div>
+                    <button class="example-item" @onclick="@(() => Pick(ex))">
+                        <span class="example-name">@ex.Name</span>
+                        <span class="example-mode">@FormatMode(ex.Mode)</span>
+                    </button>
                 }
-                else if (_examples.Count == 0)
-                {
-                    <div class="example-loading">No examples found.</div>
-                }
-                else
-                {
-                    @foreach (var ex in _examples)
-                    {
-                        <button class="example-item" @onclick="@(() => Pick(ex))">
-                            <span class="example-name">@ex.Name</span>
-                            <span class="example-mode">@FormatMode(ex.Mode)</span>
-                        </button>
-                    }
-                }
-            </div>
-            <div class="modal-footer">
-                <button class="btn-modal-save" @onclick="Close">Close</button>
-            </div>
+            }
+        </div>
+        <div class="modal-footer">
+            <button class="btn-modal-save" @onclick="Close">Close</button>
         </div>
     </div>
-}
+</div>
 
 @code {
-    [Parameter] public bool IsOpen { get; set; }
-    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
-    [Parameter] public EventCallback<ExampleSelection> OnSelected { get; set; }
-
-    public sealed record ExampleSelection(
-        string Name,
-        string Content,
-        ShaderRenderMode? Mode,
-        string FragEntry,
-        string VertEntry,
-        IReadOnlyList<(string UniformName, string FileName)> Textures);
-
     private const string BaseUrl = "_content/HLSLInterpreter.Debugger/ExampleShaders/";
 
     private sealed class Example
@@ -60,9 +49,10 @@
     }
 
     private List<Example> _examples;
-    private bool _wasOpen;
 
-    private Task Close() => IsOpenChanged.InvokeAsync(false);
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private void Close() => Store.CloseModal();
 
     private static string FormatMode(ShaderRenderMode? mode) => mode switch
     {
@@ -78,19 +68,12 @@
         _ => 2,
     };
 
-    protected override async Task OnParametersSetAsync()
-    {
-        if (IsOpen && !_wasOpen && _examples == null)
-            await LoadAsync();
-        _wasOpen = IsOpen;
-    }
-
     private async Task LoadAsync()
     {
         var entries = new List<Example>();
         try
         {
-            string indexText = await JS.InvokeAsync<string>("dbgFetchText", BaseUrl + "index.txt");
+            string indexText = await Browser.FetchText(BaseUrl + "index.txt");
             var files = indexText.Replace("\r", "").Split('\n')
                 .Select(s => s.Trim()).Where(s => s.Length > 0);
 
@@ -98,7 +81,7 @@
             {
                 try
                 {
-                    string raw = await JS.InvokeAsync<string>("dbgFetchText", BaseUrl + file);
+                    string raw = await Browser.FetchText(BaseUrl + file);
                     var ex = ParseHeader(raw);
                     ex.File = file;
                     if (string.IsNullOrWhiteSpace(ex.Name)) ex.Name = file;
@@ -109,8 +92,7 @@
             entries.Sort((a, b) =>
             {
                 int byMode = ModeOrder(a.Mode).CompareTo(ModeOrder(b.Mode));
-                if (byMode != 0) return byMode;
-                return StringComparer.OrdinalIgnoreCase.Compare(a.Name, b.Name);
+                return byMode != 0 ? byMode : StringComparer.OrdinalIgnoreCase.Compare(a.Name, b.Name);
             });
         }
         catch (Exception e) { Console.WriteLine("[examples] index: " + e.Message); }
@@ -121,8 +103,38 @@
 
     private async Task Pick(Example ex)
     {
-        await IsOpenChanged.InvokeAsync(false);
-        await OnSelected.InvokeAsync(new ExampleSelection(ex.Name, ex.Cleaned, ex.Mode, ex.FragEntry, ex.VertEntry, ex.Textures));
+        Store.CloseModal();
+        if (Store.State.Debug.IsActive) DebugSession.ExitSession();
+        await EditorDoc.LoadContentAsync(ex.Name, ex.Cleaned);
+        if (ex.Mode.HasValue) Store.SetRenderMode(ex.Mode.Value);
+        if (!string.IsNullOrWhiteSpace(ex.FragEntry)) Store.SetFragmentEntryPoint(ex.FragEntry);
+        if (!string.IsNullOrWhiteSpace(ex.VertEntry)) Store.SetVertexEntryPoint(ex.VertEntry);
+
+        var newTextures = new List<TextureBinding>();
+        if (ex.Textures.Count > 0)
+        {
+            await Library.EnsureExamplesLoadingAsync();
+            foreach (var (uniformName, fileName) in ex.Textures)
+            {
+                var src = Library.Examples.FirstOrDefault(t => t.FileName == fileName);
+                if (src == null) continue;
+                await Library.EnsureBytesAsync(src);
+                if (src.Rgba8 == null) continue;
+                newTextures.Add(new TextureBinding
+                {
+                    Name = uniformName,
+                    FileName = src.FileName,
+                    Rgba8 = src.Rgba8,
+                    Width = src.Width,
+                    Height = src.Height,
+                    PreviewDataUrl = src.PreviewDataUrl,
+                });
+            }
+        }
+        Store.SetTextures(newTextures);
+        Store.SetSamplers(new List<SamplerBinding>());
+
+        await Run.RunAsync(await EditorDoc.GetActiveCodeAsync());
     }
 
     private static Example ParseHeader(string content)

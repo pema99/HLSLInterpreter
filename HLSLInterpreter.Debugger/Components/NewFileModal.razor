@@ -1,39 +1,29 @@
-@inherits StateAwareComponent
+@inject AppStore Store
+@inject EditorDocumentService EditorDoc
+@inject DebugSessionService DebugSession
 
-@if (IsOpen)
-{
-    <div class="modal-overlay" @onclick="Close">
-        <div class="modal-dialog" @onclick:stopPropagation="true">
-            <div class="modal-header">New file</div>
-            <div class="modal-body example-list">
-                @foreach (var t in Templates)
-                {
-                    <button class="example-item" @onclick="@(() => Pick(t))">
-                        <span class="example-name">@t.Name</span>
-                        <span class="example-mode">@t.Description</span>
-                    </button>
-                }
-            </div>
-            <div class="modal-footer">
-                <button class="btn-modal-save" @onclick="Close">Close</button>
-            </div>
+<div class="modal-overlay" @onclick="Close">
+    <div class="modal-dialog" @onclick:stopPropagation="true">
+        <div class="modal-header">New file</div>
+        <div class="modal-body example-list">
+            @foreach (var t in Templates)
+            {
+                <button class="example-item" @onclick="@(() => Pick(t))">
+                    <span class="example-name">@t.Name</span>
+                    <span class="example-mode">@t.Description</span>
+                </button>
+            }
+        </div>
+        <div class="modal-footer">
+            <button class="btn-modal-save" @onclick="Close">Close</button>
         </div>
     </div>
-}
+</div>
 
 @code {
-    [Parameter] public bool IsOpen { get; set; }
-    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
-    [Parameter] public EventCallback<NewFileTemplate> OnSelected { get; set; }
-
-    public sealed record NewFileTemplate(
-        string Name,
-        string Description,
-        string FileName,
-        string Content,
-        ShaderRenderMode? Mode,
-        string FragEntry,
-        string VertEntry);
+    private sealed record NewFileTemplate(
+        string Name, string Description, string FileName, string Content,
+        ShaderRenderMode? Mode, string FragEntry, string VertEntry);
 
     private static readonly NewFileTemplate[] Templates =
     {
@@ -66,11 +56,15 @@ float4 frag(VSOut i) : SV_Target
 }
 ";
 
-    private Task Close() => IsOpenChanged.InvokeAsync(false);
+    private void Close() => Store.CloseModal();
 
     private async Task Pick(NewFileTemplate t)
     {
-        await IsOpenChanged.InvokeAsync(false);
-        await OnSelected.InvokeAsync(t);
+        Store.CloseModal();
+        if (Store.State.Debug.IsActive) DebugSession.ExitSession();
+        await EditorDoc.LoadContentAsync(t.FileName, t.Content);
+        if (t.Mode.HasValue) Store.SetRenderMode(t.Mode.Value);
+        if (!string.IsNullOrWhiteSpace(t.FragEntry)) Store.SetFragmentEntryPoint(t.FragEntry);
+        if (!string.IsNullOrWhiteSpace(t.VertEntry)) Store.SetVertexEntryPoint(t.VertEntry);
     }
 }

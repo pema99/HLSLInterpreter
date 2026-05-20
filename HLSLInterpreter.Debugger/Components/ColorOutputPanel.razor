@@ -1,18 +1,59 @@
-@using HLSLInterpreter.Debugger.Services
-@using HLSLInterpreter.Debugger.Core
-@inherits StateAwareComponent
+@inherits StoreComponent<AppState>
+@inject ShaderRunService Run
+@inject EditorDocumentService EditorDoc
+@inject ICanvasInterop Canvas
 
-<div class="debug-section debug-section-image @(IsCollapsed ? "section-collapsed" : "")">
+@{
+    var run = Slice.Run;
+    var config = Slice.Editor.ActiveDocument?.Config ?? new ShaderConfig();
+    bool isGpu = run.Backend == RunBackend.Gpu;
+    bool isRunning = run.Status != RunStatus.Idle;
+    bool isDebugging = Slice.Debug.IsActive;
+    bool collapsed = Slice.Ui.ImageCollapsed;
+    bool showLegend = run.Metrics != null && !isGpu && !isDebugging && run.ViewMode != DebugViewMode.Color;
+}
+<div class="debug-section debug-section-image @(collapsed ? "section-collapsed" : "")">
     <div class="panel-header collapsible-header" @onclick="ToggleCollapsed">
         <div class="panel-header-left">
-            <span class="collapse-icon @(IsCollapsed ? "" : "expanded")">&#x203A;</span>
+            <span class="collapse-icon @(collapsed ? "" : "expanded")">&#x203A;</span>
             <span>Color Output</span>
         </div>
         <div class="panel-header-actions" @onclick:stopPropagation="true">
-            @if (Metrics != null && !IsGpuMode && !IsDebugging)
+            @if (showLegend)
             {
-                <select class="settings-text-input" value="@ViewMode"
-                        @onchange="@(e => OnViewModeChanged(e))">
+                <div class="metric-legend-wrap">
+                    <button class="btn-time-ctrl" title="Legend" @onclick="@(() => legendOpen = !legendOpen)">
+                        <i class="mdi mdi-information-outline"></i>
+                    </button>
+                    @if (legendOpen)
+                    {
+                        <div class="metric-legend">
+                            <div class="metric-legend-title">@ModeTitle(run.ViewMode)</div>
+                            <div class="metric-legend-blurb">@ModeBlurb(run.ViewMode)</div>
+                            @if (run.ViewMode == DebugViewMode.NanDetection)
+                            {
+                                <div class="metric-legend-swatches">
+                                    <div class="metric-legend-swatch"><span style="background:#000"></span>Clean</div>
+                                    <div class="metric-legend-swatch"><span style="background:rgb(255,0,0)"></span>NaN</div>
+                                    <div class="metric-legend-swatch"><span style="background:rgb(255,255,0)"></span>+Infinity</div>
+                                    <div class="metric-legend-swatch"><span style="background:rgb(0,255,255)"></span>-Infinity</div>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="metric-legend-bar" style="background:@ExecutionMetrics.TurboCssGradient()"></div>
+                                <div class="metric-legend-scale">
+                                    <span>@run.Metrics.ScaleLabels(run.ViewMode).Low</span>
+                                    <span>@run.Metrics.ScaleLabels(run.ViewMode).High</span>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+            @if (run.Metrics != null && !isGpu && !isDebugging)
+            {
+                <select class="settings-text-input" value="@run.ViewMode" @onchange="OnViewModeChanged">
                     <option value="@DebugViewMode.Color">Color</option>
                     <option value="@DebugViewMode.WarpExecutionDivergence">Warp execution divergence</option>
                     <option value="@DebugViewMode.WarpInstructionCount">Warp instruction count</option>
@@ -22,84 +63,99 @@
                     <option value="@DebugViewMode.TextureFetches">Texture fetches</option>
                 </select>
             }
-            @if (State.ShaderRenderMode == ShaderRenderMode.VertFrag)
+            @if (config.RenderMode == ShaderRenderMode.VertFrag)
             {
                 <div class="segmented-toggle" role="radiogroup" aria-label="Debug target">
                     <button type="button" role="radio"
-                            aria-checked="@(State.DebugTarget == DebugTarget.Vertex)"
-                            class="segmented-toggle-option @(State.DebugTarget == DebugTarget.Vertex ? "active" : "")"
-                            @onclick="@(() => State.DebugTarget = DebugTarget.Vertex)">Vert</button>
+                            aria-checked="@(config.DebugTarget == DebugTarget.Vertex)"
+                            class="segmented-toggle-option @(config.DebugTarget == DebugTarget.Vertex ? "active" : "")"
+                            @onclick="@(() => Store.SetDebugTarget(DebugTarget.Vertex))">Vert</button>
                     <button type="button" role="radio"
-                            aria-checked="@(State.DebugTarget == DebugTarget.Pixel)"
-                            class="segmented-toggle-option @(State.DebugTarget == DebugTarget.Pixel ? "active" : "")"
-                            @onclick="@(() => State.DebugTarget = DebugTarget.Pixel)">Frag</button>
+                            aria-checked="@(config.DebugTarget == DebugTarget.Pixel)"
+                            class="segmented-toggle-option @(config.DebugTarget == DebugTarget.Pixel ? "active" : "")"
+                            @onclick="@(() => Store.SetDebugTarget(DebugTarget.Pixel))">Frag</button>
                 </div>
             }
-            @if (IsGpuMode)
+            @if (isGpu)
             {
-                <button class="btn-time-ctrl" title="@(GpuPaused ? "Play" : "Pause")" @onclick="OnToggleGpuPause">
-                    <i class="mdi @(GpuPaused ? "mdi-play" : "mdi-pause")"></i>
+                <button class="btn-time-ctrl" title="@(run.GpuPaused ? "Play" : "Pause")" @onclick="Run.ToggleGpuPauseAsync">
+                    <i class="mdi @(run.GpuPaused ? "mdi-play" : "mdi-pause")"></i>
                 </button>
-                <button class="btn-time-ctrl" title="Restart time" @onclick="OnRestartGpuTime">
+                <button class="btn-time-ctrl" title="Restart time" @onclick="Run.RestartGpuTimeAsync">
                     <i class="mdi mdi-restart"></i>
                 </button>
             }
             <label class="settings-toggle panel-header-toggle" title="Use GPU">
-                <input type="checkbox" checked="@State.GpuPreviewEnabled" @onchange="OnGpuToggleChanged"
-                       disabled="@(IsRunning || IsDebugging)" />
+                <input type="checkbox" checked="@run.GpuPreviewEnabled" @onchange="OnGpuToggleChanged"
+                       disabled="@(isRunning || isDebugging)" />
                 <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
                 <span class="panel-header-toggle-label">Use GPU</span>
             </label>
         </div>
     </div>
-    @* Keep canvases mounted even when collapsed so the GPU loop's
-       references stay valid across collapse/expand. *@
-    <div class="image-container @(IsGpuMode ? "gpu-mode" : "")" id="image-container"
-         data-mode-target="regular" style="@(IsCollapsed ? "display:none" : "")"
+    @* Keep canvases mounted even when collapsed so the GPU loop's references stay valid. *@
+    <div class="image-container @(isGpu ? "gpu-mode" : "")" id="image-container"
+         data-mode-target="regular" style="@(collapsed ? "display:none" : "")"
          @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true"
          @oncontextmenu="@(() => {})">
         <canvas class="image-canvas color-canvas-2d"></canvas>
         <canvas id="color-canvas-gpu" class="image-canvas"></canvas>
         <canvas class="image-overlay"></canvas>
     </div>
-    @if (!IsCollapsed)
+    @if (!collapsed)
     {
         <div class="resize-v-handle" title="Drag to resize"></div>
     }
 </div>
 
 @code {
-    [Parameter] public bool IsGpuMode { get; set; }
-    [Parameter] public bool GpuPaused { get; set; }
-    [Parameter] public EventCallback<bool> GpuPreviewEnabledChanged { get; set; }
-    [Parameter] public bool IsRunning { get; set; }
-    [Parameter] public bool IsDebugging { get; set; }
-    [Parameter] public bool IsCollapsed { get; set; }
-    [Parameter] public EventCallback<bool> IsCollapsedChanged { get; set; }
-    [Parameter] public EventCallback OnExpand { get; set; }
-    [Parameter] public EventCallback OnToggleGpuPause { get; set; }
-    [Parameter] public EventCallback OnRestartGpuTime { get; set; }
-    [Parameter] public ExecutionMetrics Metrics { get; set; }
-    [Parameter] public DebugViewMode ViewMode { get; set; }
-    [Parameter] public EventCallback<DebugViewMode> ViewModeChanged { get; set; }
+    protected override AppState Select(AppState s) => s;
 
-    private Task OnViewModeChanged(ChangeEventArgs e)
-    {
-        if (Enum.TryParse<DebugViewMode>(e.Value?.ToString(), out var mode))
-            return ViewModeChanged.InvokeAsync(mode);
-        return Task.CompletedTask;
-    }
+    private bool legendOpen;
 
-    private async Task ToggleCollapsed()
-    {
-        bool wasCollapsed = IsCollapsed;
-        await IsCollapsedChanged.InvokeAsync(!IsCollapsed);
-        if (wasCollapsed) await OnExpand.InvokeAsync();
-    }
+    private void ToggleCollapsed() => Store.SetImageCollapsed(!Slice.Ui.ImageCollapsed);
 
     private async Task OnGpuToggleChanged(ChangeEventArgs e)
     {
-        bool v = e.Value is bool b && b;
-        await GpuPreviewEnabledChanged.InvokeAsync(v);
+        Store.SetGpuPreviewEnabled(e.Value is bool b && b);
+        await Run.RunAsync(await EditorDoc.GetActiveCodeAsync());
     }
+
+    private async Task OnViewModeChanged(ChangeEventArgs e)
+    {
+        if (!Enum.TryParse<DebugViewMode>(e.Value?.ToString(), out var mode)) return;
+        Store.SetViewMode(mode);
+        var run = Slice.Run;
+        if (mode != DebugViewMode.Color && run.Metrics != null)
+        {
+            var pixels = run.Metrics.Render(mode);
+            if (pixels != null) await Canvas.SetPixels(pixels, run.Metrics.CanvasW, run.Metrics.CanvasH);
+        }
+        else if (run.Image != null)
+        {
+            await Canvas.SetPixels(run.Image.Pixels, run.Image.Width, run.Image.Height);
+        }
+    }
+
+    private static string ModeTitle(DebugViewMode mode) => mode switch
+    {
+        DebugViewMode.WarpExecutionDivergence => "Warp execution divergence",
+        DebugViewMode.WarpInstructionCount => "Warp instruction count",
+        DebugViewMode.WarpAverageUtilization => "Warp average utilization",
+        DebugViewMode.PixelActiveInstructionCount => "Pixel active instruction count",
+        DebugViewMode.NanDetection => "NaN detection",
+        DebugViewMode.TextureFetches => "Texture fetches",
+        _ => "",
+    };
+
+    private static string ModeBlurb(DebugViewMode mode) => mode switch
+    {
+        DebugViewMode.WarpExecutionDivergence => "Fraction of executed statements where threads within the warp took different paths. Lower is better.",
+        DebugViewMode.WarpInstructionCount => "Total statements executed per warp, normalized to the busiest warp.",
+        DebugViewMode.WarpAverageUtilization => "Average fraction of inactive threads across the warp's execution. Less red means the warp kept more threads busy.",
+        DebugViewMode.PixelActiveInstructionCount => "Statements executed while this pixel's thread was active, normalized to the busiest pixel.",
+        DebugViewMode.NanDetection => "Highlights pixels whose declared or assigned values became NaN or infinite.",
+        DebugViewMode.TextureFetches => "Texture and buffer fetches per pixel, normalized to the most-fetched pixel.",
+        _ => "",
+    };
 }

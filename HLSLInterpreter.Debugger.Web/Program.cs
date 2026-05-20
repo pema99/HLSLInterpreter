@@ -12,9 +12,6 @@ builder.Services.AddSingleton(new PermalinkOptions { Url = null });
 builder.Services.AddSingleton(new InitialCodeOptions { Code = null });
 builder.Services.AddSingleton(new TabbedEditorOptions { Enabled = false });
 builder.Services.AddSingleton<FileDialogService>();
-builder.Services.AddScoped<DebuggerAppState>();
-builder.Services.AddScoped<RunController>();
-builder.Services.AddScoped<DebugController>();
-builder.Services.AddScoped<ImageLibrary>();
+builder.Services.AddDebuggerServices();
 
 await builder.Build().RunAsync();

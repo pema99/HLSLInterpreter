@@ -1,17 +1,23 @@
 @using HLSL
-@using HLSLInterpreter.Debugger.Core
-@inherits StateAwareComponent
+@inherits StoreComponent<AppState>
+@inject IBrowserInterop Browser
 
 @{
-    var threadStates = Step?.GetThreadStatesAt(State.SelectedFrame) ?? Array.Empty<HLSLExecutionState.ThreadState>();
+    var debug = Slice.Debug;
+    var config = Config;
+    var step = debug.CurrentStep;
+    var threadStates = step?.GetThreadStatesAt(debug.SelectedFrame)
+        ?? Array.Empty<HLSLExecutionState.ThreadState>();
+    bool onlyThreadStates = debug.DebugVertexIndex >= 0;
+    bool showImage = debug.BottomMode is DebugBottomMode.PixelColors or DebugBottomMode.Both;
 }
 <div class="debug-section debug-section-callstack @(collapsed ? "section-collapsed" : "")">
-    <div class="panel-header collapsible-header" @onclick="ToggleCollapsed">
+    <div class="panel-header collapsible-header" @onclick="() => collapsed = !collapsed">
         <div class="panel-header-left">
             <span class="collapse-icon @(collapsed ? "" : "expanded")">&#x203A;</span>
             <span>Call Stack</span>
         </div>
-        @if (!collapsed && threadStates.Length > 0 && Mode == DebugBottomMode.ThreadStates)
+        @if (!collapsed && threadStates.Length > 0 && debug.BottomMode == DebugBottomMode.ThreadStates)
         {
             <span class="thread-legend">
                 <span class="tl-dot tc-active"></span>Active thread
@@ -23,7 +29,7 @@
     {
         <div class="callstack-exec-body">
             <div class="callstack-pane">
-                @if (Step is { } cstep)
+                @if (step is { } cstep)
                 {
                     var stack = cstep.CallStack;
                     <table class="var-table">
@@ -31,8 +37,8 @@
                             @for (int i = 0; i < stack.Length; i++)
                             {
                                 var fi = i;
-                                <tr class="@(fi == State.SelectedFrame ? "callstack-selected" : "")"
-                                    @onclick="() => State.SelectedFrame = fi"
+                                <tr class="@(fi == debug.SelectedFrame ? "callstack-selected" : "")"
+                                    @onclick="() => Store.SetSelectedFrame(fi)"
                                     style="cursor: pointer;">
                                     <td class="var-name">@stack[i]</td>
                                 </tr>
@@ -48,9 +54,6 @@
                     <div class="hint">Use Step or Continue to inspect call stack.</div>
                 }
             </div>
-            @{
-                bool showImage = Mode == DebugBottomMode.PixelColors || Mode == DebugBottomMode.Both;
-            }
             @if (threadStates.Length > 0 || showImage)
             {
                 <div class="resize-inner-h-handle" id="callstack-exec-divider"></div>
@@ -70,25 +73,26 @@
                                 {
                                     var tidx = ti;
                                     var state = threadStates[ti];
-                                    var stateClass = state switch {
-                                        HLSLExecutionState.ThreadState.Active    => "tc-active",
-                                        HLSLExecutionState.ThreadState.Inactive  => "tc-diverged",
+                                    var stateClass = state switch
+                                    {
+                                        HLSLExecutionState.ThreadState.Active => "tc-active",
+                                        HLSLExecutionState.ThreadState.Inactive => "tc-diverged",
                                         HLSLExecutionState.ThreadState.Suspended => "tc-suspended",
-                                        _ => ""
+                                        _ => "",
                                     };
-                                    var label = $"Thread ({ti % State.WarpX}, {ti / State.WarpX}) - {state}";
-                                    <div class="thread-cell @stateClass @(tidx == State.InspectedThread ? "tc-selected" : "")"
+                                    var label = $"Thread ({ti % config.WarpX}, {ti / config.WarpX}) - {state}";
+                                    <div class="thread-cell @stateClass @(tidx == debug.InspectedThread ? "tc-selected" : "")"
                                          title="@label"
-                                         @onclick="() => State.InspectedThread = tidx"></div>
+                                         @onclick="() => Store.SetInspectedThread(tidx)"></div>
                                 }
                             </div>
                         }
                     </div>
-                    @if (!OnlyThreadStates)
+                    @if (!onlyThreadStates)
                     {
                         <div class="bottom-mode-row">
                             <label>Mode</label>
-                            <select value="@Mode" @onchange="OnModeChanged">
+                            <select value="@debug.BottomMode" @onchange="OnModeChanged">
                                 <option value="@DebugBottomMode.ThreadStates">Thread states</option>
                                 <option value="@DebugBottomMode.PixelColors">Pixel colors</option>
                                 <option value="@DebugBottomMode.Both">Both</option>
@@ -103,25 +107,38 @@
 </div>
 
 @code {
-    public enum DebugBottomMode { ThreadStates, PixelColors, Both }
+    protected override AppState Select(AppState s) => s;
 
-    [Parameter] public DebuggerSession.Step Step { get; set; }
-    [Parameter] public DebugBottomMode Mode { get; set; } = DebugBottomMode.ThreadStates;
-    [Parameter] public EventCallback<DebugBottomMode> ModeChanged { get; set; }
-    [Parameter] public EventCallback OnExpand { get; set; }
-    [Parameter] public bool OnlyThreadStates { get; set; }
+    private ShaderConfig Config => Slice.Editor.ActiveDocument?.Config ?? new ShaderConfig();
 
     private bool collapsed;
+    private (int Wx, int Wy, bool Shown) _gridState;
 
-    private async Task ToggleCollapsed()
-    {
-        collapsed = !collapsed;
-        if (!collapsed) await OnExpand.InvokeAsync();
-    }
-
-    private async Task OnModeChanged(ChangeEventArgs e)
+    private void OnModeChanged(ChangeEventArgs e)
     {
         if (Enum.TryParse<DebugBottomMode>(e.Value?.ToString(), out var v))
-            await ModeChanged.InvokeAsync(v);
+            Store.SetBottomMode(v);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        var debug = Slice.Debug;
+        var config = Config;
+        bool gridShown = !collapsed
+            && debug.BottomMode == DebugBottomMode.ThreadStates
+            && (debug.CurrentStep?.GetThreadStatesAt(debug.SelectedFrame).Length ?? 0) > 0;
+        var next = (config.WarpX, config.WarpY, gridShown);
+        if (next == _gridState) return;
+        _gridState = next;
+        if (gridShown)
+            await Browser.InitThreadGridResize("thread-grid-container", config.WarpX, config.WarpY);
+        else
+            await Browser.DisposeThreadGridResize();
+    }
+
+    public override void Dispose()
+    {
+        _ = Browser.DisposeThreadGridResize();
+        base.Dispose();
     }
 }

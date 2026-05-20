@@ -1,137 +1,121 @@
-@inherits StateAwareComponent
-@using HLSLInterpreter.Debugger.Services
-@inject IJSRuntime JS
+@inject AppStore Store
+@inject IBrowserInterop Browser
+@inject IEditorInterop Editor
 
-@if (IsOpen)
-{
-    <div class="modal-overlay" @onclick="Close">
-        <div class="modal-dialog" @onclick:stopPropagation="true">
-            <div class="modal-header">Settings</div>
-            <div class="modal-body">
+@{
+    var config = Store.State.Editor.ActiveDocument?.Config ?? new ShaderConfig();
+    bool locked = Store.State.Run.Status != RunStatus.Idle || Store.State.Debug.IsActive;
+}
+<div class="modal-overlay" @onclick="Close">
+    <div class="modal-dialog" @onclick:stopPropagation="true">
+        <div class="modal-header">Settings</div>
+        <div class="modal-body">
+            <div class="settings-row">
+                <label class="settings-label">Render mode</label>
+                <select class="settings-text-input" value="@config.RenderMode"
+                        @onchange="@(e => SetRenderMode(e.Value?.ToString()))"
+                        disabled="@locked" title="Frag only: Fullscreen quad fragment shader. Vert/Frag: Custom vertex and fragment shader.">
+                    <option value="@ShaderRenderMode.Pixel">Frag only</option>
+                    <option value="@ShaderRenderMode.VertFrag">Vert/Frag</option>
+                </select>
+            </div>
+            @if (config.RenderMode == ShaderRenderMode.VertFrag)
+            {
                 <div class="settings-row">
-                    <label class="settings-label">Render mode</label>
-                    <select class="settings-text-input"
-                            value="@State.ShaderRenderMode"
-                            @onchange="@(e => SetShaderRenderMode(e.Value?.ToString()))"
-                            disabled="@IsLocked" title="Frag only: Fullscreen quad fragment shader. Vert/Frag: Custom vertex and fragment shader.">
-                        <option value="@ShaderRenderMode.Pixel">Frag only</option>
-                        <option value="@ShaderRenderMode.VertFrag">Vert/Frag</option>
-                    </select>
-                </div>
-                @if (State.ShaderRenderMode == ShaderRenderMode.VertFrag)
-                {
-                    <div class="settings-row">
-                        <label class="settings-label">Mesh</label>
-                        <button class="settings-text-input" @onclick="PickMesh" disabled="@IsLocked"
-                                title="Pick a .obj file to use as the mesh">Pick .obj file...</button>
-                    </div>
-                    <div class="settings-row">
-                        <label class="settings-label">Vertex entry</label>
-                        <input class="settings-text-input" type="text"
-                               value="@State.VertexEntryPoint"
-                               @oninput="@(e => State.VertexEntryPoint = e.Value?.ToString() ?? "")"
-                               disabled="@IsLocked" title="Vertex shader function name" />
-                    </div>
-                }
-                <div class="settings-row">
-                    <label class="settings-label">@(State.ShaderRenderMode == ShaderRenderMode.VertFrag ? "Frag entry" : "Entry point")</label>
-                    <input class="settings-text-input" type="text"
-                           value="@State.FragmentEntryPoint"
-                           @oninput="@(e => State.FragmentEntryPoint = e.Value?.ToString() ?? "")"
-                           disabled="@IsLocked" title="Fragment shader function name" />
+                    <label class="settings-label">Mesh</label>
+                    <button class="settings-text-input" @onclick="@(async () => await Browser.PickObj())" disabled="@locked"
+                            title="Pick a .obj file to use as the mesh">Pick .obj file...</button>
                 </div>
                 <div class="settings-row">
-                    <label class="settings-label">Group offset</label>
-                    <div class="warp-control">
-                        <input class="warp-input" type="number" min="0"
-                               value="@State.GroupOffsetX"
-                               @oninput="@(e => SetInt(e, v => State.GroupOffsetX = v))"
-                               disabled="@IsLocked" title="Group X" />
-                        <span class="warp-sep">×</span>
-                        <input class="warp-input" type="number" min="0"
-                               value="@State.GroupOffsetY"
-                               @oninput="@(e => SetInt(e, v => State.GroupOffsetY = v))"
-                               disabled="@IsLocked" title="Group Y" />
-                    </div>
+                    <label class="settings-label">Vertex entry</label>
+                    <input class="settings-text-input" type="text" value="@config.VertexEntryPoint"
+                           @oninput="@(e => Store.SetVertexEntryPoint(e.Value?.ToString() ?? ""))"
+                           disabled="@locked" title="Vertex shader function name" />
                 </div>
-                <div class="settings-row">
-                    <label class="settings-label">Warp size</label>
-                    <div class="warp-control">
-                        <input class="warp-input" type="number" min="1" max="32"
-                               value="@State.WarpX"
-                               @oninput="@(e => SetInt(e, v => State.WarpX = v))"
-                               disabled="@IsLocked" title="Warp X" />
-                        <span class="warp-sep">×</span>
-                        <input class="warp-input" type="number" min="1" max="32"
-                               value="@State.WarpY"
-                               @oninput="@(e => SetInt(e, v => State.WarpY = v))"
-                               disabled="@IsLocked" title="Warp Y" />
-                    </div>
-                </div>
-                <div class="settings-row">
-                    <label class="settings-label">Font size</label>
-                    <select class="settings-text-input"
-                            value="@State.EditorFontSize"
-                            @onchange="OnFontSizeChanged"
-                            title="Editor font size">
-                        @foreach (var size in fontSizes)
-                        {
-                            <option value="@size">@size</option>
-                        }
-                    </select>
-                </div>
-                <div class="settings-row">
-                    <label class="settings-label">CPU run mode</label>
-                    <select class="settings-text-input"
-                            value="@State.CpuMode"
-                            @onchange="OnCpuModeChanged"
-                            disabled="@IsLocked"
-                            title="Single warp: render just the selected warp tile. Full frame: render the entire frame tile by tile. Full frame with execution metrics: also record per-warp and per-pixel stats for the heatmap views (slower).">
-                        <option value="@CpuMode.SingleWarp">Single warp</option>
-                        <option value="@CpuMode.FullFrame">Full frame</option>
-                        <option value="@CpuMode.FullFrameWithMetrics">Full frame with execution metrics</option>
-                    </select>
+            }
+            <div class="settings-row">
+                <label class="settings-label">@(config.RenderMode == ShaderRenderMode.VertFrag ? "Frag entry" : "Entry point")</label>
+                <input class="settings-text-input" type="text" value="@config.FragmentEntryPoint"
+                       @oninput="@(e => Store.SetFragmentEntryPoint(e.Value?.ToString() ?? ""))"
+                       disabled="@locked" title="Fragment shader function name" />
+            </div>
+            <div class="settings-row">
+                <label class="settings-label">Group offset</label>
+                <div class="warp-control">
+                    <input class="warp-input" type="number" min="0" value="@config.GroupOffsetX"
+                           @oninput="@(e => SetInt(e, v => Store.SetGroupOffset(v, config.GroupOffsetY)))"
+                           disabled="@locked" title="Group X" />
+                    <span class="warp-sep">×</span>
+                    <input class="warp-input" type="number" min="0" value="@config.GroupOffsetY"
+                           @oninput="@(e => SetInt(e, v => Store.SetGroupOffset(config.GroupOffsetX, v)))"
+                           disabled="@locked" title="Group Y" />
                 </div>
             </div>
-            <div class="modal-footer">
-                <button class="btn-modal-save" @onclick="Close">Close</button>
+            <div class="settings-row">
+                <label class="settings-label">Warp size</label>
+                <div class="warp-control">
+                    <input class="warp-input" type="number" min="1" max="32" value="@config.WarpX"
+                           @oninput="@(e => SetInt(e, v => Store.SetWarpSize(v, config.WarpY)))"
+                           disabled="@locked" title="Warp X" />
+                    <span class="warp-sep">×</span>
+                    <input class="warp-input" type="number" min="1" max="32" value="@config.WarpY"
+                           @oninput="@(e => SetInt(e, v => Store.SetWarpSize(config.WarpX, v)))"
+                           disabled="@locked" title="Warp Y" />
+                </div>
+            </div>
+            <div class="settings-row">
+                <label class="settings-label">Font size</label>
+                <select class="settings-text-input" value="@Store.State.Editor.FontSize"
+                        @onchange="OnFontSizeChanged" title="Editor font size">
+                    @foreach (var size in fontSizes)
+                    {
+                        <option value="@size">@size</option>
+                    }
+                </select>
+            </div>
+            <div class="settings-row">
+                <label class="settings-label">CPU run mode</label>
+                <select class="settings-text-input" value="@config.CpuMode"
+                        @onchange="OnCpuModeChanged" disabled="@locked"
+                        title="Single warp: render just the selected warp tile. Full frame: render the entire frame tile by tile. Full frame with execution metrics: also record per-warp and per-pixel stats for the heatmap views (slower).">
+                    <option value="@CpuMode.SingleWarp">Single warp</option>
+                    <option value="@CpuMode.FullFrame">Full frame</option>
+                    <option value="@CpuMode.FullFrameWithMetrics">Full frame with execution metrics</option>
+                </select>
             </div>
         </div>
+        <div class="modal-footer">
+            <button class="btn-modal-save" @onclick="Close">Close</button>
+        </div>
     </div>
-}
+</div>
 
 @code {
-    [Parameter] public bool IsOpen { get; set; }
-    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
-    [Parameter] public bool IsLocked { get; set; }
-
     private static readonly int[] fontSizes = { 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36 };
 
-    private Task Close() => IsOpenChanged.InvokeAsync(false);
+    private void Close() => Store.CloseModal();
 
     private static void SetInt(ChangeEventArgs e, Action<int> setter)
     {
         if (int.TryParse(e.Value?.ToString(), out var v)) setter(v);
     }
 
-    private void SetShaderRenderMode(string value)
+    private void SetRenderMode(string value)
     {
-        if (Enum.TryParse<ShaderRenderMode>(value, out var mode)) State.ShaderRenderMode = mode;
+        if (Enum.TryParse<ShaderRenderMode>(value, out var mode)) Store.SetRenderMode(mode);
     }
 
     private void OnCpuModeChanged(ChangeEventArgs e)
     {
-        if (Enum.TryParse<CpuMode>(e.Value?.ToString(), out var mode)) State.CpuMode = mode;
+        if (Enum.TryParse<CpuMode>(e.Value?.ToString(), out var mode)) Store.SetCpuMode(mode);
     }
-
-    private Task PickMesh() => JS.InvokeVoidAsync("dbgPickObj").AsTask();
 
     private async Task OnFontSizeChanged(ChangeEventArgs e)
     {
         if (int.TryParse(e.Value?.ToString(), out int size))
         {
-            State.EditorFontSize = size;
-            await JS.InvokeVoidAsync("setMonacoFontSize", size);
+            Store.SetFontSize(size);
+            await Editor.SetFontSize(size);
         }
     }
 }

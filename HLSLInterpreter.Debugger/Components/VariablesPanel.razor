@@ -1,6 +1,5 @@
 @using HLSL
-@using HLSLInterpreter.Debugger.Core
-@inherits StateAwareComponent
+@inherits StoreComponent<DebugState>
 
 <div class="debug-section debug-section-vars @(collapsed ? "section-collapsed" : "")">
     <div class="panel-header collapsible-header" @onclick="() => collapsed = !collapsed">
@@ -12,9 +11,9 @@
     @if (!collapsed)
     {
         <div class="output-body debug-vars-body">
-            @if (Step is { } step)
+            @if (Slice.CurrentStep is { } step)
             {
-                var localFrameIdx = Math.Clamp(State.SelectedFrame, 0, Math.Max(0, step.FrameVariables.Length - 1));
+                var localFrameIdx = Math.Clamp(Slice.SelectedFrame, 0, Math.Max(0, step.FrameVariables.Length - 1));
                 var locals = localFrameIdx < step.FrameVariables.Length ? step.FrameVariables[localFrameIdx] : null;
                 var globals = step.GlobalVariables;
 
@@ -60,7 +59,7 @@
                                             <span class="var-toggle-spacer"></span>
                                         }
                                         <span class="var-row-name" title="@row.Name">@row.Name</span>
-                                        <span class="var-row-value">@HLSLValueFormatter.Format(row.Value, State.InspectedThread)</span>
+                                        <span class="var-row-value">@HLSLValueFormatter.Format(row.Value, Slice.InspectedThread)</span>
                                     </div>
                                 }
                             }
@@ -87,7 +86,7 @@
                                             <span class="var-toggle-spacer"></span>
                                         }
                                         <span class="var-row-name" title="@row.Name">@row.Name</span>
-                                        <span class="var-row-value">@HLSLValueFormatter.Format(row.Value, State.InspectedThread)</span>
+                                        <span class="var-row-value">@HLSLValueFormatter.Format(row.Value, Slice.InspectedThread)</span>
                                     </div>
                                 }
                             }
@@ -105,7 +104,7 @@
 </div>
 
 @code {
-    [Parameter] public DebuggerSession.Step Step { get; set; }
+    protected override DebugState Select(AppState s) => s.Debug;
 
     private bool collapsed;
     private bool localsCollapsed;

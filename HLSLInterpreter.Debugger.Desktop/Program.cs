@@ -22,10 +22,7 @@ if (args.Length > 0 && File.Exists(args[0]))
 builder.Services.AddSingleton(new InitialCodeOptions { Code = initialCode, Name = initialName, Path = args.Length > 0 ? args[0] : null });
 builder.Services.AddSingleton(new TabbedEditorOptions { Enabled = true });
 builder.Services.AddSingleton<FileDialogService, WpfFileDialogService>();
-builder.Services.AddScoped<DebuggerAppState>();
-builder.Services.AddScoped<RunController>();
-builder.Services.AddScoped<DebugController>();
-builder.Services.AddScoped<ImageLibrary>();
+builder.Services.AddDebuggerServices();
 
 builder.Window.UseTitle("HLSL Interpreter");
 builder.Window.UseWidth(1600);

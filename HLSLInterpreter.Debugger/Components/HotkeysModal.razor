@@ -1,44 +1,40 @@
-@if (IsOpen)
-{
-    <div class="modal-overlay" @onclick="Close">
-        <div class="modal-dialog" @onclick:stopPropagation="true" style="max-width: 420px; width: 90vw;">
-            <div class="modal-header">Hotkeys</div>
-            <div class="modal-body">
-                @foreach (var group in Groups)
-                {
-                    <div class="modal-section-title">@group.Title</div>
-                    <table class="hotkeys-table">
-                        @foreach (var (keys, desc) in group.Items)
-                        {
-                            <tr>
-                                <td class="hotkeys-keys">
-                                    @for (int i = 0; i < keys.Length; i++)
+@inject AppStore Store
+
+<div class="modal-overlay" @onclick="Close">
+    <div class="modal-dialog" @onclick:stopPropagation="true" style="max-width: 420px; width: 90vw;">
+        <div class="modal-header">Hotkeys</div>
+        <div class="modal-body">
+            @foreach (var group in Groups)
+            {
+                <div class="modal-section-title">@group.Title</div>
+                <table class="hotkeys-table">
+                    @foreach (var (keys, desc) in group.Items)
+                    {
+                        <tr>
+                            <td class="hotkeys-keys">
+                                @for (int i = 0; i < keys.Length; i++)
+                                {
+                                    if (i > 0)
                                     {
-                                        if (i > 0)
-                                        {
-                                            <span class="hotkeys-plus">+</span>
-                                        }
-                                        <kbd>@keys[i]</kbd>
+                                        <span class="hotkeys-plus">+</span>
                                     }
-                                </td>
-                                <td class="hotkeys-desc">@desc</td>
-                            </tr>
-                        }
-                    </table>
-                }
-            </div>
-            <div class="modal-footer">
-                <button class="btn-modal-save" @onclick="Close">Close</button>
-            </div>
+                                    <kbd>@keys[i]</kbd>
+                                }
+                            </td>
+                            <td class="hotkeys-desc">@desc</td>
+                        </tr>
+                    }
+                </table>
+            }
+        </div>
+        <div class="modal-footer">
+            <button class="btn-modal-save" @onclick="Close">Close</button>
         </div>
     </div>
-}
+</div>
 
 @code {
-    [Parameter] public bool IsOpen { get; set; }
-    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
-
-    private Task Close() => IsOpenChanged.InvokeAsync(false);
+    private void Close() => Store.CloseModal();
 
     private record HotkeyGroup(string Title, (string[] Keys, string Desc)[] Items);
 
