@@ -180,7 +180,9 @@
         try
         {
             string objText = await Browser.FetchText("_content/HLSLInterpreter.Debugger/lib/monkey.obj");
-            Store.SetMesh(Mesh.ParseObj(objText));
+            var mesh = Mesh.ParseObj(objText);
+            EditorDoc.DefaultMesh = mesh;
+            Store.SetMesh(mesh);
         }
         catch (Exception ex) { Console.WriteLine("[default-mesh] " + ex.Message); }
     }

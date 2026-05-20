@@ -1,3 +1,4 @@
+using HLSLInterpreter.Debugger.Core;
 using HLSLInterpreter.Debugger.Interop;
 using HLSLInterpreter.Debugger.State;
 
@@ -13,6 +14,10 @@ public sealed class EditorDocumentService
     private readonly bool _tabsEnabled;
 
     private int _nextId;
+
+    // Mesh that newly created documents start with. Set once the monkey .obj
+    // has loaded at startup.
+    public Mesh DefaultMesh { get; set; } = Mesh.CreateCube();
 
     public EditorDocumentService(
         AppStore store, IEditorInterop editor, FileDialogService fileDialogs, TabbedEditorOptions tabbedEditor)
@@ -32,7 +37,7 @@ public sealed class EditorDocumentService
             Name = name,
             Path = path,
             Code = code,
-            Config = config ?? new ShaderConfig(),
+            Config = config ?? new ShaderConfig { Mesh = DefaultMesh },
         };
 
     public async Task<string> GetActiveCodeAsync()
