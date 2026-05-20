@@ -15,4 +15,8 @@ public sealed class ExecutionOptions
     // Attach the hooks before the program is loaded so global initializers are
     // observed. The trace recorder needs this, plain runs and metrics do not.
     public bool ObserveProgramLoad { get; init; }
+
+    // Redirect Console.Out for this run. Disabled for tiled full-frame tiles,
+    // where one outer redirect spans all tiles instead.
+    public bool CaptureConsole { get; init; } = true;
 }

@@ -13,45 +13,46 @@ public sealed class ShaderExecutor
         ExecutionOptions options)
     {
         options ??= ExecutionOptions.None;
-        using var capture = new ConsoleCapture();
-
-        runner.Reset();
-        runner.SetWarpSize(Math.Max(1, invocation.WarpX), Math.Max(1, invocation.WarpY));
-        invocation.SetUniforms(runner);
+        ConsoleCapture capture = options.CaptureConsole ? new ConsoleCapture() : null;
 
         void AttachHooks()
         {
             runner.DebugHookBeforeStatement = options.BeforeStatement is { } before
-                ? node => before(new StatementEvent(node, runner, capture.Length))
+                ? node => before(new StatementEvent(node, runner, capture?.Length ?? 0))
                 : null;
             runner.DebugHookAfterStatement = options.AfterStatement is { } after
-                ? node => after(new StatementEvent(node, runner, capture.Length))
+                ? node => after(new StatementEvent(node, runner, capture?.Length ?? 0))
                 : null;
         }
 
         try
         {
+            runner.Reset();
+            runner.SetWarpSize(Math.Max(1, invocation.WarpX), Math.Max(1, invocation.WarpY));
+            invocation.SetUniforms(runner);
+
             if (options.ObserveProgramLoad) AttachHooks();
             var errors = program.LoadInto(runner);
             if (errors.Count > 0)
             {
                 string message = string.Join("\n", errors.Select(
                     d => $"Line {d.Location.Line}, col {d.Location.Column}: {d.Text}"));
-                return RunOutcome.Failure(capture.ToString(), message, null);
+                return RunOutcome.Failure(capture?.ToString() ?? "", message, null);
             }
             if (!options.ObserveProgramLoad) AttachHooks();
 
             var result = invocation.Execute(runner);
-            return RunOutcome.Success(result, capture.ToString());
+            return RunOutcome.Success(result, capture?.ToString() ?? "");
         }
         catch (Exception ex)
         {
-            return RunOutcome.Failure(capture.ToString(), ex.Message, ex);
+            return RunOutcome.Failure(capture?.ToString() ?? "", ex.Message, ex);
         }
         finally
         {
             runner.DebugHookBeforeStatement = null;
             runner.DebugHookAfterStatement = null;
+            capture?.Dispose();
         }
     }
 }
