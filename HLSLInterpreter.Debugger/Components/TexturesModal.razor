@@ -1,8 +1,6 @@
-@inject AppStore Store
+@inject MvuProgram Program
 @inject ImageLibrary Library
 @inject IBrowserInterop Browser
-@inject EditorDocumentService EditorDoc
-@inject ShaderRunService Run
 
 <div class="modal-overlay" @onclick="Close">
     <div class="modal-dialog" @onclick:stopPropagation="true" style="max-width: 480px; width: 90vw; max-height: 85vh;">
@@ -93,12 +91,12 @@
 
     protected override void OnInitialized()
     {
-        var config = Store.State.Editor.ActiveDocument?.Config ?? new ShaderConfig();
+        var config = Program.Model.Editor.ActiveDocument?.Config ?? new ShaderConfig();
         textures = config.Textures.Select(t => t.Clone()).ToList();
         samplers = config.Samplers.Select(s => s.Clone()).ToList();
     }
 
-    private void Close() => Store.CloseModal();
+    private void Close() => Program.Dispatch(new ModalDismissed());
 
     private async Task PickImage(int idx)
     {
@@ -135,11 +133,5 @@
         t.PreviewDataUrl = src.PreviewDataUrl;
     }
 
-    private async Task Save()
-    {
-        Store.SetTextures(textures);
-        Store.SetSamplers(samplers);
-        Store.CloseModal();
-        await Run.RunAsync(await EditorDoc.GetActiveCodeAsync());
-    }
+    private void Save() => Program.Dispatch(new TexturesSaved(textures, samplers));
 }

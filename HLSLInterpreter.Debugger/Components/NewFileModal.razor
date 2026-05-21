@@ -1,6 +1,4 @@
-@inject AppStore Store
-@inject EditorDocumentService EditorDoc
-@inject DebugSessionService DebugSession
+@inject MvuProgram Program
 
 <div class="modal-overlay" @onclick="Close">
     <div class="modal-dialog" @onclick:stopPropagation="true">
@@ -56,15 +54,8 @@ float4 frag(VSOut i) : SV_Target
 }
 ";
 
-    private void Close() => Store.CloseModal();
+    private void Close() => Program.Dispatch(new ModalDismissed());
 
-    private async Task Pick(NewFileTemplate t)
-    {
-        Store.CloseModal();
-        if (Store.State.Debug.IsActive) DebugSession.ExitSession();
-        await EditorDoc.LoadContentAsync(t.FileName, t.Content);
-        if (t.Mode.HasValue) Store.SetRenderMode(t.Mode.Value);
-        if (!string.IsNullOrWhiteSpace(t.FragEntry)) Store.SetFragmentEntryPoint(t.FragEntry);
-        if (!string.IsNullOrWhiteSpace(t.VertEntry)) Store.SetVertexEntryPoint(t.VertEntry);
-    }
+    private void Pick(NewFileTemplate t) =>
+        Program.Dispatch(new NewFileRequested(t.FileName, t.Content, t.Mode, t.FragEntry, t.VertEntry));
 }

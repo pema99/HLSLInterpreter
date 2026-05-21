@@ -36,7 +36,6 @@ public sealed record OpenFileDialog : Cmd;
 public sealed record SaveFileDialog(string Code, string CurrentPath, bool AsNew) : Cmd;
 public sealed record DownloadFile(string FileName, string Content) : Cmd;
 public sealed record PickObjFile : Cmd;
-public sealed record LoadDefaultMesh : Cmd;
 public sealed record CopyToClipboard(string Text) : Cmd;
 
 // ---- Canvas ----

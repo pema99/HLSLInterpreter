@@ -74,13 +74,14 @@ public static class Update
         TabMoveRequested x => (MoveDoc(m, x.From, x.Desired), None),
         ObjPickRequested => (m, Cmds(new PickObjFile())),
         ObjMeshLoaded x => ObjMesh(m, x.ObjText),
-        OpenFileRequested => (m, Cmds(new OpenFileDialog())),
+        OpenFileRequested => (m with { Ui = m.Ui with { MenuOpen = false } }, Cmds(new OpenFileDialog())),
         FileOpened x => (m, Cmds(new FetchEditorText(code => new FileOpenedWithCode(code, x.Path, x.Content)))),
         FileOpenedWithCode x => FileOpen(m, x),
         FileDropped x => (m, Cmds(new FetchEditorText(
             code => new FileDroppedWithCode(code, x.Name, x.Content, x.Path)))),
         FileDroppedWithCode x => FileDrop(m, x),
-        SaveFileRequested x => (m, Cmds(new FetchEditorText(code => new SaveFileWithCode(code, x.AsNew)))),
+        SaveFileRequested x => (m with { Ui = m.Ui with { MenuOpen = false } },
+            Cmds(new FetchEditorText(code => new SaveFileWithCode(code, x.AsNew)))),
         SaveFileWithCode x => (SyncActiveCode(m, x.Code),
             Cmds(new SaveFileDialog(x.Code, ActiveDocPath(m), x.AsNew))),
         FileSaved x => (WithActiveDoc(m, d => d with
@@ -184,7 +185,7 @@ public static class Update
             },
             Run = m.Run with { GpuPreviewEnabled = applied.GpuPreviewEnabled },
         };
-        return (next, Cmds(new LoadDefaultMesh()));
+        return (next, None);
     }
 
     // ---- Run ----

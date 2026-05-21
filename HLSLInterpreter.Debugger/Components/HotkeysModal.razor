@@ -1,4 +1,4 @@
-@inject AppStore Store
+@inject MvuProgram Program
 
 <div class="modal-overlay" @onclick="Close">
     <div class="modal-dialog" @onclick:stopPropagation="true" style="max-width: 420px; width: 90vw;">
@@ -34,7 +34,7 @@
 </div>
 
 @code {
-    private void Close() => Store.CloseModal();
+    private void Close() => Program.Dispatch(new ModalDismissed());
 
     private record HotkeyGroup(string Title, (string[] Keys, string Desc)[] Items);
 

@@ -1,9 +1,6 @@
-@inject AppStore Store
+@inject MvuProgram Program
 @inject IBrowserInterop Browser
 @inject ImageLibrary Library
-@inject EditorDocumentService EditorDoc
-@inject DebugSessionService DebugSession
-@inject ShaderRunService Run
 
 <div class="modal-overlay" @onclick="Close">
     <div class="modal-dialog" @onclick:stopPropagation="true" style="max-width: 480px; width: 90vw;">
@@ -52,7 +49,7 @@
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
-    private void Close() => Store.CloseModal();
+    private void Close() => Program.Dispatch(new ModalDismissed());
 
     private static string FormatMode(ShaderRenderMode? mode) => mode switch
     {
@@ -103,13 +100,6 @@
 
     private async Task Pick(Example ex)
     {
-        Store.CloseModal();
-        if (Store.State.Debug.IsActive) DebugSession.ExitSession();
-        await EditorDoc.LoadContentAsync(ex.Name, ex.Cleaned);
-        if (ex.Mode.HasValue) Store.SetRenderMode(ex.Mode.Value);
-        if (!string.IsNullOrWhiteSpace(ex.FragEntry)) Store.SetFragmentEntryPoint(ex.FragEntry);
-        if (!string.IsNullOrWhiteSpace(ex.VertEntry)) Store.SetVertexEntryPoint(ex.VertEntry);
-
         var newTextures = new List<TextureBinding>();
         if (ex.Textures.Count > 0)
         {
@@ -131,10 +121,8 @@
                 });
             }
         }
-        Store.SetTextures(newTextures);
-        Store.SetSamplers(new List<SamplerBinding>());
-
-        await Run.RunAsync(await EditorDoc.GetActiveCodeAsync());
+        Program.Dispatch(new ExampleLoaded(
+            ex.Name, ex.Cleaned, ex.Mode, ex.FragEntry, ex.VertEntry, newTextures, new List<SamplerBinding>()));
     }
 
     private static Example ParseHeader(string content)

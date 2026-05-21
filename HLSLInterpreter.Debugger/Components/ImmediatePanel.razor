@@ -1,7 +1,4 @@
-@using HLSL
-@inherits StoreComponent<AppState>
-@inject DebugSessionService DebugSession
-@inject IBrowserInterop Browser
+@inherits ProgramComponent<DebugState>
 
 <div class="debug-section debug-section-immediate @(collapsed ? "section-collapsed" : "")">
     <div class="panel-header collapsible-header" @onclick="() => collapsed = !collapsed">
@@ -13,14 +10,14 @@
     @if (!collapsed)
     {
         <div class="output-body imm-body">
-            @if (history.Count == 0)
+            @if (Slice.ImmediateHistory.Count == 0)
             {
                 <div class="hint">Evaluate expressions in the current scope.</div>
             }
             else
             {
                 <div class="imm-history">
-                    @foreach (var entry in history)
+                    @foreach (var entry in Slice.ImmediateHistory)
                     {
                         <div class="imm-entry">
                             <div class="imm-expr"><span class="imm-prompt">&gt;</span> @entry.Expression</div>
@@ -40,74 +37,28 @@
                    @bind="immediateInput" @bind:event="oninput"
                    @onkeydown="OnImmediateKeyDown" />
             <button class="imm-eval-btn" @onclick="Evaluate"
-                    disabled="@(Slice.Debug.Trace == null || Slice.Debug.StepIndex < 0)">Eval</button>
+                    disabled="@(Slice.Trace == null || Slice.StepIndex < 0)">Eval</button>
         </div>
         <div class="resize-v-handle" title="Drag to resize"></div>
     }
 </div>
 
 @code {
-    protected override AppState Select(AppState s) => s;
+    protected override DebugState Select(AppState s) => s.Debug;
 
     private bool collapsed;
     private string immediateInput = "";
-    private List<ImmediateEntry> history = new();
 
-    private sealed class ImmediateEntry
+    private void OnImmediateKeyDown(KeyboardEventArgs e)
     {
-        public string Expression { get; init; } = "";
-        public string Result { get; init; } = "";
-        public bool IsError { get; init; }
-        public string ImageDataUrl { get; init; }
+        if (e.Key == "Enter") Evaluate();
     }
 
-    private async Task OnImmediateKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter") await Evaluate();
-    }
-
-    private async Task Evaluate()
+    private void Evaluate()
     {
         string expr = immediateInput.Trim();
-        if (string.IsNullOrEmpty(expr) || Slice.Debug.Trace == null || Slice.Debug.StepIndex < 0) return;
+        if (string.IsNullOrEmpty(expr) || Slice.Trace == null || Slice.StepIndex < 0) return;
         immediateInput = "";
-
-        var result = await DebugSession.EvaluateExpressionAsync(expr);
-
-        string resultStr;
-        bool isError;
-        string imageDataUrl = null;
-        if (result.Error != null)
-        {
-            resultStr = result.Error;
-            isError = true;
-        }
-        else
-        {
-            var config = Slice.Editor.ActiveDocument?.Config ?? new ShaderConfig();
-            int wx = Math.Max(1, config.WarpX);
-            int wy = Math.Max(1, config.WarpY);
-            int inspected = Slice.Debug.InspectedThread;
-            resultStr = HLSLValueFormatter.Format(result.Value, inspected);
-            isError = false;
-
-            var resolved = result.Value is ReferenceValue rv ? rv.Get() : result.Value;
-            byte[] rgba = null;
-            try { rgba = ValueImageRenderer.RenderVariableImage(resolved, wx, wy); }
-            catch { }
-            if (rgba != null)
-            {
-                try { imageDataUrl = await Browser.RgbaToDataUrl(rgba, wx, wy, inspected % wx, inspected / wx, 0.7); }
-                catch { }
-            }
-        }
-
-        history.Add(new ImmediateEntry
-        {
-            Expression = expr, Result = resultStr, IsError = isError, ImageDataUrl = imageDataUrl,
-        });
-        StateHasChanged();
-        await Task.Yield();
-        await Browser.ScrollImmediateToBottom();
+        Dispatch(new ImmediateEvalRequested(expr));
     }
 }

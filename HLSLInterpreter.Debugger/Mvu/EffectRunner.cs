@@ -25,7 +25,6 @@ public sealed partial class EffectRunner : IEffectRunner
     private readonly FileDialogService _fileDialogs;
 
     private readonly HLSLRunner _runner = new();
-    private volatile bool _cancelRequested;
 
     // Set once by the shell so the GPU render loop can report click-to-debug
     // back into .NET.
@@ -64,7 +63,7 @@ public sealed partial class EffectRunner : IEffectRunner
 
                 case RunCpu c: await RunCpuEffect(c, dispatch); break;
                 case RunGpu c: await RunGpuEffect(c, dispatch); break;
-                case CancelRun: _cancelRequested = true; break;
+                case CancelRun: CancelRunEffect(); break;
                 case RenderViewMode c: await RenderViewModeEffect(c); break;
                 case SetGpuPaused c: await SetGpuPausedEffect(c.Paused); break;
                 case RestartGpuTime: await Try(() => _gpu.Restart()); break;
@@ -76,7 +75,6 @@ public sealed partial class EffectRunner : IEffectRunner
                 case SaveFileDialog c: await SaveFileDialogEffect(c, dispatch); break;
                 case DownloadFile c: await Try(() => _browser.DownloadTextFile(c.FileName, c.Content)); break;
                 case PickObjFile: await Try(() => _browser.PickObj()); break;
-                case LoadDefaultMesh: await LoadDefaultMeshEffect(dispatch); break;
                 case CopyToClipboard c: await Try(() => _browser.CopyToClipboard(c.Text)); break;
 
                 case SyncCanvas c: await SyncCanvasEffect(c.Projection); break;

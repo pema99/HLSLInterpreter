@@ -6,19 +6,12 @@ using UnityShaderParser.HLSL;
 namespace HLSLInterpreter.Debugger.Services;
 
 // Gathers the per-frame inputs a ShaderInvocation needs (canvas size, camera
-// matrices, mouse) from the GPU interop. The MVU effect runner passes the
-// model-derived inputs explicitly; the legacy store-based overloads are kept
-// until the old services are removed.
+// matrices, mouse) from the GPU interop. Everything model-derived is passed in.
 public sealed class ShaderInvocationBuilder
 {
-    private readonly AppStore _store;
     private readonly IGpuInterop _gpu;
 
-    public ShaderInvocationBuilder(AppStore store, IGpuInterop gpu)
-    {
-        _store = store;
-        _gpu = gpu;
-    }
+    public ShaderInvocationBuilder(IGpuInterop gpu) => _gpu = gpu;
 
     public async Task<ShaderInvocation> BuildAsync(ShaderConfig config, FrameCapture captured, int debugVertexIndex)
     {
@@ -64,13 +57,4 @@ public sealed class ShaderInvocationBuilder
         {
             BasePath = docPath != null ? System.IO.Path.GetDirectoryName(docPath) ?? "" : "",
         };
-
-    public Task<ShaderInvocation> BuildAsync()
-    {
-        var config = _store.State.Editor.ActiveDocument?.Config ?? new ShaderConfig();
-        return BuildAsync(config, _store.State.Run.CapturedFrame, _store.State.Debug.DebugVertexIndex);
-    }
-
-    public HLSLParserConfig MakeParserConfig() =>
-        MakeParserConfig(_store.State.Editor.ActiveDocument?.Path);
 }

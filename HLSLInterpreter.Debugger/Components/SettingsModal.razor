@@ -1,10 +1,8 @@
-@inject AppStore Store
-@inject IBrowserInterop Browser
-@inject IEditorInterop Editor
+@inherits ProgramComponent<AppState>
 
 @{
-    var config = Store.State.Editor.ActiveDocument?.Config ?? new ShaderConfig();
-    bool locked = Store.State.Run.Status != RunStatus.Idle || Store.State.Debug.IsActive;
+    var config = Slice.Editor.ActiveDocument?.Config ?? new ShaderConfig();
+    bool locked = Slice.Run.Status != RunStatus.Idle || Slice.Debug.IsActive;
 }
 <div class="modal-overlay" @onclick="Close">
     <div class="modal-dialog" @onclick:stopPropagation="true">
@@ -23,31 +21,31 @@
             {
                 <div class="settings-row">
                     <label class="settings-label">Mesh</label>
-                    <button class="settings-text-input" @onclick="@(async () => await Browser.PickObj())" disabled="@locked"
+                    <button class="settings-text-input" @onclick="@(() => Dispatch(new ObjPickRequested()))" disabled="@locked"
                             title="Pick a .obj file to use as the mesh">Pick .obj file...</button>
                 </div>
                 <div class="settings-row">
                     <label class="settings-label">Vertex entry</label>
                     <input class="settings-text-input" type="text" value="@config.VertexEntryPoint"
-                           @oninput="@(e => Store.SetVertexEntryPoint(e.Value?.ToString() ?? ""))"
+                           @oninput="@(e => Dispatch(new VertexEntryChanged(e.Value?.ToString() ?? "")))"
                            disabled="@locked" title="Vertex shader function name" />
                 </div>
             }
             <div class="settings-row">
                 <label class="settings-label">@(config.RenderMode == ShaderRenderMode.VertFrag ? "Frag entry" : "Entry point")</label>
                 <input class="settings-text-input" type="text" value="@config.FragmentEntryPoint"
-                       @oninput="@(e => Store.SetFragmentEntryPoint(e.Value?.ToString() ?? ""))"
+                       @oninput="@(e => Dispatch(new FragmentEntryChanged(e.Value?.ToString() ?? "")))"
                        disabled="@locked" title="Fragment shader function name" />
             </div>
             <div class="settings-row">
                 <label class="settings-label">Group offset</label>
                 <div class="warp-control">
                     <input class="warp-input" type="number" min="0" value="@config.GroupOffsetX"
-                           @oninput="@(e => SetInt(e, v => Store.SetGroupOffset(v, config.GroupOffsetY)))"
+                           @oninput="@(e => SetInt(e, v => Dispatch(new GroupOffsetChanged(v, config.GroupOffsetY))))"
                            disabled="@locked" title="Group X" />
                     <span class="warp-sep">×</span>
                     <input class="warp-input" type="number" min="0" value="@config.GroupOffsetY"
-                           @oninput="@(e => SetInt(e, v => Store.SetGroupOffset(config.GroupOffsetX, v)))"
+                           @oninput="@(e => SetInt(e, v => Dispatch(new GroupOffsetChanged(config.GroupOffsetX, v))))"
                            disabled="@locked" title="Group Y" />
                 </div>
             </div>
@@ -55,17 +53,17 @@
                 <label class="settings-label">Warp size</label>
                 <div class="warp-control">
                     <input class="warp-input" type="number" min="1" max="32" value="@config.WarpX"
-                           @oninput="@(e => SetInt(e, v => Store.SetWarpSize(v, config.WarpY)))"
+                           @oninput="@(e => SetInt(e, v => Dispatch(new WarpSizeChanged(v, config.WarpY))))"
                            disabled="@locked" title="Warp X" />
                     <span class="warp-sep">×</span>
                     <input class="warp-input" type="number" min="1" max="32" value="@config.WarpY"
-                           @oninput="@(e => SetInt(e, v => Store.SetWarpSize(config.WarpX, v)))"
+                           @oninput="@(e => SetInt(e, v => Dispatch(new WarpSizeChanged(config.WarpX, v))))"
                            disabled="@locked" title="Warp Y" />
                 </div>
             </div>
             <div class="settings-row">
                 <label class="settings-label">Font size</label>
-                <select class="settings-text-input" value="@Store.State.Editor.FontSize"
+                <select class="settings-text-input" value="@Slice.Editor.FontSize"
                         @onchange="OnFontSizeChanged" title="Editor font size">
                     @foreach (var size in fontSizes)
                     {
@@ -91,9 +89,11 @@
 </div>
 
 @code {
+    protected override AppState Select(AppState s) => s;
+
     private static readonly int[] fontSizes = { 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36 };
 
-    private void Close() => Store.CloseModal();
+    private void Close() => Dispatch(new ModalDismissed());
 
     private static void SetInt(ChangeEventArgs e, Action<int> setter)
     {
@@ -102,20 +102,16 @@
 
     private void SetRenderMode(string value)
     {
-        if (Enum.TryParse<ShaderRenderMode>(value, out var mode)) Store.SetRenderMode(mode);
+        if (Enum.TryParse<ShaderRenderMode>(value, out var mode)) Dispatch(new RenderModeChanged(mode));
     }
 
     private void OnCpuModeChanged(ChangeEventArgs e)
     {
-        if (Enum.TryParse<CpuMode>(e.Value?.ToString(), out var mode)) Store.SetCpuMode(mode);
+        if (Enum.TryParse<CpuMode>(e.Value?.ToString(), out var mode)) Dispatch(new CpuModeChanged(mode));
     }
 
-    private async Task OnFontSizeChanged(ChangeEventArgs e)
+    private void OnFontSizeChanged(ChangeEventArgs e)
     {
-        if (int.TryParse(e.Value?.ToString(), out int size))
-        {
-            Store.SetFontSize(size);
-            await Editor.SetFontSize(size);
-        }
+        if (int.TryParse(e.Value?.ToString(), out int size)) Dispatch(new FontSizeChanged(size));
     }
 }

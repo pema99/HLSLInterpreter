@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Threading.Channels;
 using HLSL;
 using HLSLInterpreter.Debugger.Core;
@@ -10,11 +11,28 @@ namespace HLSLInterpreter.Debugger.Mvu;
 
 // Run effects: GPU preview, CPU single-warp, and CPU tiled full-frame. The
 // tiled run is detached so it can dispatch progress messages (it becomes
-// cancellable, then finishes) while the dispatch pump stays free.
+// cancellable, then finishes) while the dispatch pump stays free. Each run owns
+// a cancellation source; starting a run cancels the previous one.
 public sealed partial class EffectRunner
 {
+    private CancellationTokenSource _runCts;
+
+    private CancellationTokenSource BeginRun()
+    {
+        var previous = _runCts;
+        _runCts = new CancellationTokenSource();
+        try { previous?.Cancel(); } catch { }
+        return _runCts;
+    }
+
+    private void CancelRunEffect()
+    {
+        try { _runCts?.Cancel(); } catch { }
+    }
+
     private async Task RunCpuEffect(RunCpu c, Action<Msg> dispatch)
     {
+        var cts = BeginRun();
         try { await _gpu.Stop(); } catch { }
         RuntimeMemory.Reclaim();
 
@@ -24,7 +42,7 @@ public sealed partial class EffectRunner
 
         if (c.Config.CpuMode != CpuMode.SingleWarp)
         {
-            _ = RunCpuFullFrameSafe(c, parserConfig, wx, wy, dispatch);
+            _ = RunCpuFullFrameSafe(c, parserConfig, wx, wy, dispatch, cts);
             return;
         }
 
@@ -56,9 +74,9 @@ public sealed partial class EffectRunner
     }
 
     private async Task RunCpuFullFrameSafe(
-        RunCpu c, HLSLParserConfig parserConfig, int wx, int wy, Action<Msg> dispatch)
+        RunCpu c, HLSLParserConfig parserConfig, int wx, int wy, Action<Msg> dispatch, CancellationTokenSource cts)
     {
-        try { await RunCpuFullFrame(c, parserConfig, wx, wy, dispatch); }
+        try { await RunCpuFullFrame(c, parserConfig, wx, wy, dispatch, cts); }
         catch (Exception ex)
         {
             dispatch(new RunFinished("", new RunError(ex.Message, ex), null, null));
@@ -66,7 +84,7 @@ public sealed partial class EffectRunner
     }
 
     private async Task RunCpuFullFrame(
-        RunCpu c, HLSLParserConfig parserConfig, int wx, int wy, Action<Msg> dispatch)
+        RunCpu c, HLSLParserConfig parserConfig, int wx, int wy, Action<Msg> dispatch, CancellationTokenSource cts)
     {
         var (canvasW, canvasH) = await GetCanvasSizeAsync(wx, wy);
         var invocation = (await _invocationBuilder.BuildAsync(c.Config, null, -1))
@@ -85,20 +103,15 @@ public sealed partial class EffectRunner
             ? new ExecutionMetrics(canvasW, canvasH, wx, wy)
             : null;
 
-        _cancelRequested = false;
         dispatch(new RunBecameCancellable());
 
         RunOutcome tileError;
         string output;
         using (var capture = new ConsoleCapture())
         {
-            try
-            {
-                tileError = OperatingSystem.IsBrowser()
-                    ? await RunTilesSerial(c.Code, parserConfig, invocation, wx, wy, canvasW, canvasH, tilesX, tilesY, fullPixels, metrics)
-                    : await RunTilesParallel(c.Code, parserConfig, invocation, wx, wy, canvasW, canvasH, tilesX, tilesY, fullPixels, metrics);
-            }
-            finally { _cancelRequested = false; }
+            tileError = OperatingSystem.IsBrowser()
+                ? await RunTilesSerial(c.Code, parserConfig, invocation, wx, wy, canvasW, canvasH, tilesX, tilesY, fullPixels, metrics, cts)
+                : await RunTilesParallel(c.Code, parserConfig, invocation, wx, wy, canvasW, canvasH, tilesX, tilesY, fullPixels, metrics, cts);
             output = capture.ToString();
         }
 
@@ -115,7 +128,7 @@ public sealed partial class EffectRunner
     private async Task<RunOutcome> RunTilesSerial(
         string code, HLSLParserConfig parserConfig, ShaderInvocation invocation,
         int wx, int wy, int canvasW, int canvasH, int tilesX, int tilesY,
-        byte[] fullPixels, ExecutionMetrics metrics)
+        byte[] fullPixels, ExecutionMetrics metrics, CancellationTokenSource cts)
     {
         var program = ShaderProgram.FromParsedNodes(ShaderProgram.Parse(code, parserConfig));
         var runner = new HLSLRunner();
@@ -123,7 +136,7 @@ public sealed partial class EffectRunner
         {
             for (int tx = 0; tx < tilesX; tx++)
             {
-                if (_cancelRequested) return null;
+                if (cts.IsCancellationRequested) return null;
                 var outcome = RenderTile(runner, program, invocation, tx, ty, metrics);
                 if (outcome.HasError) return outcome;
                 var tilePixels = ValueImageRenderer.TryExtractImage(outcome.Result, wx, wy);
@@ -139,7 +152,7 @@ public sealed partial class EffectRunner
     private async Task<RunOutcome> RunTilesParallel(
         string code, HLSLParserConfig parserConfig, ShaderInvocation invocation,
         int wx, int wy, int canvasW, int canvasH, int tilesX, int tilesY,
-        byte[] fullPixels, ExecutionMetrics metrics)
+        byte[] fullPixels, ExecutionMetrics metrics, CancellationTokenSource cts)
     {
         var workQueue = Channel.CreateUnbounded<(int tx, int ty)>();
         for (int ty = 0; ty < tilesY; ty++)
@@ -160,7 +173,7 @@ public sealed partial class EffectRunner
                 var program = ShaderProgram.FromParsedNodes(ShaderProgram.Parse(code, parserConfig));
                 await foreach (var (tx, ty) in workQueue.Reader.ReadAllAsync())
                 {
-                    if (_cancelRequested) break;
+                    if (cts.IsCancellationRequested) break;
                     var outcome = RenderTile(runner, program, invocation, tx, ty, metrics);
                     await results.Writer.WriteAsync((tx, ty, outcome));
                 }
@@ -174,10 +187,10 @@ public sealed partial class EffectRunner
         {
             if (outcome.HasError)
             {
-                error ??= outcome;
-                _cancelRequested = true;
+                if (error == null) { error = outcome; try { cts.Cancel(); } catch { } }
                 continue;
             }
+            if (cts.IsCancellationRequested) continue;
             var tilePixels = ValueImageRenderer.TryExtractImage(outcome.Result, wx, wy);
             if (tilePixels == null) continue;
             BlitTile(tilePixels, tx * wx, ty * wy, wx, wy, canvasW, canvasH, fullPixels);
@@ -255,6 +268,7 @@ public sealed partial class EffectRunner
 
     private async Task RunGpuEffect(RunGpu c, Action<Msg> dispatch)
     {
+        BeginRun();
         try { await _gpu.Stop(); } catch { }
         RuntimeMemory.Reclaim();
 

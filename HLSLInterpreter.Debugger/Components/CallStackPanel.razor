@@ -1,5 +1,5 @@
 @using HLSL
-@inherits StoreComponent<AppState>
+@inherits ProgramComponent<AppState>
 @inject IBrowserInterop Browser
 
 @{
@@ -38,7 +38,7 @@
                             {
                                 var fi = i;
                                 <tr class="@(fi == debug.SelectedFrame ? "callstack-selected" : "")"
-                                    @onclick="() => Store.SetSelectedFrame(fi)"
+                                    @onclick="() => Dispatch(new SelectedFrameChanged(fi))"
                                     style="cursor: pointer;">
                                     <td class="var-name">@stack[i]</td>
                                 </tr>
@@ -83,7 +83,7 @@
                                     var label = $"Thread ({ti % config.WarpX}, {ti / config.WarpX}) - {state}";
                                     <div class="thread-cell @stateClass @(tidx == debug.InspectedThread ? "tc-selected" : "")"
                                          title="@label"
-                                         @onclick="() => Store.SetInspectedThread(tidx)"></div>
+                                         @onclick="() => Dispatch(new InspectedThreadChanged(tidx))"></div>
                                 }
                             </div>
                         }
@@ -117,7 +117,7 @@
     private void OnModeChanged(ChangeEventArgs e)
     {
         if (Enum.TryParse<DebugBottomMode>(e.Value?.ToString(), out var v))
-            Store.SetBottomMode(v);
+            Dispatch(new BottomModeChanged(v));
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

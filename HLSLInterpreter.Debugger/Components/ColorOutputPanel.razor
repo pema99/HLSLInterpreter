@@ -1,7 +1,4 @@
-@inherits StoreComponent<AppState>
-@inject ShaderRunService Run
-@inject EditorDocumentService EditorDoc
-@inject ICanvasInterop Canvas
+@inherits ProgramComponent<AppState>
 
 @{
     var run = Slice.Run;
@@ -13,7 +10,7 @@
     bool showLegend = run.Metrics != null && !isGpu && !isDebugging && run.ViewMode != DebugViewMode.Color;
 }
 <div class="debug-section debug-section-image @(collapsed ? "section-collapsed" : "")">
-    <div class="panel-header collapsible-header" @onclick="ToggleCollapsed">
+    <div class="panel-header collapsible-header" @onclick="@(() => Dispatch(new ImageCollapseToggled()))">
         <div class="panel-header-left">
             <span class="collapse-icon @(collapsed ? "" : "expanded")">&#x203A;</span>
             <span>Color Output</span>
@@ -69,19 +66,19 @@
                     <button type="button" role="radio"
                             aria-checked="@(config.DebugTarget == DebugTarget.Vertex)"
                             class="segmented-toggle-option @(config.DebugTarget == DebugTarget.Vertex ? "active" : "")"
-                            @onclick="@(() => Store.SetDebugTarget(DebugTarget.Vertex))">Vert</button>
+                            @onclick="@(() => Dispatch(new DebugTargetChanged(DebugTarget.Vertex)))">Vert</button>
                     <button type="button" role="radio"
                             aria-checked="@(config.DebugTarget == DebugTarget.Pixel)"
                             class="segmented-toggle-option @(config.DebugTarget == DebugTarget.Pixel ? "active" : "")"
-                            @onclick="@(() => Store.SetDebugTarget(DebugTarget.Pixel))">Frag</button>
+                            @onclick="@(() => Dispatch(new DebugTargetChanged(DebugTarget.Pixel)))">Frag</button>
                 </div>
             }
             @if (isGpu)
             {
-                <button class="btn-time-ctrl" title="@(run.GpuPaused ? "Play" : "Pause")" @onclick="Run.ToggleGpuPauseAsync">
+                <button class="btn-time-ctrl" title="@(run.GpuPaused ? "Play" : "Pause")" @onclick="@(() => Dispatch(new GpuPauseToggled()))">
                     <i class="mdi @(run.GpuPaused ? "mdi-play" : "mdi-pause")"></i>
                 </button>
-                <button class="btn-time-ctrl" title="Restart time" @onclick="Run.RestartGpuTimeAsync">
+                <button class="btn-time-ctrl" title="Restart time" @onclick="@(() => Dispatch(new GpuTimeRestartRequested()))">
                     <i class="mdi mdi-restart"></i>
                 </button>
             }
@@ -113,28 +110,13 @@
 
     private bool legendOpen;
 
-    private void ToggleCollapsed() => Store.SetImageCollapsed(!Slice.Ui.ImageCollapsed);
+    private void OnGpuToggleChanged(ChangeEventArgs e) =>
+        Dispatch(new GpuPreviewToggled(e.Value is bool b && b));
 
-    private async Task OnGpuToggleChanged(ChangeEventArgs e)
+    private void OnViewModeChanged(ChangeEventArgs e)
     {
-        Store.SetGpuPreviewEnabled(e.Value is bool b && b);
-        await Run.RunAsync(await EditorDoc.GetActiveCodeAsync());
-    }
-
-    private async Task OnViewModeChanged(ChangeEventArgs e)
-    {
-        if (!Enum.TryParse<DebugViewMode>(e.Value?.ToString(), out var mode)) return;
-        Store.SetViewMode(mode);
-        var run = Slice.Run;
-        if (mode != DebugViewMode.Color && run.Metrics != null)
-        {
-            var pixels = run.Metrics.Render(mode);
-            if (pixels != null) await Canvas.SetPixels(pixels, run.Metrics.CanvasW, run.Metrics.CanvasH);
-        }
-        else if (run.Image != null)
-        {
-            await Canvas.SetPixels(run.Image.Pixels, run.Image.Width, run.Image.Height);
-        }
+        if (Enum.TryParse<DebugViewMode>(e.Value?.ToString(), out var mode))
+            Dispatch(new ViewModeChanged(mode));
     }
 
     private static string ModeTitle(DebugViewMode mode) => mode switch

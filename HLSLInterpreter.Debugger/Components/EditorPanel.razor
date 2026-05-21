@@ -1,28 +1,25 @@
 @using HLSL
 @using Microsoft.JSInterop
-@inherits StoreComponent<AppState>
+@inherits ProgramComponent<EditorState>
 @inject IEditorInterop Editor
-@inject EditorDocumentService EditorDoc
-@inject DebugSessionService DebugSession
-@inject TabbedEditorOptions TabbedEditor
 
 <div class="editor-panel">
-    @if (TabbedEditor.Enabled)
+    @if (Slice.TabsEnabled)
     {
         <div class="editor-tabs panel-header-tabs">
-            @{ var docs = Slice.Editor.Documents; }
+            @{ var docs = Slice.Documents; }
             @for (int i = 0; i < docs.Count; i++)
             {
                 var idx = i;
-                <div class="editor-tab @(idx == Slice.Editor.ActiveIndex ? "active" : "")"
+                <div class="editor-tab @(idx == Slice.ActiveIndex ? "active" : "")"
                      draggable="true"
-                     @onclick="() => EditorDoc.SwitchToAsync(idx)"
+                     @onclick="() => Dispatch(new TabSwitchRequested(idx))"
                      @ondragstart="() => _draggedTab = idx"
                      @ondragover:preventDefault="true"
                      @ondrop="(e) => OnTabDrop(e, idx)"
                      @ondragend="() => _draggedTab = -1">
                     @docs[idx].Name
-                    <span class="editor-tab-close" @onclick="() => CloseTab(idx)" @onclick:stopPropagation>&#x2715;</span>
+                    <span class="editor-tab-close" @onclick="() => Dispatch(new TabCloseRequested(idx))" @onclick:stopPropagation>&#x2715;</span>
                 </div>
             }
             <div class="editor-tabs-rest"
@@ -42,52 +39,18 @@
 @code {
     [Parameter] public EventCallback OnReady { get; set; }
 
-    protected override AppState Select(AppState s) => s;
+    protected override EditorState Select(AppState s) => s.Editor;
 
     private DotNetObjectReference<EditorPanel> _selfRef;
     private int _draggedTab = -1;
 
-    private bool? _lastReadOnly;
-    private int _lastDebugLine = -1;
-    private IReadOnlySet<int> _lastBreakpoints;
-
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
-        {
-            _selfRef = DotNetObjectReference.Create(this);
-            await Editor.Init("monaco-container", Slice.Editor.ActiveDocument?.Code ?? "", _selfRef);
-            await Editor.SetFontSize(Slice.Editor.FontSize);
-            await OnReady.InvokeAsync();
-        }
-
-        var debug = Store.State.Debug;
-        if (_lastReadOnly != debug.IsActive)
-        {
-            _lastReadOnly = debug.IsActive;
-            await Editor.SetReadOnly(debug.IsActive);
-        }
-        bool onDebugDoc = debug.IsActive && Store.State.Editor.ActiveDocument?.Id == debug.DebugDocumentId;
-        int line = onDebugDoc && debug.Trace != null ? debug.Trace.LineAt(debug.StepIndex) : 0;
-        if (_lastDebugLine != line)
-        {
-            _lastDebugLine = line;
-            await Editor.HighlightLine(line);
-        }
-        if (!ReferenceEquals(_lastBreakpoints, debug.Breakpoints))
-        {
-            _lastBreakpoints = debug.Breakpoints;
-            await Editor.SetBreakpoints(debug.Breakpoints.ToArray());
-        }
-    }
-
-    private async Task CloseTab(int index)
-    {
-        var docs = Store.State.Editor.Documents;
-        if (index >= 0 && index < docs.Count && Store.State.Debug.IsActive
-            && docs[index].Id == Store.State.Debug.DebugDocumentId)
-            DebugSession.ExitSession();
-        await EditorDoc.CloseTabAsync(index);
+        if (!firstRender) return;
+        _selfRef = DotNetObjectReference.Create(this);
+        await Editor.Init("monaco-container", Slice.ActiveDocument?.Code ?? "", _selfRef);
+        await Editor.SetFontSize(Slice.FontSize);
+        await OnReady.InvokeAsync();
     }
 
     private async Task OnTabDrop(DragEventArgs e, int targetIndex)
@@ -95,21 +58,21 @@
         int from = _draggedTab;
         _draggedTab = -1;
         if (from < 0) return;
-        bool after = await EditorDoc.IsTabDropAfterAsync(targetIndex, e.ClientX);
-        EditorDoc.MoveTab(from, after ? targetIndex + 1 : targetIndex);
+        bool after = await Editor.IsTabDropAfter(targetIndex, e.ClientX);
+        Dispatch(new TabMoveRequested(from, after ? targetIndex + 1 : targetIndex));
     }
 
     private void OnTabDropEnd()
     {
         int from = _draggedTab;
         _draggedTab = -1;
-        if (from >= 0) EditorDoc.MoveTab(from, Store.State.Editor.Documents.Count);
+        if (from >= 0) Dispatch(new TabMoveRequested(from, Slice.Documents.Count));
     }
 
     [JSInvokable]
     public HoverInfo GetHoverInfo(string identifier)
     {
-        var debug = Store.State.Debug;
+        var debug = Program.Model.Debug;
         if (!debug.IsActive || debug.CurrentStep is not { } step) return null;
 
         HLSLValue value = null;
@@ -119,7 +82,7 @@
             value = global;
         if (value == null) return null;
 
-        var config = Store.State.Editor.ActiveDocument?.Config ?? new ShaderConfig();
+        var config = Program.Model.Editor.ActiveDocument?.Config ?? new ShaderConfig();
         int wx = Math.Max(1, config.WarpX);
         int wy = Math.Max(1, config.WarpY);
         var resolved = value is ReferenceValue rv ? rv.Get() : value;
@@ -146,11 +109,7 @@
     }
 
     [JSInvokable]
-    public async Task ToggleBreakpoint(int line)
-    {
-        Store.ToggleBreakpoint(line);
-        await Editor.SetBreakpoints(Store.State.Debug.Breakpoints.ToArray());
-    }
+    public void ToggleBreakpoint(int line) => Dispatch(new BreakpointToggled(line));
 
     public override void Dispose()
     {

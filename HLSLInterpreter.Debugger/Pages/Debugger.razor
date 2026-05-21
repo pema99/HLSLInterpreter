@@ -1,16 +1,12 @@
 @page "/"
-@inherits StoreComponent<AppState>
-@implements IDisposable
-@inject ShaderRunService Run
-@inject DebugSessionService DebugSession
-@inject EditorDocumentService EditorDoc
-@inject PermalinkService Permalink
-@inject JsProjectionService Projection
-@inject IBrowserInterop Browser
+@inherits ProgramComponent<AppState>
 @inject NavigationManager Nav
 @inject InitialCodeOptions InitialCode
 @inject PermalinkOptions PermalinkBase
 @inject TabbedEditorOptions TabbedEditor
+@inject IBrowserInterop Browser
+@inject FileDialogService FileDialogs
+@inject EffectRunner Effects
 @using Microsoft.JSInterop
 
 @{
@@ -28,32 +24,32 @@
     <header class="topbar">
         <div class="topbar-left">
             <div class="menu-button-wrap">
-                <button class="btn-menu" @onclick="@(() => Store.SetMenuOpen(!ui.MenuOpen))" title="Menu"><i class="mdi mdi-menu"></i></button>
+                <button class="btn-menu" @onclick="@(() => Dispatch(new MenuToggled()))" title="Menu"><i class="mdi mdi-menu"></i></button>
                 @if (ui.MenuOpen)
                 {
-                    <div class="menu-backdrop" @onclick="@(() => Store.SetMenuOpen(false))"></div>
+                    <div class="menu-backdrop" @onclick="@(() => Dispatch(new MenuClosed()))"></div>
                     <div class="menu-dropdown">
                         @if (TabbedEditor.Enabled)
                         {
-                            <button class="menu-item" @onclick="@(() => OpenModal(ModalKind.NewFile))">New file</button>
-                            <button class="menu-item" @onclick="MenuOpenFile">Open file</button>
-                            <button class="menu-item" @onclick="MenuSaveFileAs">Save as</button>
-                            <button class="menu-item" @onclick="MenuSaveFile">Save</button>
+                            <button class="menu-item" @onclick="@(() => Dispatch(new ModalRequested(ModalKind.NewFile)))">New file</button>
+                            <button class="menu-item" @onclick="@(() => Dispatch(new OpenFileRequested()))">Open file</button>
+                            <button class="menu-item" @onclick="@(() => Dispatch(new SaveFileRequested(true)))">Save as</button>
+                            <button class="menu-item" @onclick="@(() => Dispatch(new SaveFileRequested(false)))">Save</button>
                             <div class="menu-divider"></div>
                         }
-                        <button class="menu-item" @onclick="@(() => OpenModal(ModalKind.Examples))">Example shaders</button>
-                        <button class="menu-item" @onclick="@(() => OpenModal(ModalKind.ShaderToyImport))">Import ShaderToy</button>
-                        <button class="menu-item menu-item-toggle" @onclick="ToggleBonzomatic">
+                        <button class="menu-item" @onclick="@(() => Dispatch(new ModalRequested(ModalKind.Examples)))">Example shaders</button>
+                        <button class="menu-item" @onclick="@(() => Dispatch(new ModalRequested(ModalKind.ShaderToyImport)))">Import ShaderToy</button>
+                        <button class="menu-item menu-item-toggle" @onclick="@(() => Dispatch(new BonzomaticToggled()))">
                             <span>Bonzomatic mode</span>
                             <span class="menu-item-check">@(ui.BonzomaticMode ? "✓" : "")</span>
                         </button>
                         <div class="menu-divider"></div>
-                        <button class="menu-item" @onclick="MenuCopyPermalink">Copy permalink</button>
-                        <button class="menu-item" @onclick="MenuDownload">Download current file</button>
+                        <button class="menu-item" @onclick="CopyPermalink">Copy permalink</button>
+                        <button class="menu-item" @onclick="@(() => Dispatch(new DownloadRequested()))">Download current file</button>
                         <div class="menu-divider"></div>
-                        <button class="menu-item" @onclick="@(() => OpenModal(ModalKind.Hotkeys))">Hotkeys</button>
-                        <button class="menu-item" @onclick="@(() => OpenModal(ModalKind.Textures))">Textures</button>
-                        <button class="menu-item" @onclick="@(() => OpenModal(ModalKind.Settings))">Settings</button>
+                        <button class="menu-item" @onclick="@(() => Dispatch(new ModalRequested(ModalKind.Hotkeys)))">Hotkeys</button>
+                        <button class="menu-item" @onclick="@(() => Dispatch(new ModalRequested(ModalKind.Textures)))">Textures</button>
+                        <button class="menu-item" @onclick="@(() => Dispatch(new ModalRequested(ModalKind.Settings)))">Settings</button>
                     </div>
                 }
             </div>
@@ -64,25 +60,25 @@
             @if (debugging)
             {
                 <div class="debug-controls">
-                    <button class="btn-dbg btn-dbg-continue" data-dbg="continue" @onclick="@(() => Step(Store.ContinueToBreakpoint))" disabled="@(!canFwd)" title="Continue (F5)"><i class="mdi mdi-play-outline"></i></button>
-                    <button class="btn-dbg" data-dbg="step-over" @onclick="@(() => Step(Store.StepOver))" disabled="@(!canFwd)" title="Step over (F10)"><i class="mdi mdi-debug-step-over"></i></button>
-                    <button class="btn-dbg" data-dbg="step-in" @onclick="@(() => Step(Store.StepForward))" disabled="@(!canFwd)" title="Step in (F11)"><i class="mdi mdi-debug-step-into icon-step-into"></i></button>
-                    <button class="btn-dbg" data-dbg="step-out" @onclick="@(() => Step(Store.StepOut))" disabled="@(!canFwd)" title="Step out (F12)"><i class="mdi mdi-debug-step-out icon-step-out"></i></button>
+                    <button class="btn-dbg btn-dbg-continue" data-dbg="continue" @onclick="@(() => Dispatch(new StepRequested(StepKind.Continue)))" disabled="@(!canFwd)" title="Continue (F5)"><i class="mdi mdi-play-outline"></i></button>
+                    <button class="btn-dbg" data-dbg="step-over" @onclick="@(() => Dispatch(new StepRequested(StepKind.Over)))" disabled="@(!canFwd)" title="Step over (F10)"><i class="mdi mdi-debug-step-over"></i></button>
+                    <button class="btn-dbg" data-dbg="step-in" @onclick="@(() => Dispatch(new StepRequested(StepKind.In)))" disabled="@(!canFwd)" title="Step in (F11)"><i class="mdi mdi-debug-step-into icon-step-into"></i></button>
+                    <button class="btn-dbg" data-dbg="step-out" @onclick="@(() => Dispatch(new StepRequested(StepKind.Out)))" disabled="@(!canFwd)" title="Step out (F12)"><i class="mdi mdi-debug-step-out icon-step-out"></i></button>
                     <div class="dbg-controls-sep"></div>
-                    <button class="btn-dbg btn-dbg-continue-back" data-dbg="continue-back" @onclick="@(() => Step(Store.ContinueToBreakpointBack))" disabled="@(!canBack)" title="Continue back (Shift+F5)"><i class="mdi mdi-play-outline btn-icon-mirror"></i></button>
-                    <button class="btn-dbg" data-dbg="step-over-back" @onclick="@(() => Step(Store.StepOverBack))" disabled="@(!canBack)" title="Step over back (Shift+F10)"><i class="mdi mdi-debug-step-over btn-icon-mirror"></i></button>
-                    <button class="btn-dbg" data-dbg="step-in-back" @onclick="@(() => Step(Store.StepBack))" disabled="@(!canBack)" title="Step in back (Shift+F11)"><i class="mdi mdi-debug-step-into icon-step-into-back"></i></button>
-                    <button class="btn-dbg" data-dbg="step-out-back" @onclick="@(() => Step(Store.StepOutBack))" disabled="@(!canBack)" title="Step out back (Shift+F12)"><i class="mdi mdi-debug-step-out icon-step-out-back"></i></button>
+                    <button class="btn-dbg btn-dbg-continue-back" data-dbg="continue-back" @onclick="@(() => Dispatch(new StepRequested(StepKind.ContinueBack)))" disabled="@(!canBack)" title="Continue back (Shift+F5)"><i class="mdi mdi-play-outline btn-icon-mirror"></i></button>
+                    <button class="btn-dbg" data-dbg="step-over-back" @onclick="@(() => Dispatch(new StepRequested(StepKind.OverBack)))" disabled="@(!canBack)" title="Step over back (Shift+F10)"><i class="mdi mdi-debug-step-over btn-icon-mirror"></i></button>
+                    <button class="btn-dbg" data-dbg="step-in-back" @onclick="@(() => Dispatch(new StepRequested(StepKind.InBack)))" disabled="@(!canBack)" title="Step in back (Shift+F11)"><i class="mdi mdi-debug-step-into icon-step-into-back"></i></button>
+                    <button class="btn-dbg" data-dbg="step-out-back" @onclick="@(() => Dispatch(new StepRequested(StepKind.OutBack)))" disabled="@(!canBack)" title="Step out back (Shift+F12)"><i class="mdi mdi-debug-step-out icon-step-out-back"></i></button>
                 </div>
             }
         </div>
 
         <div class="topbar-right">
             <div class="share-button-wrap">
-                <button class="btn-share" @onclick="MenuCopyPermalink" title="Copy permalink to clipboard"><i class="mdi mdi-share-variant"></i></button>
-                @if (permalinkCopied)
+                <button class="btn-share" @onclick="CopyPermalink" title="Copy permalink to clipboard"><i class="mdi mdi-share-variant"></i></button>
+                @if (ui.PermalinkToastVisible)
                 {
-                    <span class="permalink-toast" @key="permalinkToastKey">Permalink copied to clipboard</span>
+                    <span class="permalink-toast">Permalink copied to clipboard</span>
                 }
             </div>
             <button class="btn-run" @onclick="RunOrCancel"
@@ -99,11 +95,11 @@
             </button>
             @if (debugging)
             {
-                <button class="btn-stop" @onclick="ExitDebug" title="Stop debugging"><i class="mdi mdi-stop"></i></button>
+                <button class="btn-stop" @onclick="@(() => Dispatch(new DebugExitRequested()))" title="Stop debugging"><i class="mdi mdi-stop"></i></button>
             }
             else
             {
-                <button class="btn-debug-start" @onclick="StartDebug" disabled="@running" title="Debug (record execution trace)"><i class="mdi mdi-bug-outline"></i></button>
+                <button class="btn-debug-start" @onclick="@(() => Dispatch(new DebugRequested()))" disabled="@running" title="Debug (record execution trace)"><i class="mdi mdi-bug-outline"></i></button>
             }
         </div>
     </header>
@@ -148,21 +144,20 @@
 
     private DotNetObjectReference<Debugger> _dotNetRef;
     private string _pendingShaderToy;
-    private bool permalinkCopied;
-    private int permalinkToastKey;
 
     protected override void OnInitialized()
     {
         base.OnInitialized();
         _dotNetRef = DotNetObjectReference.Create(this);
+        Effects.DotNetRef = _dotNetRef;
 
-        string code = InitialCode.Code ?? DefaultShader.Code;
-        var codeParam = PermalinkCodec.GetQueryParam(Nav.Uri, "c");
-        if (!string.IsNullOrEmpty(codeParam))
-        {
-            try { code = PermalinkCodec.DecompressCode(codeParam); }
-            catch { }
-        }
+        if (TabbedEditor.Enabled)
+            FileDialogs.FileDropped = (name, content, path) =>
+            {
+                Dispatch(new FileDropped(name, content, path));
+                return Task.CompletedTask;
+            };
+
         var shaderToyParam = PermalinkCodec.GetQueryParam(Nav.Uri, "shadertoy");
         if (!string.IsNullOrEmpty(shaderToyParam))
         {
@@ -170,19 +165,17 @@
             catch (Exception ex) { Console.WriteLine("[shadertoy-url] decode failed: " + ex.Message); }
         }
 
-        var document = EditorDoc.NewDocument(InitialCode.Name ?? "new.hlsl", code, InitialCode.Path);
-        Store.SetDocuments(new[] { document }, 0);
-        Permalink.ApplyUrlToStore(Nav.Uri);
+        Dispatch(new AppStarted(Nav.Uri, InitialCode.Code, InitialCode.Name, InitialCode.Path, TabbedEditor.Enabled));
     }
 
+    // Load the monkey mesh before the first render so the auto-run on editor
+    // ready already has it. The fetch is plain prep for a single dispatch.
     protected override async Task OnInitializedAsync()
     {
         try
         {
             string objText = await Browser.FetchText("_content/HLSLInterpreter.Debugger/lib/monkey.obj");
-            var mesh = Mesh.ParseObj(objText);
-            EditorDoc.DefaultMesh = mesh;
-            Store.SetMesh(mesh);
+            Dispatch(new DefaultMeshLoaded(Mesh.ParseObj(objText)));
         }
         catch (Exception ex) { Console.WriteLine("[default-mesh] " + ex.Message); }
     }
@@ -192,9 +185,7 @@
         if (firstRender)
         {
             await Browser.SetDebuggerRef(_dotNetRef);
-            Run.DotNetRef = _dotNetRef;
-            Projection.Start();
-            await Projection.ProjectAsync();
+            Dispatch(new CanvasReady());
         }
     }
 
@@ -207,186 +198,39 @@
             try
             {
                 string hlsl = await Browser.TranspileGlsl(glsl);
-                await EditorDoc.LoadContentAsync("shadertoy.hlsl", hlsl);
-                Store.SetRenderMode(ShaderRenderMode.Pixel);
-                Store.SetFragmentEntryPoint("frag");
+                Dispatch(new ShaderToyImported(hlsl));
+                return;
             }
             catch (Exception ex) { Console.WriteLine("[shadertoy-url] " + ex.Message); }
         }
-        await DoRun();
+        Dispatch(new RunRequested());
     }
 
-    private Task RunOrCancel()
+    private void RunOrCancel()
     {
-        if (Slice.Run.Status == RunStatus.Cancellable)
-        {
-            Run.RequestCancel();
-            return Task.CompletedTask;
-        }
-        return DoRun();
+        if (Slice.Run.Status == RunStatus.Cancellable) Dispatch(new RunCancelRequested());
+        else Dispatch(new RunRequested());
     }
 
-    private async Task DoRun()
+    private void CopyPermalink()
     {
-        Store.SetImageCollapsed(false);
-        await Run.RunAsync(await EditorDoc.GetActiveCodeAsync());
-    }
-
-    private async Task StartDebug()
-    {
-        var config = Slice.Editor.ActiveDocument?.Config ?? new ShaderConfig();
-        if (config.RenderMode == ShaderRenderMode.VertFrag
-            && config.DebugTarget == DebugTarget.Vertex
-            && Slice.Debug.DebugVertexIndex < 0)
-        {
-            await StartDebugAtVertex(0, Slice.Run.CapturedFrame?.Time ?? 0f,
-                Slice.Run.CapturedFrame?.CanvasW ?? Math.Max(1, config.WarpX),
-                Slice.Run.CapturedFrame?.CanvasH ?? Math.Max(1, config.WarpY));
-            return;
-        }
-        var document = Slice.Editor.ActiveDocument;
-        if (document == null) return;
-        string code = await EditorDoc.GetActiveCodeAsync();
-        await DebugSession.StartSessionAsync(code, document.Id);
-    }
-
-    private async Task ExitDebug()
-    {
-        DebugSession.ExitSession();
-        await DoRun();
-    }
-
-    private async Task Step(Action navigate)
-    {
-        await EnsureDebugDocumentActive();
-        navigate();
-    }
-
-    private async Task EnsureDebugDocumentActive()
-    {
-        int debugId = Slice.Debug.DebugDocumentId;
-        if (debugId < 0 || Slice.Editor.ActiveDocument?.Id == debugId) return;
-        var documents = Slice.Editor.Documents;
-        for (int i = 0; i < documents.Count; i++)
-        {
-            if (documents[i].Id == debugId)
-            {
-                await EditorDoc.SwitchToAsync(i);
-                return;
-            }
-        }
-    }
-
-    [JSInvokable]
-    public async Task LoadObjMesh(string objText)
-    {
-        if (string.IsNullOrWhiteSpace(objText)) return;
-        try { Store.SetMesh(Mesh.ParseObj(objText)); }
-        catch (Exception ex)
-        {
-            Store.SetRunError("Failed to load OBJ: " + ex.Message, ex);
-            return;
-        }
-        await DoRun();
-    }
-
-    [JSInvokable]
-    public void SetInspectedPixel(int px, int py)
-    {
-        var config = Slice.Editor.ActiveDocument?.Config ?? new ShaderConfig();
-        if (config.WarpX <= 0) return;
-        Store.SetInspectedThread(py * config.WarpX + px);
-    }
-
-    [JSInvokable]
-    public async Task StartDebugAtPixel(int px, int py, float time, int canvasW, int canvasH)
-    {
-        var config = Slice.Editor.ActiveDocument?.Config ?? new ShaderConfig();
-        int wx = Math.Max(1, config.WarpX);
-        int wy = Math.Max(1, config.WarpY);
-        DebugSession.SaveGroupOffsetsForRestore();
-        Store.SetGroupOffset(px / wx, py / wy);
-        Store.SetInspectedThread((py % wy) * wx + (px % wx));
-        Store.SetCapturedFrame(new FrameCapture(time, canvasW, canvasH));
-        await StartDebug();
-    }
-
-    [JSInvokable]
-    public async Task StartDebugAtVertex(int vertexIndex, float time, int canvasW, int canvasH)
-    {
-        var config = Slice.Editor.ActiveDocument?.Config ?? new ShaderConfig();
-        int warpSize = Math.Max(1, config.WarpX * config.WarpY);
-        Store.SetInspectedThread(vertexIndex % warpSize);
-        Store.SetDebugVertexIndex(vertexIndex);
-        Store.SetCapturedFrame(new FrameCapture(time, canvasW, canvasH));
-        if (Slice.Debug.BottomMode != DebugBottomMode.ThreadStates)
-            Store.SetBottomMode(DebugBottomMode.ThreadStates);
-        await StartDebug();
-    }
-
-    private void OpenModal(ModalKind kind)
-    {
-        Store.SetMenuOpen(false);
-        Store.OpenModal(kind);
-    }
-
-    private async Task MenuOpenFile()
-    {
-        Store.SetMenuOpen(false);
-        await EditorDoc.OpenFileDialogAsync();
-    }
-
-    private async Task MenuSaveFile()
-    {
-        Store.SetMenuOpen(false);
-        await EditorDoc.SaveFileAsync();
-    }
-
-    private async Task MenuSaveFileAs()
-    {
-        Store.SetMenuOpen(false);
-        await EditorDoc.SaveFileAsAsync();
-    }
-
-    private async Task MenuDownload()
-    {
-        Store.SetMenuOpen(false);
-        string code = await EditorDoc.GetActiveCodeAsync();
-        var document = Slice.Editor.ActiveDocument;
-        string fileName = string.IsNullOrWhiteSpace(document?.Name) ? "shader.hlsl" : document.Name;
-        await Browser.DownloadTextFile(fileName, code);
-    }
-
-    private async Task ToggleBonzomatic()
-    {
-        Store.SetMenuOpen(false);
-        if (Slice.Debug.IsActive) DebugSession.ExitSession();
-        bool enabled = !Slice.Ui.BonzomaticMode;
-        Store.SetBonzomaticMode(enabled);
-        if (enabled && !Slice.Run.GpuPreviewEnabled)
-        {
-            Store.SetGpuPreviewEnabled(true);
-            await DoRun();
-        }
-    }
-
-    private async Task MenuCopyPermalink()
-    {
-        Store.SetMenuOpen(false);
-        string code = await EditorDoc.GetActiveCodeAsync();
         string baseUrl = PermalinkBase.Url ?? new Uri(Nav.Uri).GetLeftPart(UriPartial.Path);
-        await Permalink.CopyAsync(code, baseUrl);
-
-        int key = ++permalinkToastKey;
-        permalinkCopied = true;
-        StateHasChanged();
-        await Task.Delay(1500);
-        if (permalinkToastKey == key)
-        {
-            permalinkCopied = false;
-            StateHasChanged();
-        }
+        Dispatch(new PermalinkCopyRequested(baseUrl));
     }
+
+    [JSInvokable]
+    public void LoadObjMesh(string objText) => Dispatch(new ObjMeshLoaded(objText));
+
+    [JSInvokable]
+    public void SetInspectedPixel(int px, int py) => Dispatch(new InspectedPixelChanged(px, py));
+
+    [JSInvokable]
+    public void StartDebugAtPixel(int px, int py, float time, int canvasW, int canvasH) =>
+        Dispatch(new DebugAtPixelRequested(px, py, time, canvasW, canvasH));
+
+    [JSInvokable]
+    public void StartDebugAtVertex(int vertexIndex, float time, int canvasW, int canvasH) =>
+        Dispatch(new DebugAtVertexRequested(vertexIndex, time, canvasW, canvasH));
 
     public override void Dispose()
     {

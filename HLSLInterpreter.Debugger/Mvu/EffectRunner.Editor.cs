@@ -1,8 +1,6 @@
-using HLSLInterpreter.Debugger.Core;
-
 namespace HLSLInterpreter.Debugger.Mvu;
 
-// Editor, file, and mesh effects.
+// Editor and file-dialog effects.
 public sealed partial class EffectRunner
 {
     private async Task FetchTextEffect(FetchEditorText c, Action<Msg> dispatch)
@@ -25,15 +23,5 @@ public sealed partial class EffectRunner
             ? await _fileDialogs.SaveFileAs(c.Code)
             : await _fileDialogs.SaveFile(c.Code, c.CurrentPath);
         if (path != null) dispatch(new FileSaved(path));
-    }
-
-    private async Task LoadDefaultMeshEffect(Action<Msg> dispatch)
-    {
-        try
-        {
-            string objText = await _browser.FetchText("_content/HLSLInterpreter.Debugger/lib/monkey.obj");
-            dispatch(new DefaultMeshLoaded(Mesh.ParseObj(objText)));
-        }
-        catch { }
     }
 }
