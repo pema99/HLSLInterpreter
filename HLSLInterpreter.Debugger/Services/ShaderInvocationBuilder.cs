@@ -6,7 +6,9 @@ using UnityShaderParser.HLSL;
 namespace HLSLInterpreter.Debugger.Services;
 
 // Gathers the per-frame inputs a ShaderInvocation needs (canvas size, camera
-// matrices, mouse) from the store and the GPU interop.
+// matrices, mouse) from the GPU interop. The MVU effect runner passes the
+// model-derived inputs explicitly; the legacy store-based overloads are kept
+// until the old services are removed.
 public sealed class ShaderInvocationBuilder
 {
     private readonly AppStore _store;
@@ -18,12 +20,10 @@ public sealed class ShaderInvocationBuilder
         _gpu = gpu;
     }
 
-    public async Task<ShaderInvocation> BuildAsync()
+    public async Task<ShaderInvocation> BuildAsync(ShaderConfig config, FrameCapture captured, int debugVertexIndex)
     {
-        var config = _store.State.Editor.ActiveDocument?.Config ?? new ShaderConfig();
         int wx = Math.Max(1, config.WarpX);
         int wy = Math.Max(1, config.WarpY);
-        var captured = _store.State.Run.CapturedFrame;
         int canvasW = captured?.CanvasW ?? wx;
         int canvasH = captured?.CanvasH ?? wy;
 
@@ -54,17 +54,23 @@ public sealed class ShaderInvocationBuilder
             View: view,
             Projection: projection,
             Mouse: mouse,
-            DebugVertexIndex: _store.State.Debug.DebugVertexIndex,
+            DebugVertexIndex: debugVertexIndex,
             Textures: config.Textures,
             Samplers: config.Samplers);
     }
 
-    public HLSLParserConfig MakeParserConfig()
-    {
-        string path = _store.State.Editor.ActiveDocument?.Path;
-        return new HLSLParserConfig
+    public static HLSLParserConfig MakeParserConfig(string docPath) =>
+        new HLSLParserConfig
         {
-            BasePath = path != null ? System.IO.Path.GetDirectoryName(path) ?? "" : "",
+            BasePath = docPath != null ? System.IO.Path.GetDirectoryName(docPath) ?? "" : "",
         };
+
+    public Task<ShaderInvocation> BuildAsync()
+    {
+        var config = _store.State.Editor.ActiveDocument?.Config ?? new ShaderConfig();
+        return BuildAsync(config, _store.State.Run.CapturedFrame, _store.State.Debug.DebugVertexIndex);
     }
+
+    public HLSLParserConfig MakeParserConfig() =>
+        MakeParserConfig(_store.State.Editor.ActiveDocument?.Path);
 }

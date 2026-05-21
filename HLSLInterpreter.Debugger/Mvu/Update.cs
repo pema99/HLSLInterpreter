@@ -407,7 +407,7 @@ public static class Update
             return (m, None);
         return (m, Cmds(new EvaluateImmediate(
             expression, debug.DebugCode, debug.StepIndex, ActiveConfig(m),
-            m.Run.CapturedFrame, debug.InspectedThread, ActiveDocPath(m))));
+            m.Run.CapturedFrame, debug.InspectedThread, debug.DebugVertexIndex, ActiveDocPath(m))));
     }
 
     // ---- Editor and documents ----

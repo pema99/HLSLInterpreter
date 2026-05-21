@@ -29,7 +29,7 @@ public sealed record RecordTrace(
     int DebugVertexIndex, int DocumentId, string DocPath) : Cmd;
 public sealed record EvaluateImmediate(
     string Expression, string DebugCode, int StepIndex, ShaderConfig Config,
-    FrameCapture Captured, int InspectedThread, string DocPath) : Cmd;
+    FrameCapture Captured, int InspectedThread, int DebugVertexIndex, string DocPath) : Cmd;
 
 // ---- Files ----
 public sealed record OpenFileDialog : Cmd;
