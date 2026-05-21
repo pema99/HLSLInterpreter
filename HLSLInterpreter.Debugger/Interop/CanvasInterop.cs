@@ -2,8 +2,10 @@ using Microsoft.JSInterop;
 
 namespace HLSLInterpreter.Debugger.Interop;
 
-// Typed wrapper over the image canvas state in imagestate.js. Nullable arguments
-// map to JS null, which clears the corresponding overlay.
+// Typed wrapper over the image canvas in imagestate.js. The painted pixels and
+// the overlay state (warp, modes, click handlers, ...) are pushed separately:
+// pixels are large and change rarely, the overlay state is one small object
+// pushed after every message.
 public sealed class CanvasInterop
 {
     private const string ModulePath = "./_content/HLSLInterpreter.Debugger/js/imagestate.js";
@@ -28,29 +30,9 @@ public sealed class CanvasInterop
     public async ValueTask<int[]> GetCpuCanvasSize() =>
         await (await Module()).InvokeAsync<int[]>("cpuCanvasSize");
 
-    public async ValueTask SetWarp(int warpX, int warpY) =>
-        await (await Module()).InvokeVoidAsync("imgSetWarp", warpX, warpY);
-
-    public async ValueTask SetRegularMode(string mode) =>
-        await (await Module()).InvokeVoidAsync("imgSetRegularMode", mode);
-
-    public async ValueTask SetDebugMode(string mode) =>
-        await (await Module()).InvokeVoidAsync("imgSetDebugMode", mode);
-
-    public async ValueTask SetDebugPixel(int? x, int? y) =>
-        await (await Module()).InvokeVoidAsync("imgSetDebugPixel", x, y);
-
-    public async ValueTask SetThreadStates(int[] states) =>
-        await (await Module()).InvokeVoidAsync("imgSetThreadStates", states);
-
-    public async ValueTask SetCpuClickHandler(int? warpX, int? warpY) =>
-        await (await Module()).InvokeVoidAsync("imgSetCpuClickHandler", warpX, warpY);
-
-    public async ValueTask SetDebugClickHandler(bool active) =>
-        await (await Module()).InvokeVoidAsync("imgSetDebugClickHandler", active);
-
-    public async ValueTask SetPickMode(string mode) =>
-        await (await Module()).InvokeVoidAsync("imgSetPickMode", mode);
+    // The whole canvas overlay projection, pushed in one call.
+    public async ValueTask SetState(object state) =>
+        await (await Module()).InvokeVoidAsync("imgSetState", state);
 
     public async ValueTask SetMeshData(float[] positions, uint[] indices) =>
         await (await Module()).InvokeVoidAsync("imgSetMeshData", positions, indices);

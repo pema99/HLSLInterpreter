@@ -2,10 +2,10 @@ using Microsoft.JSInterop;
 
 namespace HLSLInterpreter.Debugger.Interop;
 
-// Typed wrapper over the Monaco editor exports in app.js.
+// Typed wrapper over the Monaco editor exports in editor.js.
 public sealed class EditorInterop
 {
-    private const string ModulePath = "./_content/HLSLInterpreter.Debugger/js/app.js";
+    private const string ModulePath = "./_content/HLSLInterpreter.Debugger/js/editor.js";
 
     private readonly IJSRuntime _js;
     private IJSObjectReference _module;

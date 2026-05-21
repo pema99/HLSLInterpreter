@@ -4,16 +4,17 @@ using HLSLInterpreter.Debugger.State;
 
 namespace HLSLInterpreter.Debugger.Mvu;
 
+public sealed record Point(int X, int Y);
+
 // The full canvas and editor-theme state derived from the model. update computes
-// one of these after every message and hands it to the effect runner, which
-// pushes only the fields that changed since the last sync.
+// one of these after every message; SyncCanvas hands it to JS in a single push.
 public sealed record CanvasProjection(
     int WarpX, int WarpY,
     string RegularMode,
     string DebugMode,
-    (int X, int Y)? DebugPixel,
+    Point DebugPixel,
     int[] ThreadStates,
-    (int X, int Y)? CpuClick,
+    Point CpuClick,
     bool DebugClick,
     string PickMode,
     Mesh PickMesh,
@@ -36,8 +37,8 @@ public sealed record CanvasProjection(
             }
             : "idle";
 
-        (int, int)? debugPixel = debugging
-            ? (s.Debug.InspectedThread % wx, s.Debug.InspectedThread / wx)
+        Point debugPixel = debugging
+            ? new Point(s.Debug.InspectedThread % wx, s.Debug.InspectedThread / wx)
             : null;
 
         int[] threadStates = debugging
@@ -53,7 +54,7 @@ public sealed record CanvasProjection(
 
         return new CanvasProjection(
             wx, wy, regularMode, debugMode, debugPixel, threadStates,
-            cpuClick ? (wx, wy) : null, debugging,
+            cpuClick ? new Point(wx, wy) : null, debugging,
             vertexPick ? "vertex" : "pixel", vertexPick ? config.Mesh : null, theme);
     }
 }

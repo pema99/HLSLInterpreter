@@ -9,17 +9,16 @@ import {
     dbgSetClickHandler, dbgResetView,
 } from './viewport.js';
 import { gpuSnapshot, gpuPause } from './gpu.js';
-import { getDebuggerRef } from './app.js';
+import { getDebuggerRef } from './host.js';
 
 const state = {
     pixels: null, width: 0, height: 0,
     warpX: 1, warpY: 1,
-    isGpuMode: false,
     regularMode: 'cpu',
     debugMode: 'idle',
     debugPixel: null,
     threadStates: null,
-    cpuClickWarp: null,
+    cpuClick: null,
     debugClickActive: false,
     pickMode: 'pixel',  // 'pixel' or 'vertex'
     meshPositions: null,
@@ -81,8 +80,8 @@ function applyTo(container) {
             gpuPause();
             ref.invokeMethodAsync('StartDebugAtPixel', px, py, snap[0], snap[1], snap[2]);
         });
-    } else if (target === 'regular' && state.cpuClickWarp) {
-        const [wx, wy] = state.cpuClickWarp;
+    } else if (target === 'regular' && state.cpuClick) {
+        const wx = state.cpuClick.x, wy = state.cpuClick.y;
         dbgSetClickHandler(id, (px, py) => {
             const ref = getDebuggerRef();
             if (!ref) return;
@@ -166,44 +165,17 @@ export function cpuCanvasSize() {
     return [cw, ch];
 }
 
-export function imgSetWarp(warpX, warpY) {
-    state.warpX = warpX;
-    state.warpY = warpY;
-    applyAll();
-}
-
-export function imgSetRegularMode(mode) {
-    state.regularMode = mode;
-    applyAll();
-}
-
-export function imgSetDebugMode(mode) {
-    state.debugMode = mode;
-    applyAll();
-}
-
-export function imgSetDebugPixel(px, py) {
-    state.debugPixel = (px == null || py == null) ? null : { x: px, y: py };
-    applyAll();
-}
-
-export function imgSetThreadStates(states) {
-    state.threadStates = states;
-    applyAll();
-}
-
-export function imgSetCpuClickHandler(warpX, warpY) {
-    state.cpuClickWarp = (warpX == null) ? null : [warpX, warpY];
-    applyAll();
-}
-
-export function imgSetDebugClickHandler(active) {
-    state.debugClickActive = !!active;
-    applyAll();
-}
-
-export function imgSetPickMode(mode) {
-    state.pickMode = (mode === 'vertex') ? 'vertex' : 'pixel';
+// C# pushes the whole canvas overlay projection in one call after every message.
+export function imgSetState(p) {
+    state.warpX = p.warpX;
+    state.warpY = p.warpY;
+    state.regularMode = p.regularMode;
+    state.debugMode = p.debugMode;
+    state.debugPixel = p.debugPixel;
+    state.threadStates = p.threadStates;
+    state.cpuClick = p.cpuClick;
+    state.debugClickActive = !!p.debugClick;
+    state.pickMode = p.pickMode === 'vertex' ? 'vertex' : 'pixel';
     applyAll();
 }
 

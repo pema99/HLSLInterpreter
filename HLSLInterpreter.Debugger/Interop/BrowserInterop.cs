@@ -3,11 +3,11 @@ using Microsoft.JSInterop;
 
 namespace HLSLInterpreter.Debugger.Interop;
 
-// Typed wrapper over the host and document helpers in app.js: file IO,
+// Typed wrapper over the host and document helpers in host.js: file IO,
 // clipboard, the glsl2hlsl transpiler, image rendering, and DOM layout glue.
 public sealed class BrowserInterop
 {
-    private const string ModulePath = "./_content/HLSLInterpreter.Debugger/js/app.js";
+    private const string ModulePath = "./_content/HLSLInterpreter.Debugger/js/host.js";
 
     private readonly IJSRuntime _js;
     private IJSObjectReference _module;
@@ -50,15 +50,6 @@ public sealed class BrowserInterop
 
     public async ValueTask ScrollImmediateToBottom() =>
         await (await Module()).InvokeVoidAsync("scrollImmediateToBottom");
-
-    public async ValueTask SaveSectionHeights() =>
-        await (await Module()).InvokeVoidAsync("saveSectionHeights");
-
-    public async ValueTask RestoreSectionHeights() =>
-        await (await Module()).InvokeVoidAsync("restoreSectionHeights");
-
-    public async ValueTask RestoreImageSectionHeight() =>
-        await (await Module()).InvokeVoidAsync("restoreImageSectionHeight");
 
     public async ValueTask InitThreadGridResize(string containerId, int cols, int rows) =>
         await (await Module()).InvokeVoidAsync("initThreadGridResize", containerId, cols, rows);
