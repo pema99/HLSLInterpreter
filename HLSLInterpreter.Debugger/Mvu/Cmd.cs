@@ -1,5 +1,7 @@
 namespace HLSLInterpreter.Debugger.Mvu;
 
+// What an update step asks the runtime to do next. Built through Effects, or
+// directly via these factories, and interpreted by DebuggerProgram.
 public abstract record Cmd
 {
     public static readonly Cmd None = new BatchCmd([]);
@@ -9,10 +11,7 @@ public abstract record Cmd
     public static Cmd Batch(params Cmd[] commands) => new BatchCmd(commands);
     public static Cmd Batch(IEnumerable<Cmd> commands) => new BatchCmd(commands.ToArray());
 
-    public static Cmd OfTask(Func<CancellationToken, Task<Msg>> run) => new TaskCmd(run);
     public static Cmd OfTask(Func<Task<Msg>> run) => new TaskCmd(_ => run());
-
-    public static Cmd OfTask(Func<CancellationToken, Task> run) => new TaskUnitCmd(run);
     public static Cmd OfTask(Func<Task> run) => new TaskUnitCmd(_ => run());
 
     public static Cmd OfEffect(Func<Action<Msg>, CancellationToken, Task> run) => new EffectCmd(run);

@@ -2,17 +2,15 @@ using HLSLInterpreter.Debugger.State;
 
 namespace HLSLInterpreter.Debugger.Mvu;
 
-// The pure update function: computes the next model and the command to run.
-public delegate (AppState State, Cmd Command) UpdateFn(AppState model, Msg message);
-
-// The MVU runtime. Holds the single application model, runs the dispatch loop,
-// and interprets commands. Messages are queued and pumped one at a time, so
-// ordering is defined and the loop is never re-entered: a message dispatched
-// from within an effect (or a JS callback) is simply enqueued for the running
-// pump. This type knows nothing app-specific: the command vocabulary is generic.
-public sealed class DebuggerProgram : IDisposable
+// The debugger's MVU runtime: it holds the single application model, runs the
+// dispatch loop, applies the update logic (in DebuggerProgram.Update.cs), and
+// interprets the resulting commands. Messages are queued and pumped one at a
+// time, so ordering is defined and the loop is never re-entered: a message
+// dispatched from within an effect (or a JS callback) is simply enqueued for
+// the running pump.
+public sealed partial class DebuggerProgram : IDisposable
 {
-    private readonly UpdateFn _update;
+    private readonly Effects _effects;
     private readonly Queue<Msg> _queue = new();
     private readonly CancellationTokenSource _cts = new();
     private bool _pumping;
@@ -23,10 +21,10 @@ public sealed class DebuggerProgram : IDisposable
     // decide for themselves whether the change concerns them.
     public event Action Changed;
 
-    public DebuggerProgram(AppState initial, UpdateFn update)
+    public DebuggerProgram(AppState initial, Effects effects)
     {
         Model = initial;
-        _update = update;
+        _effects = effects;
     }
 
     public void Dispatch(Msg message)
@@ -43,7 +41,7 @@ public sealed class DebuggerProgram : IDisposable
             while (_queue.Count > 0)
             {
                 var message = _queue.Dequeue();
-                var (model, command) = _update(Model, message);
+                var (model, command) = Update(Model, message);
                 Model = model;
                 Changed?.Invoke();
                 await Execute(command);
