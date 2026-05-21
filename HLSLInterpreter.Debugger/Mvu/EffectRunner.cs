@@ -78,7 +78,7 @@ public sealed partial class EffectRunner : IEffectRunner
                 case CopyToClipboard c: await Try(() => _browser.CopyToClipboard(c.Text)); break;
 
                 case SyncCanvas c: await SyncCanvasEffect(c.Projection); break;
-                case DelayThenDispatch c: await DelayEffect(c, dispatch); break;
+                case DelayThenDispatch c: DelayEffect(c, dispatch); break;
             }
         }
         catch
@@ -93,7 +93,12 @@ public sealed partial class EffectRunner : IEffectRunner
         catch { }
     }
 
-    private static async Task DelayEffect(DelayThenDispatch c, Action<Msg> dispatch)
+    // Detached: a timed message must not hold the dispatch pump for its delay.
+    // The await captures the dispatch context so the follow-up stays on it.
+    private static void DelayEffect(DelayThenDispatch c, Action<Msg> dispatch) =>
+        _ = DelayAsync(c, dispatch);
+
+    private static async Task DelayAsync(DelayThenDispatch c, Action<Msg> dispatch)
     {
         await Task.Delay(c.DelayMs);
         dispatch(c.Message);
