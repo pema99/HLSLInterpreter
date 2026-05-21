@@ -94,4 +94,3 @@ public sealed record MenuClosed : Msg;
 public sealed record BonzomaticToggled : Msg;
 public sealed record PermalinkCopyRequested(string BaseUrl) : Msg;
 public sealed record PermalinkCopyWithCode(string Code, string BaseUrl) : Msg;
-public sealed record PermalinkToastDismissed : Msg;

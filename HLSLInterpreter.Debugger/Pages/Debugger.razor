@@ -76,9 +76,9 @@
         <div class="topbar-right">
             <div class="share-button-wrap">
                 <button class="btn-share" @onclick="CopyPermalink" title="Copy permalink to clipboard"><i class="mdi mdi-share-variant"></i></button>
-                @if (ui.PermalinkToastVisible)
+                @if (ui.PermalinkToastKey > 0)
                 {
-                    <span class="permalink-toast">Permalink copied to clipboard</span>
+                    <span class="permalink-toast" @key="ui.PermalinkToastKey">Permalink copied to clipboard</span>
                 }
             </div>
             <button class="btn-run" @onclick="RunOrCancel"

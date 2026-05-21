@@ -44,19 +44,4 @@ public sealed partial class Effects
         _browser = browser;
         _fileDialogs = fileDialogs;
     }
-
-    // Dispatch a message after a delay, without holding the dispatch pump: the
-    // effect closure starts the wait detached and returns immediately.
-    public Cmd Delay(int delayMs, Msg message) =>
-        Cmd.OfEffect(dispatch =>
-        {
-            _ = DelayThenDispatch(delayMs, message, dispatch);
-            return Task.CompletedTask;
-        });
-
-    private static async Task DelayThenDispatch(int delayMs, Msg message, Action<Msg> dispatch)
-    {
-        await Task.Delay(delayMs);
-        dispatch(message);
-    }
 }

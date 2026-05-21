@@ -63,7 +63,10 @@ public sealed record UiState
     public bool MenuOpen { get; init; }
     public bool BonzomaticMode { get; init; }
     public bool ImageCollapsed { get; init; }
-    public bool PermalinkToastVisible { get; init; }
+
+    // Bumped on each permalink copy. The toast element is keyed on this, so a
+    // copy re-creates it and its CSS fade animation replays.
+    public int PermalinkToastKey { get; init; }
 }
 
 public sealed record AppState

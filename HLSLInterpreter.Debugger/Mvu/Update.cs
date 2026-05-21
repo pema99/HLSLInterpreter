@@ -692,17 +692,13 @@ public static class Update
                     config.GroupOffsetX, config.GroupOffsetY, model.Run.GpuPreviewEnabled,
                     config.RenderMode, config.VertexEntryPoint, config.CpuMode);
                 string url = PermalinkCodec.BuildUrl(x.BaseUrl, x.Code, settings);
-                next = SyncActiveCode(model, x.Code) with { Ui = model.Ui with { PermalinkToastVisible = true } };
-                command = Cmd.Batch(
-                    fx.CopyToClipboard(url),
-                    fx.Delay(1500, new PermalinkToastDismissed()));
+                next = SyncActiveCode(model, x.Code) with
+                {
+                    Ui = model.Ui with { PermalinkToastKey = model.Ui.PermalinkToastKey + 1 },
+                };
+                command = fx.CopyToClipboard(url);
                 break;
             }
-
-            case PermalinkToastDismissed:
-                next = model with { Ui = model.Ui with { PermalinkToastVisible = false } };
-                command = Cmd.None;
-                break;
 
             default:
                 next = model;
