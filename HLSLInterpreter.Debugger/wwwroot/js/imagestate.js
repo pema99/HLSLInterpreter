@@ -1,7 +1,6 @@
-// Painting and overlay setup for the Color Output canvas. There is no cached
-// canvas state here: a CanvasView component pushes the overlay projection on
-// render and asks for a repaint when it mounts, and the run effects paint pixels
-// straight onto the <canvas>, which is itself the buffer.
+// Painting and overlay setup for the Color Output canvas. JS keeps no copy of
+// the image: C# owns it and CanvasView pushes it (on mount, or when a new image
+// is produced). The functions here just put pixels on the <canvas>.
 import {
     dbgInitViewport, dbgSetViewportImageSize, dbgSetViewportWarp, dbgSetViewportMode,
     dbgSetViewportPickMode, dbgSetDebugPixel, dbgSetViewportThreadStates,
@@ -10,8 +9,8 @@ import {
 import { gpuSnapshot, gpuPause } from './gpu.js';
 import { getDebuggerRef } from './host.js';
 
-// The mesh is needed for vertex picking. It changes rarely and is pushed on its
-// own cadence, so it is the one thing retained here between calls.
+// The picking mesh is the one thing retained here: it is needed by every
+// applyCanvasState call and changes only rarely.
 let _meshPositions = null;
 let _meshIndices = null;
 
@@ -78,18 +77,16 @@ export function applyCanvasState(containerId, p) {
     }
 }
 
-function paintFull(canvas, pixels, width, height) {
-    if (!canvas) return;
-    if (pixels && !(pixels instanceof Uint8ClampedArray)) pixels = new Uint8ClampedArray(pixels);
-    canvas.width = width;
-    canvas.height = height;
-    canvas.getContext('2d').putImageData(new ImageData(pixels, width, height), 0, 0);
-}
-
 export function setPixels(pixels, width, height) {
     const container = document.querySelector('.image-container');
     if (!container) return;
-    paintFull(container.querySelector('.color-canvas-2d'), pixels, width, height);
+    const canvas = container.querySelector('.color-canvas-2d');
+    if (canvas) {
+        const src = pixels instanceof Uint8ClampedArray ? pixels : new Uint8ClampedArray(pixels);
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d').putImageData(new ImageData(src, width, height), 0, 0);
+    }
     dbgSetViewportImageSize(container.id, width, height);
     dbgResetView(container.id);
 }
@@ -113,10 +110,9 @@ export function allocPixels(width, height) {
 export function setPixelsRect(pixels, x, y, rectW, rectH) {
     const canvas = the2dCanvas();
     if (!canvas) return;
-    let src;
-    if (pixels instanceof Uint8ClampedArray) src = pixels;
-    else if (ArrayBuffer.isView(pixels)) src = new Uint8ClampedArray(pixels.buffer, pixels.byteOffset, pixels.byteLength);
-    else src = new Uint8ClampedArray(pixels);
+    const src = pixels instanceof Uint8ClampedArray ? pixels
+        : ArrayBuffer.isView(pixels) ? new Uint8ClampedArray(pixels.buffer, pixels.byteOffset, pixels.byteLength)
+        : new Uint8ClampedArray(pixels);
     canvas.getContext('2d').putImageData(new ImageData(src, rectW, rectH), x, y);
 }
 

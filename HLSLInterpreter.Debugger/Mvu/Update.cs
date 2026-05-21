@@ -62,14 +62,6 @@ public static class Update
                 break;
             }
 
-            case CanvasReady:
-                // A canvas just mounted: repaint it and re-push the mesh.
-                next = model;
-                command = Cmd.Batch(
-                    fx.RenderViewMode(model.Run.ViewMode, model.Run.Metrics, model.Run.Image),
-                    fx.SetMeshData(ActiveConfig(model).Mesh));
-                break;
-
             case DefaultMeshLoaded x:
                 next = WithActiveConfig(
                     model with { Editor = model.Editor with { DefaultMesh = x.Mesh } },
@@ -106,7 +98,7 @@ public static class Update
                         Status = RunStatus.Idle,
                         Output = x.Output ?? "",
                         Error = x.Error,
-                        Image = x.Image,
+                        Image = x.Image ?? model.Run.Image,
                         Metrics = x.Metrics,
                     }
                 };
@@ -750,7 +742,6 @@ public static class Update
         Backend = RunBackend.Cpu,
         Error = null,
         Output = "",
-        Image = null,
         Metrics = null,
         CapturedFrame = keepCaptured ? r.CapturedFrame : null,
         ViewMode = DebugViewMode.Color,

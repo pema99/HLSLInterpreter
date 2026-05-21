@@ -75,12 +75,7 @@ public sealed partial class Effects
                 return;
             }
             var pixels = HLSLValueDisplay.RenderOutputImage(outcome.Result, wx, wy);
-            ShaderImage image = null;
-            if (pixels != null)
-            {
-                image = new ShaderImage(pixels, wx, wy);
-                await _canvas.SetPixels(pixels, wx, wy);
-            }
+            var image = pixels != null ? new ShaderImage(pixels, wx, wy) : null;
             dispatch(new RunFinished(outcome.Output, null, image, null));
         }
         catch (Exception ex)

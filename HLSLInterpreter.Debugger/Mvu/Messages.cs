@@ -13,7 +13,6 @@ public enum StepKind { In, Over, Out, InBack, OverBack, OutBack, Continue, Conti
 // ---- Lifecycle ----
 public sealed record AppStarted(
     string Url, string FallbackName, string FallbackPath, bool TabsEnabled) : Msg;
-public sealed record CanvasReady : Msg;
 public sealed record DefaultMeshLoaded(Mesh Mesh) : Msg;
 
 // ---- Run ----

@@ -32,7 +32,11 @@ public sealed record RunState
     public bool GpuPreviewEnabled { get; init; }
     public bool GpuPaused { get; init; }
     public FrameCapture CapturedFrame { get; init; }
+
+    // The interpreter's output image. Owned by the model; CanvasView pushes it
+    // to the canvas. JS keeps no copy.
     public ShaderImage Image { get; init; }
+
     public ExecutionMetrics Metrics { get; init; }
     public DebugViewMode ViewMode { get; init; } = DebugViewMode.Color;
     public string Output { get; init; } = "";

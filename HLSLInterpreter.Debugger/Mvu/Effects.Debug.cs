@@ -52,11 +52,7 @@ public sealed partial class Effects
             if (!trace.HasError && trace.Result != null)
             {
                 var pixels = HLSLValueDisplay.RenderOutputImage(trace.Result, wx, wy);
-                if (pixels != null)
-                {
-                    image = new ShaderImage(pixels, wx, wy);
-                    await _canvas.SetPixels(pixels, wx, wy);
-                }
+                if (pixels != null) image = new ShaderImage(pixels, wx, wy);
             }
             dispatch(new DebugTraceRecorded(trace, code, documentId, captured, image));
         }
