@@ -233,12 +233,10 @@
     public void SetInspectedPixel(int px, int py) => Dispatch(new InspectedPixelChanged(px, py));
 
     [JSInvokable]
-    public void StartDebugAtPixel(int px, int py, float time, int canvasW, int canvasH) =>
-        Dispatch(new DebugAtPixelRequested(px, py, time, canvasW, canvasH));
+    public void StartDebugAtPixel(int px, int py) => Dispatch(new DebugPixelClicked(px, py));
 
     [JSInvokable]
-    public void StartDebugAtVertex(int vertexIndex, float time, int canvasW, int canvasH) =>
-        Dispatch(new DebugAtVertexRequested(vertexIndex, time, canvasW, canvasH));
+    public void StartDebugAtVertex(int vertexIndex) => Dispatch(new DebugVertexClicked(vertexIndex));
 
     public override void Dispose()
     {

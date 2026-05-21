@@ -162,6 +162,16 @@ public static class Update
                 break;
             }
 
+            case DebugPixelClicked x:
+                next = model;
+                command = fx.DebugAtPixel(x.Px, x.Py, model.Run.Backend, model.Run.Image);
+                break;
+
+            case DebugVertexClicked x:
+                next = model;
+                command = fx.DebugAtVertex(x.VertexIndex, model.Run.Backend, model.Run.Image);
+                break;
+
             case DebugAtPixelRequested x:
             {
                 var config = ActiveConfig(model);

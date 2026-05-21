@@ -577,7 +577,7 @@ export async function gpuRender(canvasId, hlslSource, entryPoint, warpX, warpY, 
     }
     fitCanvas(canvas);
 
-    // imagestate.js owns viewport mode and click handlers. We only push the
+    // viewport.js owns viewport mode and click handlers. We only push the
     // live canvas size, since we own the GPU render target's dimensions.
     dbgInitViewport('image-container');
     dbgSetViewportImageSize('image-container', canvas.width, canvas.height);

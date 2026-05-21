@@ -15,6 +15,32 @@ public sealed partial class Effects
         Cmd.OfEffect((dispatch, _) =>
             RecordTraceImpl(code, config, captured, snapshotGpu, debugVertexIndex, documentId, docPath, dispatch));
 
+    // A canvas click: resolve the frame (a GPU snapshot, or the CPU image size)
+    // and start a debug session at the clicked pixel or vertex.
+    public Cmd DebugAtPixel(int px, int py, RunBackend backend, ShaderImage image) =>
+        Cmd.OfEffect((dispatch, _) => ResolveCanvasFrame(backend, image, dispatch,
+            (t, w, h) => new DebugAtPixelRequested(px, py, t, w, h)));
+
+    public Cmd DebugAtVertex(int vertexIndex, RunBackend backend, ShaderImage image) =>
+        Cmd.OfEffect((dispatch, _) => ResolveCanvasFrame(backend, image, dispatch,
+            (t, w, h) => new DebugAtVertexRequested(vertexIndex, t, w, h)));
+
+    private async Task ResolveCanvasFrame(
+        RunBackend backend, ShaderImage image, Action<Msg> dispatch, Func<float, int, int, Msg> make)
+    {
+        if (backend == RunBackend.Gpu)
+        {
+            var snap = await _gpu.Snapshot();
+            if (snap == null || snap.Length < 3) return;
+            await _gpu.Pause();
+            dispatch(make(snap[0], (int)snap[1], (int)snap[2]));
+        }
+        else if (image != null)
+        {
+            dispatch(make(0, image.Width, image.Height));
+        }
+    }
+
     public Cmd EvaluateImmediate(
         string expression, string debugCode, int stepIndex, ShaderConfig config,
         FrameCapture captured, int inspectedThread, int debugVertexIndex, string docPath) =>

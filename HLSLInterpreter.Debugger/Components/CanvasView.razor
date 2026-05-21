@@ -68,20 +68,18 @@
                 ?? Array.Empty<HLSLExecutionState.ThreadState>()).Select(x => (int)x).ToArray()
             : null;
 
-        bool cpuClick = !debugging && s.Run.Backend == RunBackend.Cpu;
         bool vertexPick = !debugging
             && config.RenderMode == ShaderRenderMode.VertFrag
             && config.DebugTarget == DebugTarget.Vertex;
 
         return new Overlay(
             wx, wy, regularMode, debugMode, debugPixel, threadStates,
-            cpuClick ? new Point(wx, wy) : null, debugging,
-            vertexPick ? "vertex" : "pixel");
+            debugging, vertexPick ? "vertex" : "pixel");
     }
 
     private sealed record Overlay(
         int WarpX, int WarpY, string RegularMode, string DebugMode,
-        Point DebugPixel, int[] ThreadStates, Point CpuClick, bool DebugClick, string PickMode);
+        Point DebugPixel, int[] ThreadStates, bool DebugClick, string PickMode);
 
     private sealed record Point(int X, int Y);
 }

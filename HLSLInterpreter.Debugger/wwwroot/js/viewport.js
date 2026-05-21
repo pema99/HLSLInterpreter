@@ -1,6 +1,7 @@
-// Zoom/pan + overlay rectangles for the Color Output panel. The image canvas
-// is transformed in CSS for zoom/pan. The overlay canvas is drawn in device
-// pixels so its rings stay crisp at any DPR.
+// The Color Output image canvas: painting, zoom/pan, and the overlay. The image
+// canvas is transformed in CSS for zoom/pan; the overlay canvas is drawn in
+// device pixels so its rings stay crisp at any DPR. This module is the JS side
+// of CanvasInterop; C# owns the image and the overlay projection.
 import { gpuViewProjection, gpuPickRay } from './camera.js';
 import { getDebuggerRef } from './host.js';
 
@@ -461,7 +462,7 @@ export function dbgSetViewportImageSize(containerId, w, h) {
     applyLayout(container, s);
 };
 
-export function dbgSetViewportWarp(containerId, wx, wy) {
+function dbgSetViewportWarp(containerId, wx, wy) {
     const container = document.getElementById(containerId);
     if (!container) return;
     const s = getState(container);
@@ -469,7 +470,7 @@ export function dbgSetViewportWarp(containerId, wx, wy) {
     s.warpY = Math.max(1, wy | 0);
 };
 
-export function dbgSetViewportMode(containerId, mode) {
+function dbgSetViewportMode(containerId, mode) {
     const container = document.getElementById(containerId);
     if (!container) return;
     const s = getState(container);
@@ -479,7 +480,7 @@ export function dbgSetViewportMode(containerId, mode) {
     applyLayout(container, s);
 };
 
-export function dbgSetDebugPixel(containerId, px, py) {
+function dbgSetDebugPixel(containerId, px, py) {
     const container = document.getElementById(containerId);
     if (!container) return;
     const s = getState(container);
@@ -487,7 +488,7 @@ export function dbgSetDebugPixel(containerId, px, py) {
     refreshOverlay(container, s);
 };
 
-export function dbgSetViewportThreadStates(containerId, states) {
+function dbgSetViewportThreadStates(containerId, states) {
     const container = document.getElementById(containerId);
     if (!container) return;
     const s = getState(container);
@@ -495,14 +496,14 @@ export function dbgSetViewportThreadStates(containerId, states) {
     refreshOverlay(container, s);
 };
 
-export function dbgSetClickHandler(containerId, handler) {
+function dbgSetClickHandler(containerId, handler) {
     const container = document.getElementById(containerId);
     if (!container) return;
     const s = getState(container);
     s.onClick = handler;
 };
 
-export function dbgSetViewportPickMode(containerId, pickMode, positions, indices) {
+function dbgSetViewportPickMode(containerId, pickMode, positions, indices) {
     const container = document.getElementById(containerId);
     if (!container) return;
     const s = getState(container);
@@ -524,7 +525,7 @@ export function dbgRefreshViewportOverlay(containerId) {
     refreshOverlay(container, s);
 };
 
-export function dbgResetView(containerId) {
+function dbgResetView(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
     const s = getState(container);
@@ -532,3 +533,107 @@ export function dbgResetView(containerId) {
     s.box = fitImageBox(container, s);
     applyLayout(container, s);
 };
+
+// ---- Painting + the C#-facing API (the JS side of CanvasInterop) ----
+
+// The picking mesh is retained here: applyCanvasState passes it on every call
+// and it changes only rarely.
+let _meshPositions = null;
+let _meshIndices = null;
+
+function the2dCanvas() {
+    return document.querySelector('.image-container .color-canvas-2d');
+}
+
+// Apply the overlay projection to one container. Called by CanvasView on render.
+export function applyCanvasState(containerId, p) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    dbgInitViewport(containerId);
+
+    const target = container.dataset.modeTarget;
+    const mode = target === 'regular' ? p.regularMode : p.debugMode;
+
+    dbgSetViewportWarp(containerId, p.warpX, p.warpY);
+    dbgSetViewportMode(containerId, mode);
+    dbgSetViewportPickMode(containerId, p.pickMode, _meshPositions, _meshIndices);
+
+    if (target === 'debug') {
+        if (p.debugPixel) dbgSetDebugPixel(containerId, p.debugPixel.x, p.debugPixel.y);
+        if (p.threadStates) dbgSetViewportThreadStates(containerId, p.threadStates);
+    }
+
+    // The click handler just reports the click; C# resolves the GPU snapshot or
+    // the CPU image size and starts the debug session.
+    if (target === 'regular' && p.pickMode === 'vertex') {
+        dbgSetClickHandler(containerId, (px, py, vertexIndex) => {
+            const ref = getDebuggerRef();
+            if (vertexIndex != null && ref) ref.invokeMethodAsync('StartDebugAtVertex', vertexIndex);
+        });
+    } else if (target === 'regular') {
+        dbgSetClickHandler(containerId, (px, py) => {
+            const ref = getDebuggerRef();
+            if (ref) ref.invokeMethodAsync('StartDebugAtPixel', px, py);
+        });
+    } else if (target === 'debug' && p.debugClick) {
+        dbgSetClickHandler(containerId, (px, py) => {
+            const ref = getDebuggerRef();
+            if (ref) ref.invokeMethodAsync('SetInspectedPixel', px, py);
+        });
+    } else {
+        dbgSetClickHandler(containerId, null);
+    }
+}
+
+export function setPixels(pixels, width, height) {
+    const container = document.querySelector('.image-container');
+    if (!container) return;
+    const canvas = container.querySelector('.color-canvas-2d');
+    if (canvas) {
+        const src = pixels instanceof Uint8ClampedArray ? pixels : new Uint8ClampedArray(pixels);
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d').putImageData(new ImageData(src, width, height), 0, 0);
+    }
+    dbgSetViewportImageSize(container.id, width, height);
+    dbgResetView(container.id);
+}
+
+export function allocPixels(width, height) {
+    const container = document.querySelector('.image-container');
+    if (!container) return;
+    const canvas = container.querySelector('.color-canvas-2d');
+    if (canvas) {
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, width, height);
+    }
+    dbgSetViewportImageSize(container.id, width, height);
+    dbgResetView(container.id);
+}
+
+// Paint one tile straight onto the canvas; the canvas accumulates the frame.
+export function setPixelsRect(pixels, x, y, rectW, rectH) {
+    const canvas = the2dCanvas();
+    if (!canvas) return;
+    const src = pixels instanceof Uint8ClampedArray ? pixels
+        : ArrayBuffer.isView(pixels) ? new Uint8ClampedArray(pixels.buffer, pixels.byteOffset, pixels.byteLength)
+        : new Uint8ClampedArray(pixels);
+    canvas.getContext('2d').putImageData(new ImageData(src, rectW, rectH), x, y);
+}
+
+export function setMeshData(positions, indices) {
+    _meshPositions = positions;
+    _meshIndices = indices;
+}
+
+export function cpuCanvasSize() {
+    const el = document.querySelector('.image-container');
+    if (!el) return [256, 256];
+    const dpr = window.devicePixelRatio || 1;
+    const cw = Math.max(1, Math.floor(el.clientWidth * dpr));
+    const ch = Math.max(1, Math.floor(el.clientHeight * dpr));
+    return [cw, ch];
+}

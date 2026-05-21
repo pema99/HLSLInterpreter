@@ -2,12 +2,12 @@ using Microsoft.JSInterop;
 
 namespace HLSLInterpreter.Debugger.Interop;
 
-// Typed wrapper over the image canvas in imagestate.js. Pixels are painted
+// Typed wrapper over the image canvas in viewport.js. Pixels are painted
 // straight onto the <canvas>; the overlay projection is applied per container
 // by CanvasView.
 public sealed class CanvasInterop
 {
-    private const string ModulePath = "./_content/HLSLInterpreter.Debugger/js/imagestate.js";
+    private const string ModulePath = "./_content/HLSLInterpreter.Debugger/js/viewport.js";
 
     private readonly IJSRuntime _js;
     private IJSObjectReference _module;

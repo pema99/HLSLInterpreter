@@ -30,6 +30,8 @@ public sealed record ImageCollapseToggled : Msg;
 // ---- Debug ----
 public sealed record DebugRequested : Msg;
 public sealed record DebugWithCode(string Code) : Msg;
+public sealed record DebugPixelClicked(int Px, int Py) : Msg;
+public sealed record DebugVertexClicked(int VertexIndex) : Msg;
 public sealed record DebugAtPixelRequested(int Px, int Py, float Time, int CanvasW, int CanvasH) : Msg;
 public sealed record DebugAtVertexRequested(int VertexIndex, float Time, int CanvasW, int CanvasH) : Msg;
 public sealed record DebugTraceRecorded(
