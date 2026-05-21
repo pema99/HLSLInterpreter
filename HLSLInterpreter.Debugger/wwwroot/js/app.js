@@ -3,7 +3,6 @@ let dotNetEditorRef = null;
 let dotNetDebugRef = null;
 let _models = new Map();        // document id -> { model, bpIds, lineIds }
 let _currentModelId = -1;
-let _lastBreakpointLines = [];
 let _imageSectionHeight = null;
 let _savedSectionHeights = null;
 let _glsl2hlslPromise = null;
@@ -651,8 +650,11 @@ document.addEventListener('keydown', function (e) {
     }
 });
 
-function _breakpointDecos(lines) {
-    return (lines || []).map(function (line) {
+// Breakpoints are per document: each model carries only its own.
+export function setBreakpoints(docId, lines) {
+    var e = _models.get(docId);
+    if (!e) return;
+    var decorations = (lines || []).map(function (line) {
         return {
             range: new monaco.Range(line, 1, line, 1),
             options: {
@@ -662,15 +664,7 @@ function _breakpointDecos(lines) {
             }
         };
     });
-}
-
-// Breakpoints are global, so they show in every document's gutter.
-export function setBreakpoints(lines) {
-    _lastBreakpointLines = lines || [];
-    var decorations = _breakpointDecos(_lastBreakpointLines);
-    _models.forEach(function (e) {
-        e.bpIds = e.model.deltaDecorations(e.bpIds, decorations);
-    });
+    e.bpIds = e.model.deltaDecorations(e.bpIds, decorations);
 };
 
 // Highlight the current debug line (0 to clear). Only the visible model carries
@@ -872,10 +866,7 @@ export function createModel(id, content) {
     var existing = _models.get(id);
     if (existing) { existing.model.setValue(content); return; }
     var model = monaco.editor.createModel(content, 'hlsl');
-    var entry = { model: model, bpIds: [], lineIds: [] };
-    if (_lastBreakpointLines.length)
-        entry.bpIds = model.deltaDecorations([], _breakpointDecos(_lastBreakpointLines));
-    _models.set(id, entry);
+    _models.set(id, { model: model, bpIds: [], lineIds: [] });
 };
 
 export function showModel(id) {

@@ -44,7 +44,6 @@ public sealed record DebugState
     public bool IsActive { get; init; }
     public ExecutionTrace Trace { get; init; }
     public int StepIndex { get; init; }
-    public IReadOnlySet<int> Breakpoints { get; init; } = new HashSet<int>();
     public int SelectedFrame { get; init; }
     public int InspectedThread { get; init; }
     public int DebugDocumentId { get; init; } = -1;

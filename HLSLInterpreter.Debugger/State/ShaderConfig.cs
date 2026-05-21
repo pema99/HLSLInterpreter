@@ -32,4 +32,7 @@ public sealed record ShaderDocument
     public string Name { get; init; } = "new.hlsl";
     public string Path { get; init; }
     public ShaderConfig Config { get; init; } = new();
+
+    // Breakpoints belong to the document, so they do not bleed across tabs.
+    public IReadOnlySet<int> Breakpoints { get; init; } = new HashSet<int>();
 }

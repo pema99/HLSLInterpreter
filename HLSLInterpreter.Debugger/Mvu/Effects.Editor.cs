@@ -36,8 +36,8 @@ public sealed partial class Effects
     public Cmd HighlightLine(int line) =>
         Cmd.OfTask(() => _editor.HighlightLine(line).AsTask());
 
-    public Cmd SetBreakpoints(IReadOnlyList<int> lines) =>
-        Cmd.OfTask(() => _editor.SetBreakpoints(lines).AsTask());
+    public Cmd SetBreakpoints(int docId, IReadOnlyList<int> lines) =>
+        Cmd.OfTask(() => _editor.SetBreakpoints(docId, lines).AsTask());
 
     public Cmd OpenFileDialog() =>
         Cmd.OfTask(async () =>

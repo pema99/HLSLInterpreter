@@ -46,8 +46,8 @@ public sealed class EditorInterop
     public async ValueTask HighlightLine(int line) =>
         await (await Module()).InvokeVoidAsync("highlightDebugLine", line);
 
-    public async ValueTask SetBreakpoints(IReadOnlyList<int> lines) =>
-        await (await Module()).InvokeVoidAsync("setBreakpoints", lines);
+    public async ValueTask SetBreakpoints(int docId, IReadOnlyList<int> lines) =>
+        await (await Module()).InvokeVoidAsync("setBreakpoints", docId, lines);
 
     public async ValueTask<bool> IsTabDropAfter(int tabIndex, double clientX) =>
         await (await Module()).InvokeAsync<bool>("dbgIsTabDropAfter", tabIndex, clientX);

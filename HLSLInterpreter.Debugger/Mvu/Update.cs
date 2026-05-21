@@ -260,7 +260,8 @@ public static class Update
                 }
 
                 int from = next.Debug.StepIndex;
-                var breakpoints = next.Debug.Breakpoints;
+                var debugDoc = model.Editor.Documents.FirstOrDefault(d => d.Id == model.Debug.DebugDocumentId);
+                IReadOnlySet<int> breakpoints = debugDoc?.Breakpoints ?? new HashSet<int>();
                 int index = x.Kind switch
                 {
                     StepKind.In => TraceNavigator.Forward(trace, from),
@@ -281,10 +282,12 @@ public static class Update
 
             case BreakpointToggled x:
             {
-                var breakpoints = new HashSet<int>(model.Debug.Breakpoints);
+                var doc = model.Editor.ActiveDocument;
+                if (doc == null) { next = model; command = Cmd.None; break; }
+                var breakpoints = new HashSet<int>(doc.Breakpoints);
                 if (!breakpoints.Add(x.Line)) breakpoints.Remove(x.Line);
-                next = model with { Debug = model.Debug with { Breakpoints = breakpoints } };
-                command = fx.SetBreakpoints(breakpoints.ToArray());
+                next = WithActiveDoc(model, d => d with { Breakpoints = breakpoints });
+                command = fx.SetBreakpoints(doc.Id, breakpoints.ToArray());
                 break;
             }
 
