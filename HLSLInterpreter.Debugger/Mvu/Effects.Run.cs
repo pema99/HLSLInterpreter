@@ -13,9 +13,27 @@ namespace HLSLInterpreter.Debugger.Mvu;
 // tiled run is detached so it can dispatch progress messages (it becomes
 // cancellable, then finishes) while the dispatch pump stays free. Each run owns
 // a cancellation source; starting a run cancels the previous one.
-public sealed partial class EffectRunner
+public sealed partial class Effects
 {
     private CancellationTokenSource _runCts;
+
+    public Cmd RunCpu(string code, ShaderConfig config, string docPath) =>
+        Cmd.OfEffect((dispatch, _) => RunCpuImpl(code, config, docPath, dispatch));
+
+    public Cmd RunGpu(string code, ShaderConfig config, float initialTime, bool paused, string docPath) =>
+        Cmd.OfEffect((dispatch, _) => RunGpuImpl(code, config, initialTime, paused, docPath, dispatch));
+
+    public Cmd RenderViewMode(DebugViewMode mode, ExecutionMetrics metrics, ShaderImage image) =>
+        Cmd.OfTask(() => RenderViewModeImpl(mode, metrics, image));
+
+    public Cmd SetGpuPaused(bool paused) =>
+        Cmd.OfTask(() => SetGpuPausedImpl(paused));
+
+    public Cmd RestartGpuTime() =>
+        Cmd.OfTask(() => _gpu.Restart().AsTask());
+
+    public Cmd CancelRun() =>
+        Cmd.OfTask(() => { try { _runCts?.Cancel(); } catch { } return Task.CompletedTask; });
 
     private CancellationTokenSource BeginRun()
     {
@@ -25,31 +43,26 @@ public sealed partial class EffectRunner
         return _runCts;
     }
 
-    private void CancelRunEffect()
-    {
-        try { _runCts?.Cancel(); } catch { }
-    }
-
-    private async Task RunCpuEffect(RunCpu c, Action<Msg> dispatch)
+    private async Task RunCpuImpl(string code, ShaderConfig config, string docPath, Action<Msg> dispatch)
     {
         var cts = BeginRun();
         try { await _gpu.Stop(); } catch { }
         RuntimeMemory.Reclaim();
 
-        var parserConfig = ShaderInvocationBuilder.MakeParserConfig(c.DocPath);
-        int wx = Math.Max(1, c.Config.WarpX);
-        int wy = Math.Max(1, c.Config.WarpY);
+        var parserConfig = ShaderInvocationBuilder.MakeParserConfig(docPath);
+        int wx = Math.Max(1, config.WarpX);
+        int wy = Math.Max(1, config.WarpY);
 
-        if (c.Config.CpuMode != CpuMode.SingleWarp)
+        if (config.CpuMode != CpuMode.SingleWarp)
         {
-            _ = RunCpuFullFrameSafe(c, parserConfig, wx, wy, dispatch, cts);
+            _ = RunCpuFullFrameSafe(code, config, parserConfig, wx, wy, dispatch, cts);
             return;
         }
 
         try
         {
-            var invocation = await _invocationBuilder.BuildAsync(c.Config, null, -1);
-            var program = ShaderProgram.FromSource(c.Code, parserConfig);
+            var invocation = await _invocationBuilder.BuildAsync(config, null, -1);
+            var program = ShaderProgram.FromSource(code, parserConfig);
             var outcome = _executor.Execute(_runner, program, invocation, ExecutionOptions.None);
 
             if (outcome.HasError)
@@ -74,9 +87,10 @@ public sealed partial class EffectRunner
     }
 
     private async Task RunCpuFullFrameSafe(
-        RunCpu c, HLSLParserConfig parserConfig, int wx, int wy, Action<Msg> dispatch, CancellationTokenSource cts)
+        string code, ShaderConfig config, HLSLParserConfig parserConfig,
+        int wx, int wy, Action<Msg> dispatch, CancellationTokenSource cts)
     {
-        try { await RunCpuFullFrame(c, parserConfig, wx, wy, dispatch, cts); }
+        try { await RunCpuFullFrame(code, config, parserConfig, wx, wy, dispatch, cts); }
         catch (Exception ex)
         {
             dispatch(new RunFinished("", new RunError(ex.Message, ex), null, null));
@@ -84,12 +98,13 @@ public sealed partial class EffectRunner
     }
 
     private async Task RunCpuFullFrame(
-        RunCpu c, HLSLParserConfig parserConfig, int wx, int wy, Action<Msg> dispatch, CancellationTokenSource cts)
+        string code, ShaderConfig config, HLSLParserConfig parserConfig,
+        int wx, int wy, Action<Msg> dispatch, CancellationTokenSource cts)
     {
         var (canvasW, canvasH) = await GetCanvasSizeAsync(wx, wy);
-        var invocation = (await _invocationBuilder.BuildAsync(c.Config, null, -1))
+        var invocation = (await _invocationBuilder.BuildAsync(config, null, -1))
             with { CanvasW = canvasW, CanvasH = canvasH };
-        if (c.Config.RenderMode == ShaderRenderMode.VertFrag)
+        if (config.RenderMode == ShaderRenderMode.VertFrag)
             invocation = invocation with { Projection = await _gpu.Projection(canvasW, canvasH) };
 
         int tilesX = (canvasW + wx - 1) / wx;
@@ -99,7 +114,7 @@ public sealed partial class EffectRunner
         for (int i = 3; i < fullPixels.Length; i += 4) fullPixels[i] = 255;
         await _canvas.AllocPixels(canvasW, canvasH);
 
-        var metrics = c.Config.CpuMode == CpuMode.FullFrameWithMetrics
+        var metrics = config.CpuMode == CpuMode.FullFrameWithMetrics
             ? new ExecutionMetrics(canvasW, canvasH, wx, wy)
             : null;
 
@@ -110,8 +125,8 @@ public sealed partial class EffectRunner
         using (var capture = new ConsoleCapture())
         {
             tileError = OperatingSystem.IsBrowser()
-                ? await RunTilesSerial(c.Code, parserConfig, invocation, wx, wy, canvasW, canvasH, tilesX, tilesY, fullPixels, metrics, cts)
-                : await RunTilesParallel(c.Code, parserConfig, invocation, wx, wy, canvasW, canvasH, tilesX, tilesY, fullPixels, metrics, cts);
+                ? await RunTilesSerial(code, parserConfig, invocation, wx, wy, canvasW, canvasH, tilesX, tilesY, fullPixels, metrics, cts)
+                : await RunTilesParallel(code, parserConfig, invocation, wx, wy, canvasW, canvasH, tilesX, tilesY, fullPixels, metrics, cts);
             output = capture.ToString();
         }
 
@@ -266,7 +281,8 @@ public sealed partial class EffectRunner
         return (Math.Max(wx, 256), Math.Max(wy, 256));
     }
 
-    private async Task RunGpuEffect(RunGpu c, Action<Msg> dispatch)
+    private async Task RunGpuImpl(
+        string code, ShaderConfig config, float initialTime, bool paused, string docPath, Action<Msg> dispatch)
     {
         BeginRun();
         try { await _gpu.Stop(); } catch { }
@@ -281,23 +297,23 @@ public sealed partial class EffectRunner
         }
         try
         {
-            int wx = Math.Max(1, c.Config.WarpX);
-            int wy = Math.Max(1, c.Config.WarpY);
-            var parserConfig = ShaderInvocationBuilder.MakeParserConfig(c.DocPath);
+            int wx = Math.Max(1, config.WarpX);
+            int wy = Math.Max(1, config.WarpY);
+            var parserConfig = ShaderInvocationBuilder.MakeParserConfig(docPath);
             var assembled = ShaderReflection.AssembleVertexShader(
-                c.Code, c.Config.VertexEntryPoint, c.Config.FragmentEntryPoint, c.Config.RenderMode, parserConfig);
-            string mode = c.Config.RenderMode == ShaderRenderMode.VertFrag ? "vertfrag" : "pixel";
+                code, config.VertexEntryPoint, config.FragmentEntryPoint, config.RenderMode, parserConfig);
+            string mode = config.RenderMode == ShaderRenderMode.VertFrag ? "vertfrag" : "pixel";
             float[] meshVertices = null;
             uint[] meshIndices = null;
-            if (c.Config.RenderMode == ShaderRenderMode.VertFrag)
+            if (config.RenderMode == ShaderRenderMode.VertFrag)
             {
-                meshVertices = c.Config.Mesh.GetInterleavedVertices();
-                meshIndices = c.Config.Mesh.Indices;
+                meshVertices = config.Mesh.GetInterleavedVertices();
+                meshIndices = config.Mesh.Indices;
             }
             await _gpu.Render(new GpuRenderRequest(
                 CanvasId: "color-canvas-gpu",
                 Source: assembled.Source,
-                FragmentEntryPoint: c.Config.FragmentEntryPoint,
+                FragmentEntryPoint: config.FragmentEntryPoint,
                 WarpX: wx,
                 WarpY: wy,
                 DotNetRef: DotNetRef,
@@ -306,10 +322,10 @@ public sealed partial class EffectRunner
                 VertexInputs: assembled.VertexInputs,
                 MeshVertices: meshVertices,
                 MeshIndices: meshIndices,
-                Time: c.InitialTime,
-                Textures: c.Config.Textures,
-                Samplers: c.Config.Samplers));
-            if (c.Paused)
+                Time: initialTime,
+                Textures: config.Textures,
+                Samplers: config.Samplers));
+            if (paused)
             {
                 try { await _gpu.Pause(); } catch { }
             }
@@ -321,20 +337,20 @@ public sealed partial class EffectRunner
         }
     }
 
-    private async Task RenderViewModeEffect(RenderViewMode c)
+    private async Task RenderViewModeImpl(DebugViewMode mode, ExecutionMetrics metrics, ShaderImage image)
     {
-        if (c.Mode != DebugViewMode.Color && c.Metrics != null)
+        if (mode != DebugViewMode.Color && metrics != null)
         {
-            var pixels = c.Metrics.Render(c.Mode);
-            if (pixels != null) await _canvas.SetPixels(pixels, c.Metrics.CanvasW, c.Metrics.CanvasH);
+            var pixels = metrics.Render(mode);
+            if (pixels != null) await _canvas.SetPixels(pixels, metrics.CanvasW, metrics.CanvasH);
         }
-        else if (c.Image != null)
+        else if (image != null)
         {
-            await _canvas.SetPixels(c.Image.Pixels, c.Image.Width, c.Image.Height);
+            await _canvas.SetPixels(image.Pixels, image.Width, image.Height);
         }
     }
 
-    private async Task SetGpuPausedEffect(bool paused)
+    private async Task SetGpuPausedImpl(bool paused)
     {
         try
         {

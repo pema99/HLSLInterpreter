@@ -6,7 +6,7 @@ namespace HLSLInterpreter.Debugger.Mvu;
 // runner pushes only the fields that changed since the last sync. A field that
 // fails to push (for example before its canvas is mounted) is left uncached so
 // the next sync retries it.
-public sealed partial class EffectRunner
+public sealed partial class Effects
 {
     private (int, int)? _cWarp;
     private string _cRegularMode;
@@ -19,7 +19,10 @@ public sealed partial class EffectRunner
     private int[] _cThreadStates;
     private Mesh _cPushedMesh;
 
-    private async Task SyncCanvasEffect(CanvasProjection p)
+    public Cmd SyncCanvas(CanvasProjection projection) =>
+        Cmd.OfTask(() => SyncCanvasImpl(projection));
+
+    private async Task SyncCanvasImpl(CanvasProjection p)
     {
         if (_cWarp != (p.WarpX, p.WarpY))
         {

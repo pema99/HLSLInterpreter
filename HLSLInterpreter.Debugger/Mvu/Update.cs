@@ -5,17 +5,16 @@ using HLSLInterpreter.Debugger.State;
 namespace HLSLInterpreter.Debugger.Mvu;
 
 // The pure update function. It maps (model, message) to the next model plus the
-// side effects to run. It never performs an effect itself: anything impure is
-// described as a Cmd and handed to the effect runner. A canvas sync is appended
-// after every message so the JS canvas state always tracks the model.
+// command to run. It performs no effect itself: every effect is expressed as a
+// Cmd (built through Effects, or the generic Cmd vocabulary) and handed to the
+// MvuProgram interpreter. A canvas sync is appended after every message so the
+// JS canvas state always tracks the model.
 public static class Update
 {
-    private static readonly IReadOnlyList<Cmd> None = Array.Empty<Cmd>();
-
-    public static (AppState State, IReadOnlyList<Cmd> Commands) Run(AppState model, Msg message)
+    public static (AppState State, Cmd Command) Run(Effects fx, AppState model, Msg message)
     {
         AppState next;
-        IReadOnlyList<Cmd> commands;
+        Cmd command;
         switch (message)
         {
             case AppStarted x:
@@ -63,41 +62,41 @@ public static class Update
                     },
                     Run = model.Run with { GpuPreviewEnabled = applied.GpuPreviewEnabled },
                 };
-                commands = None;
+                command = Cmd.None;
                 break;
             }
 
             case CanvasReady:
                 next = model;
-                commands = None;
+                command = Cmd.None;
                 break;
 
             case DefaultMeshLoaded x:
                 next = WithActiveConfig(
                     model with { Editor = model.Editor with { DefaultMesh = x.Mesh } },
                     c => c with { Mesh = x.Mesh });
-                commands = None;
+                command = Cmd.None;
                 break;
 
             case RunRequested:
                 next = model;
-                commands = model.Run.Status != RunStatus.Idle
-                    ? None
-                    : Cmds(new FetchEditorText(code => new RunWithCode(code)));
+                command = model.Run.Status != RunStatus.Idle
+                    ? Cmd.None
+                    : fx.FetchEditorText(code => new RunWithCode(code));
                 break;
 
             case RunCancelRequested:
                 next = model;
-                commands = Cmds(new CancelRun());
+                command = fx.CancelRun();
                 break;
 
             case RunWithCode x:
-                (next, commands) = StartRunWithCode(SyncActiveCode(model, x.Code), x.Code);
+                (next, command) = StartRunWithCode(fx, SyncActiveCode(model, x.Code), x.Code);
                 break;
 
             case RunBecameCancellable:
                 next = model with { Run = model.Run with { Status = RunStatus.Cancellable } };
-                commands = None;
+                command = Cmd.None;
                 break;
 
             case RunFinished x:
@@ -112,32 +111,32 @@ public static class Update
                         Metrics = x.Metrics,
                     }
                 };
-                commands = None;
+                command = Cmd.None;
                 break;
 
             case GpuPauseToggled:
                 next = model with { Run = model.Run with { GpuPaused = !model.Run.GpuPaused } };
-                commands = Cmds(new SetGpuPaused(!model.Run.GpuPaused));
+                command = fx.SetGpuPaused(!model.Run.GpuPaused);
                 break;
 
             case GpuTimeRestartRequested:
                 next = model;
-                commands = Cmds(new RestartGpuTime());
+                command = fx.RestartGpuTime();
                 break;
 
             case GpuPreviewToggled x:
                 next = model with { Run = model.Run with { GpuPreviewEnabled = x.Enabled } };
-                commands = Cmds(new FetchEditorText(code => new RunWithCode(code)));
+                command = fx.FetchEditorText(code => new RunWithCode(code));
                 break;
 
             case ViewModeChanged x:
                 next = model with { Run = model.Run with { ViewMode = x.Mode } };
-                commands = Cmds(new RenderViewMode(x.Mode, model.Run.Metrics, model.Run.Image));
+                command = fx.RenderViewMode(x.Mode, model.Run.Metrics, model.Run.Image);
                 break;
 
             case ImageCollapseToggled:
                 next = model with { Ui = model.Ui with { ImageCollapsed = !model.Ui.ImageCollapsed } };
-                commands = None;
+                command = Cmd.None;
                 break;
 
             case DebugRequested:
@@ -148,16 +147,16 @@ public static class Update
                     && model.Debug.DebugVertexIndex < 0)
                 {
                     var cap = model.Run.CapturedFrame;
-                    (next, commands) = DebugAtVertex(model, 0,
+                    (next, command) = DebugAtVertex(fx, model, 0,
                         cap?.Time ?? 0f,
                         cap?.CanvasW ?? Math.Max(1, config.WarpX),
                         cap?.CanvasH ?? Math.Max(1, config.WarpY));
                     break;
                 }
                 next = model;
-                commands = model.Editor.ActiveDocument == null
-                    ? None
-                    : Cmds(new FetchEditorText(code => new DebugWithCode(code)));
+                command = model.Editor.ActiveDocument == null
+                    ? Cmd.None
+                    : fx.FetchEditorText(code => new DebugWithCode(code));
                 break;
             }
 
@@ -165,12 +164,12 @@ public static class Update
             {
                 next = SyncActiveCode(model, x.Code);
                 var doc = next.Editor.ActiveDocument;
-                if (doc == null) { commands = None; break; }
+                if (doc == null) { command = Cmd.None; break; }
                 var captured = next.Run.CapturedFrame;
                 bool snapshot = next.Run.GpuPreviewEnabled && captured == null;
                 next = next with { Run = BeginRunReset(next.Run, keepCaptured: true) };
-                commands = Cmds(new RecordTrace(
-                    x.Code, doc.Config, captured, snapshot, next.Debug.DebugVertexIndex, doc.Id, doc.Path));
+                command = fx.RecordTrace(
+                    x.Code, doc.Config, captured, snapshot, next.Debug.DebugVertexIndex, doc.Id, doc.Path);
                 break;
             }
 
@@ -189,12 +188,12 @@ public static class Update
                 next = WithActiveConfig(next, c => c with { GroupOffsetX = x.Px / wx, GroupOffsetY = x.Py / wy });
                 next = WithInspectedThread(next, (x.Py % wy) * wx + (x.Px % wx));
                 next = next with { Run = next.Run with { CapturedFrame = new FrameCapture(x.Time, x.CanvasW, x.CanvasH) } };
-                commands = Cmds(new FetchEditorText(code => new DebugWithCode(code)));
+                command = fx.FetchEditorText(code => new DebugWithCode(code));
                 break;
             }
 
             case DebugAtVertexRequested x:
-                (next, commands) = DebugAtVertex(model, x.VertexIndex, x.Time, x.CanvasW, x.CanvasH);
+                (next, command) = DebugAtVertex(fx, model, x.VertexIndex, x.Time, x.CanvasW, x.CanvasH);
                 break;
 
             case DebugTraceRecorded x:
@@ -211,7 +210,7 @@ public static class Update
                 if (!canDebug)
                 {
                     next = model with { Run = run with { Error = new RunError(trace.ErrorMessage, trace.Exception) } };
-                    commands = None;
+                    command = Cmd.None;
                     break;
                 }
                 if (trace.HasError)
@@ -230,22 +229,22 @@ public static class Update
                     ImmediateHistory = Array.Empty<ImmediateEntry>(),
                 };
                 next = model with { Run = run, Debug = debug };
-                commands = Cmds(new SetEditorReadOnly(true), HighlightCmd(next));
+                command = Cmd.Batch(fx.SetEditorReadOnly(true), HighlightCmd(fx, next));
                 break;
             }
 
             case DebugExitRequested:
                 next = ExitDebugCore(model);
-                commands = Cmds(
-                    new SetEditorReadOnly(false),
-                    new HighlightEditorLine(0),
-                    new FetchEditorText(code => new RunWithCode(code)));
+                command = Cmd.Batch(
+                    fx.SetEditorReadOnly(false),
+                    fx.HighlightLine(0),
+                    fx.FetchEditorText(code => new RunWithCode(code)));
                 break;
 
             case StepRequested x:
             {
                 var trace = model.Debug.Trace;
-                if (trace == null) { next = model; commands = None; break; }
+                if (trace == null) { next = model; command = Cmd.None; break; }
                 var cmds = new List<Cmd>();
 
                 // Stepping always brings the debugged document's tab to the front.
@@ -258,7 +257,7 @@ public static class Update
                     {
                         if (docs[i].Id == debugId)
                         {
-                            cmds.Add(new SetEditorText(docs[i].Code));
+                            cmds.Add(fx.SetEditorText(docs[i].Code));
                             next = model with { Editor = model.Editor with { ActiveIndex = i } };
                             break;
                         }
@@ -280,8 +279,8 @@ public static class Update
                     _ => from,
                 };
                 next = next with { Debug = next.Debug with { StepIndex = index, SelectedFrame = 0 } };
-                cmds.Add(HighlightCmd(next));
-                commands = cmds;
+                cmds.Add(HighlightCmd(fx, next));
+                command = Cmd.Batch(cmds);
                 break;
             }
 
@@ -290,42 +289,42 @@ public static class Update
                 var breakpoints = new HashSet<int>(model.Debug.Breakpoints);
                 if (!breakpoints.Add(x.Line)) breakpoints.Remove(x.Line);
                 next = model with { Debug = model.Debug with { Breakpoints = breakpoints } };
-                commands = Cmds(new SetEditorBreakpoints(breakpoints.ToArray()));
+                command = fx.SetBreakpoints(breakpoints.ToArray());
                 break;
             }
 
             case SelectedFrameChanged x:
                 next = model with { Debug = model.Debug with { SelectedFrame = Math.Max(0, x.Frame) } };
-                commands = None;
+                command = Cmd.None;
                 break;
 
             case InspectedThreadChanged x:
                 next = WithInspectedThread(model, x.Thread);
-                commands = None;
+                command = Cmd.None;
                 break;
 
             case InspectedPixelChanged x:
             {
                 var config = ActiveConfig(model);
                 next = config.WarpX <= 0 ? model : WithInspectedThread(model, x.Py * config.WarpX + x.Px);
-                commands = None;
+                command = Cmd.None;
                 break;
             }
 
             case BottomModeChanged x:
                 next = model with { Debug = model.Debug with { BottomMode = x.Mode } };
-                commands = None;
+                command = Cmd.None;
                 break;
 
             case ImmediateEvalRequested x:
             {
                 var debug = model.Debug;
                 next = model;
-                commands = debug.Trace == null || debug.StepIndex < 0 || string.IsNullOrEmpty(debug.DebugCode)
-                    ? None
-                    : Cmds(new EvaluateImmediate(
+                command = debug.Trace == null || debug.StepIndex < 0 || string.IsNullOrEmpty(debug.DebugCode)
+                    ? Cmd.None
+                    : fx.EvaluateImmediate(
                         x.Expression, debug.DebugCode, debug.StepIndex, ActiveConfig(model),
-                        model.Run.CapturedFrame, debug.InspectedThread, debug.DebugVertexIndex, ActiveDocPath(model)));
+                        model.Run.CapturedFrame, debug.InspectedThread, debug.DebugVertexIndex, ActiveDocPath(model));
                 break;
             }
 
@@ -337,23 +336,23 @@ public static class Update
                         ImmediateHistory = model.Debug.ImmediateHistory.Append(x.Entry).ToArray(),
                     }
                 };
-                commands = None;
+                command = Cmd.None;
                 break;
 
             case TabSwitchRequested x:
                 next = model;
-                commands = Cmds(new FetchEditorText(code => new TabSwitched(code, x.Index)));
+                command = fx.FetchEditorText(code => new TabSwitched(code, x.Index));
                 break;
 
             case TabSwitched x:
                 next = SyncActiveCode(model, x.CurrentCode);
                 if (x.Index < 0 || x.Index >= next.Editor.Documents.Count || x.Index == next.Editor.ActiveIndex)
                 {
-                    commands = None;
+                    command = Cmd.None;
                     break;
                 }
                 next = next with { Editor = next.Editor with { ActiveIndex = x.Index } };
-                commands = Cmds(new SetEditorText(next.Editor.ActiveDocument?.Code ?? ""), HighlightCmd(next));
+                command = Cmd.Batch(fx.SetEditorText(next.Editor.ActiveDocument?.Code ?? ""), HighlightCmd(fx, next));
                 break;
 
             case TabCloseRequested x:
@@ -362,7 +361,7 @@ public static class Update
                 if (docs.Count <= 1 || x.Index < 0 || x.Index >= docs.Count)
                 {
                     next = model;
-                    commands = None;
+                    command = Cmd.None;
                     break;
                 }
                 var cmds = new List<Cmd>();
@@ -370,8 +369,8 @@ public static class Update
                 if (next.Debug.IsActive && docs[x.Index].Id == next.Debug.DebugDocumentId)
                 {
                     next = ExitDebugCore(next);
-                    cmds.Add(new SetEditorReadOnly(false));
-                    cmds.Add(new HighlightEditorLine(0));
+                    cmds.Add(fx.SetEditorReadOnly(false));
+                    cmds.Add(fx.HighlightLine(0));
                 }
                 bool activeChanges = x.Index == next.Editor.ActiveIndex;
                 var documents = next.Editor.Documents.ToList();
@@ -387,8 +386,8 @@ public static class Update
                     }
                 };
                 if (activeChanges)
-                    cmds.Add(new SetEditorText(next.Editor.ActiveDocument?.Code ?? ""));
-                commands = cmds;
+                    cmds.Add(fx.SetEditorText(next.Editor.ActiveDocument?.Code ?? ""));
+                command = Cmd.Batch(cmds);
                 break;
             }
 
@@ -399,7 +398,7 @@ public static class Update
                     || x.Desired == x.From || x.Desired == x.From + 1)
                 {
                     next = model;
-                    commands = None;
+                    command = Cmd.None;
                     break;
                 }
                 var documents = editor.Documents.ToList();
@@ -415,13 +414,13 @@ public static class Update
                         ActiveIndex = documents.IndexOf(active),
                     }
                 };
-                commands = None;
+                command = Cmd.None;
                 break;
             }
 
             case ObjPickRequested:
                 next = model;
-                commands = Cmds(new PickObjFile());
+                command = fx.PickObjFile();
                 break;
 
             case ObjMeshLoaded x:
@@ -429,7 +428,7 @@ public static class Update
                 if (string.IsNullOrWhiteSpace(x.ObjText))
                 {
                     next = model;
-                    commands = None;
+                    command = Cmd.None;
                     break;
                 }
                 Mesh mesh;
@@ -440,43 +439,43 @@ public static class Update
                     {
                         Run = model.Run with { Error = new RunError("Failed to load OBJ: " + ex.Message, ex) }
                     };
-                    commands = None;
+                    command = Cmd.None;
                     break;
                 }
                 next = WithActiveConfig(model, c => c with { Mesh = mesh });
-                commands = Cmds(new FetchEditorText(code => new RunWithCode(code)));
+                command = fx.FetchEditorText(code => new RunWithCode(code));
                 break;
             }
 
             case OpenFileRequested:
                 next = model with { Ui = model.Ui with { MenuOpen = false } };
-                commands = Cmds(new OpenFileDialog());
+                command = fx.OpenFileDialog();
                 break;
 
             case FileOpened x:
                 next = model;
-                commands = Cmds(new FetchEditorText(code => new FileOpenedWithCode(code, x.Path, x.Content)));
+                command = fx.FetchEditorText(code => new FileOpenedWithCode(code, x.Path, x.Content));
                 break;
 
             case FileOpenedWithCode x:
                 next = SyncActiveCode(model, x.CurrentCode);
-                if (x.Path == null || x.Content == null) { commands = None; break; }
+                if (x.Path == null || x.Content == null) { command = Cmd.None; break; }
                 int openExisting = IndexOfPath(next, x.Path);
                 if (openExisting >= 0)
                 {
-                    if (openExisting == next.Editor.ActiveIndex) { commands = None; break; }
+                    if (openExisting == next.Editor.ActiveIndex) { command = Cmd.None; break; }
                     next = next with { Editor = next.Editor with { ActiveIndex = openExisting } };
-                    commands = Cmds(new SetEditorText(next.Editor.ActiveDocument?.Code ?? ""), HighlightCmd(next));
+                    command = Cmd.Batch(fx.SetEditorText(next.Editor.ActiveDocument?.Code ?? ""), HighlightCmd(fx, next));
                     break;
                 }
                 next = AddDoc(next, System.IO.Path.GetFileName(x.Path), x.Content, x.Path);
-                commands = Cmds(new SetEditorText(x.Content));
+                command = fx.SetEditorText(x.Content);
                 break;
 
             case FileDropped x:
                 next = model;
-                commands = Cmds(new FetchEditorText(
-                    code => new FileDroppedWithCode(code, x.Name, x.Content, x.Path)));
+                command = fx.FetchEditorText(
+                    code => new FileDroppedWithCode(code, x.Name, x.Content, x.Path));
                 break;
 
             case FileDroppedWithCode x:
@@ -484,23 +483,23 @@ public static class Update
                 int dropExisting = string.IsNullOrEmpty(x.Path) ? -1 : IndexOfPath(next, x.Path);
                 if (dropExisting >= 0)
                 {
-                    if (dropExisting == next.Editor.ActiveIndex) { commands = None; break; }
+                    if (dropExisting == next.Editor.ActiveIndex) { command = Cmd.None; break; }
                     next = next with { Editor = next.Editor with { ActiveIndex = dropExisting } };
-                    commands = Cmds(new SetEditorText(next.Editor.ActiveDocument?.Code ?? ""), HighlightCmd(next));
+                    command = Cmd.Batch(fx.SetEditorText(next.Editor.ActiveDocument?.Code ?? ""), HighlightCmd(fx, next));
                     break;
                 }
                 next = AddDoc(next, x.Name, x.Content, string.IsNullOrEmpty(x.Path) ? null : x.Path);
-                commands = Cmds(new SetEditorText(x.Content));
+                command = fx.SetEditorText(x.Content);
                 break;
 
             case SaveFileRequested x:
                 next = model with { Ui = model.Ui with { MenuOpen = false } };
-                commands = Cmds(new FetchEditorText(code => new SaveFileWithCode(code, x.AsNew)));
+                command = fx.FetchEditorText(code => new SaveFileWithCode(code, x.AsNew));
                 break;
 
             case SaveFileWithCode x:
                 next = SyncActiveCode(model, x.Code);
-                commands = Cmds(new SaveFileDialog(x.Code, ActiveDocPath(model), x.AsNew));
+                command = fx.SaveFileDialog(x.Code, ActiveDocPath(model), x.AsNew);
                 break;
 
             case FileSaved x:
@@ -509,12 +508,12 @@ public static class Update
                     Path = x.Path,
                     Name = System.IO.Path.GetFileName(x.Path),
                 });
-                commands = None;
+                command = Cmd.None;
                 break;
 
             case DownloadRequested:
                 next = model with { Ui = model.Ui with { MenuOpen = false } };
-                commands = Cmds(new FetchEditorText(code => new DownloadWithCode(code)));
+                command = fx.FetchEditorText(code => new DownloadWithCode(code));
                 break;
 
             case DownloadWithCode x:
@@ -522,20 +521,20 @@ public static class Update
                 next = SyncActiveCode(model, x.Code);
                 var doc = next.Editor.ActiveDocument;
                 string fileName = string.IsNullOrWhiteSpace(doc?.Name) ? "shader.hlsl" : doc.Name;
-                commands = Cmds(new DownloadFile(fileName, x.Code));
+                command = fx.DownloadFile(fileName, x.Code);
                 break;
             }
 
             case NewFileRequested x:
                 next = model with { Ui = model.Ui with { OpenModal = ModalKind.None } };
-                commands = Cmds(new FetchEditorText(code => new ContentLoaded(
-                    code, x.Name, x.Content, x.Mode, x.FragEntry, x.VertEntry, null, null, false)));
+                command = fx.FetchEditorText(code => new ContentLoaded(
+                    code, x.Name, x.Content, x.Mode, x.FragEntry, x.VertEntry, null, null, false));
                 break;
 
             case ExampleLoaded x:
                 next = model with { Ui = model.Ui with { OpenModal = ModalKind.None } };
-                commands = Cmds(new FetchEditorText(code => new ContentLoaded(
-                    code, x.Name, x.Code, x.Mode, x.FragEntry, x.VertEntry, x.Textures, x.Samplers, true)));
+                command = fx.FetchEditorText(code => new ContentLoaded(
+                    code, x.Name, x.Code, x.Mode, x.FragEntry, x.VertEntry, x.Textures, x.Samplers, true));
                 break;
 
             case ShaderToyImported x:
@@ -548,9 +547,9 @@ public static class Update
                         textures.Add(new TextureBinding { Name = name });
                 }
                 next = model with { Ui = model.Ui with { OpenModal = ModalKind.None } };
-                commands = Cmds(new FetchEditorText(code => new ContentLoaded(
+                command = fx.FetchEditorText(code => new ContentLoaded(
                     code, "shadertoy.hlsl", x.Hlsl, ShaderRenderMode.Pixel, "frag", null,
-                    textures, Array.Empty<SamplerBinding>(), true)));
+                    textures, Array.Empty<SamplerBinding>(), true));
                 break;
             }
 
@@ -561,8 +560,8 @@ public static class Update
                 if (next.Debug.IsActive)
                 {
                     next = ExitDebugCore(next);
-                    cmds.Add(new SetEditorReadOnly(false));
-                    cmds.Add(new HighlightEditorLine(0));
+                    cmds.Add(fx.SetEditorReadOnly(false));
+                    cmds.Add(fx.HighlightLine(0));
                 }
                 next = next.Editor.TabsEnabled || next.Editor.ActiveDocument == null
                     ? AddDoc(next, x.Name, x.Content)
@@ -576,35 +575,35 @@ public static class Update
                 if (x.Samplers != null) next = WithActiveConfig(next, c => c with { Samplers = x.Samplers });
 
                 string content = next.Editor.ActiveDocument?.Code ?? "";
-                cmds.Add(new SetEditorText(content));
+                cmds.Add(fx.SetEditorText(content));
                 if (x.Run)
                 {
-                    var (ranModel, runCmds) = StartRunWithCode(next, content);
+                    var (ranModel, runCommand) = StartRunWithCode(fx, next, content);
                     next = ranModel;
-                    cmds.AddRange(runCmds);
+                    cmds.Add(runCommand);
                 }
-                commands = cmds;
+                command = Cmd.Batch(cmds);
                 break;
             }
 
             case RenderModeChanged x:
                 next = WithActiveConfig(model, c => c with { RenderMode = x.Mode });
-                commands = None;
+                command = Cmd.None;
                 break;
 
             case FragmentEntryChanged x:
                 next = WithActiveConfig(model, c => c with { FragmentEntryPoint = x.Entry });
-                commands = None;
+                command = Cmd.None;
                 break;
 
             case VertexEntryChanged x:
                 next = WithActiveConfig(model, c => c with { VertexEntryPoint = x.Entry });
-                commands = None;
+                command = Cmd.None;
                 break;
 
             case GroupOffsetChanged x:
                 next = WithActiveConfig(model, c => c with { GroupOffsetX = x.X, GroupOffsetY = x.Y });
-                commands = None;
+                command = Cmd.None;
                 break;
 
             case WarpSizeChanged x:
@@ -614,49 +613,49 @@ public static class Update
                     WarpY = Math.Max(1, x.Y),
                 });
                 next = WithInspectedThread(next, next.Debug.InspectedThread);
-                commands = None;
+                command = Cmd.None;
                 break;
 
             case CpuModeChanged x:
                 next = WithActiveConfig(model, c => c with { CpuMode = x.Mode });
-                commands = None;
+                command = Cmd.None;
                 break;
 
             case DebugTargetChanged x:
                 next = WithActiveConfig(model, c => c with { DebugTarget = x.Target });
-                commands = None;
+                command = Cmd.None;
                 break;
 
             case FontSizeChanged x:
                 next = model with { Editor = model.Editor with { FontSize = x.Size } };
-                commands = Cmds(new SetEditorFontSize(x.Size));
+                command = fx.SetEditorFontSize(x.Size);
                 break;
 
             case TexturesSaved x:
                 next = WithActiveConfig(
                     model with { Ui = model.Ui with { OpenModal = ModalKind.None } },
                     c => c with { Textures = x.Textures, Samplers = x.Samplers });
-                commands = Cmds(new FetchEditorText(code => new RunWithCode(code)));
+                command = fx.FetchEditorText(code => new RunWithCode(code));
                 break;
 
             case ModalRequested x:
                 next = model with { Ui = model.Ui with { OpenModal = x.Kind, MenuOpen = false } };
-                commands = None;
+                command = Cmd.None;
                 break;
 
             case ModalDismissed:
                 next = model with { Ui = model.Ui with { OpenModal = ModalKind.None } };
-                commands = None;
+                command = Cmd.None;
                 break;
 
             case MenuToggled:
                 next = model with { Ui = model.Ui with { MenuOpen = !model.Ui.MenuOpen } };
-                commands = None;
+                command = Cmd.None;
                 break;
 
             case MenuClosed:
                 next = model with { Ui = model.Ui with { MenuOpen = false } };
-                commands = None;
+                command = Cmd.None;
                 break;
 
             case BonzomaticToggled:
@@ -666,23 +665,23 @@ public static class Update
                 if (next.Debug.IsActive)
                 {
                     next = ExitDebugCore(next);
-                    cmds.Add(new SetEditorReadOnly(false));
-                    cmds.Add(new HighlightEditorLine(0));
+                    cmds.Add(fx.SetEditorReadOnly(false));
+                    cmds.Add(fx.HighlightLine(0));
                 }
                 bool enabled = !next.Ui.BonzomaticMode;
                 next = next with { Ui = next.Ui with { BonzomaticMode = enabled } };
                 if (enabled && !next.Run.GpuPreviewEnabled)
                 {
                     next = next with { Run = next.Run with { GpuPreviewEnabled = true } };
-                    cmds.Add(new FetchEditorText(code => new RunWithCode(code)));
+                    cmds.Add(fx.FetchEditorText(code => new RunWithCode(code)));
                 }
-                commands = cmds;
+                command = Cmd.Batch(cmds);
                 break;
             }
 
             case PermalinkCopyRequested x:
                 next = model with { Ui = model.Ui with { MenuOpen = false } };
-                commands = Cmds(new FetchEditorText(code => new PermalinkCopyWithCode(code, x.BaseUrl)));
+                command = fx.FetchEditorText(code => new PermalinkCopyWithCode(code, x.BaseUrl));
                 break;
 
             case PermalinkCopyWithCode x:
@@ -694,30 +693,29 @@ public static class Update
                     config.RenderMode, config.VertexEntryPoint, config.CpuMode);
                 string url = PermalinkCodec.BuildUrl(x.BaseUrl, x.Code, settings);
                 next = SyncActiveCode(model, x.Code) with { Ui = model.Ui with { PermalinkToastVisible = true } };
-                commands = Cmds(
-                    new CopyToClipboard(url),
-                    new DelayThenDispatch(1500, new PermalinkToastDismissed()));
+                command = Cmd.Batch(
+                    fx.CopyToClipboard(url),
+                    fx.Delay(1500, new PermalinkToastDismissed()));
                 break;
             }
 
             case PermalinkToastDismissed:
                 next = model with { Ui = model.Ui with { PermalinkToastVisible = false } };
-                commands = None;
+                command = Cmd.None;
                 break;
 
             default:
                 next = model;
-                commands = None;
+                command = Cmd.None;
                 break;
         }
 
-        var all = new List<Cmd>(commands) { new SyncCanvas(CanvasProjection.Compute(next)) };
-        return (next, all);
+        return (next, Cmd.Batch(command, fx.SyncCanvas(CanvasProjection.Compute(next))));
     }
 
     // ---- Shared helpers ----
 
-    private static (AppState, IReadOnlyList<Cmd>) StartRunWithCode(AppState m, string code)
+    private static (AppState, Cmd) StartRunWithCode(Effects fx, AppState m, string code)
     {
         var config = ActiveConfig(m);
         float initialTime = m.Run.CapturedFrame?.Time ?? 0f;
@@ -729,9 +727,9 @@ public static class Update
         if (m.Run.GpuPreviewEnabled)
         {
             next = next with { Run = next.Run with { Backend = RunBackend.Gpu } };
-            return (next, Cmds(new RunGpu(code, config, initialTime, next.Run.GpuPaused, ActiveDocPath(m))));
+            return (next, fx.RunGpu(code, config, initialTime, next.Run.GpuPaused, ActiveDocPath(m)));
         }
-        return (next, Cmds(new RunCpu(code, config, ActiveDocPath(m))));
+        return (next, fx.RunCpu(code, config, ActiveDocPath(m)));
     }
 
     private static RunState BeginRunReset(RunState r, bool keepCaptured) => r with
@@ -746,8 +744,8 @@ public static class Update
         ViewMode = DebugViewMode.Color,
     };
 
-    private static (AppState, IReadOnlyList<Cmd>) DebugAtVertex(
-        AppState m, int vertexIndex, float time, int canvasW, int canvasH)
+    private static (AppState, Cmd) DebugAtVertex(
+        Effects fx, AppState m, int vertexIndex, float time, int canvasW, int canvasH)
     {
         var config = ActiveConfig(m);
         int warpSize = Math.Max(1, config.WarpX * config.WarpY);
@@ -756,7 +754,7 @@ public static class Update
         next = next with { Run = next.Run with { CapturedFrame = new FrameCapture(time, canvasW, canvasH) } };
         if (next.Debug.BottomMode != DebugBottomMode.ThreadStates)
             next = next with { Debug = next.Debug with { BottomMode = DebugBottomMode.ThreadStates } };
-        return (next, Cmds(new FetchEditorText(code => new DebugWithCode(code))));
+        return (next, fx.FetchEditorText(code => new DebugWithCode(code)));
     }
 
     private static AppState ExitDebugCore(AppState m)
@@ -845,13 +843,11 @@ public static class Update
         return m with { Debug = m.Debug with { InspectedThread = Math.Clamp(thread, 0, max) } };
     }
 
-    private static Cmd HighlightCmd(AppState m)
+    private static Cmd HighlightCmd(Effects fx, AppState m)
     {
-        if (!m.Debug.IsActive) return new HighlightEditorLine(0);
+        if (!m.Debug.IsActive) return fx.HighlightLine(0);
         bool onDoc = m.Editor.ActiveDocument?.Id == m.Debug.DebugDocumentId;
         int line = onDoc && m.Debug.Trace != null ? m.Debug.Trace.LineAt(m.Debug.StepIndex) : 0;
-        return new HighlightEditorLine(line);
+        return fx.HighlightLine(line);
     }
-
-    private static IReadOnlyList<Cmd> Cmds(params Cmd[] commands) => commands;
 }

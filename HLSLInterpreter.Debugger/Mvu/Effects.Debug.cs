@@ -7,14 +7,28 @@ namespace HLSLInterpreter.Debugger.Mvu;
 
 // Debug effects: recording an execution trace and evaluating an immediate-window
 // expression in the scope of the current debug step.
-public sealed partial class EffectRunner
+public sealed partial class Effects
 {
-    private async Task RecordTraceEffect(RecordTrace c, Action<Msg> dispatch)
+    public Cmd RecordTrace(
+        string code, ShaderConfig config, FrameCapture captured, bool snapshotGpu,
+        int debugVertexIndex, int documentId, string docPath) =>
+        Cmd.OfEffect((dispatch, _) =>
+            RecordTraceImpl(code, config, captured, snapshotGpu, debugVertexIndex, documentId, docPath, dispatch));
+
+    public Cmd EvaluateImmediate(
+        string expression, string debugCode, int stepIndex, ShaderConfig config,
+        FrameCapture captured, int inspectedThread, int debugVertexIndex, string docPath) =>
+        Cmd.OfEffect((dispatch, _) =>
+            EvaluateImmediateImpl(
+                expression, debugCode, stepIndex, config, captured, inspectedThread, debugVertexIndex, docPath, dispatch));
+
+    private async Task RecordTraceImpl(
+        string code, ShaderConfig config, FrameCapture captured, bool snapshotGpu,
+        int debugVertexIndex, int documentId, string docPath, Action<Msg> dispatch)
     {
         try
         {
-            var captured = c.Captured;
-            if (c.SnapshotGpu)
+            if (snapshotGpu)
             {
                 try
                 {
@@ -27,13 +41,13 @@ public sealed partial class EffectRunner
             try { await _gpu.Pause(); } catch { }
             RuntimeMemory.Reclaim();
 
-            var parserConfig = ShaderInvocationBuilder.MakeParserConfig(c.DocPath);
-            var invocation = await _invocationBuilder.BuildAsync(c.Config, captured, c.DebugVertexIndex);
-            var program = ShaderProgram.FromSource(c.Code, parserConfig);
+            var parserConfig = ShaderInvocationBuilder.MakeParserConfig(docPath);
+            var invocation = await _invocationBuilder.BuildAsync(config, captured, debugVertexIndex);
+            var program = ShaderProgram.FromSource(code, parserConfig);
             var trace = TraceRecorder.Record(_executor, new HLSLRunner(), program, invocation);
 
-            int wx = Math.Max(1, c.Config.WarpX);
-            int wy = Math.Max(1, c.Config.WarpY);
+            int wx = Math.Max(1, config.WarpX);
+            int wy = Math.Max(1, config.WarpY);
             ShaderImage image = null;
             if (!trace.HasError && trace.Result != null)
             {
@@ -44,7 +58,7 @@ public sealed partial class EffectRunner
                     await _canvas.SetPixels(pixels, wx, wy);
                 }
             }
-            dispatch(new DebugTraceRecorded(trace, c.Code, c.DocumentId, captured, image));
+            dispatch(new DebugTraceRecorded(trace, code, documentId, captured, image));
         }
         catch (Exception ex)
         {
@@ -52,12 +66,15 @@ public sealed partial class EffectRunner
         }
     }
 
-    private async Task EvaluateImmediateEffect(EvaluateImmediate c, Action<Msg> dispatch)
+    private async Task EvaluateImmediateImpl(
+        string expression, string debugCode, int stepIndex, ShaderConfig config,
+        FrameCapture captured, int inspectedThread, int debugVertexIndex, string docPath, Action<Msg> dispatch)
     {
-        var (value, error) = await EvaluateExpression(c);
+        var (value, error) = await EvaluateExpression(
+            expression, debugCode, stepIndex, config, captured, debugVertexIndex, docPath);
 
-        int wx = Math.Max(1, c.Config.WarpX);
-        int wy = Math.Max(1, c.Config.WarpY);
+        int wx = Math.Max(1, config.WarpX);
+        int wy = Math.Max(1, config.WarpY);
         string resultStr;
         bool isError;
         string imageDataUrl = null;
@@ -68,7 +85,7 @@ public sealed partial class EffectRunner
         }
         else
         {
-            resultStr = HLSLValueDisplay.Format(value, c.InspectedThread);
+            resultStr = HLSLValueDisplay.Format(value, inspectedThread);
             isError = false;
             var resolved = value is ReferenceValue rv ? rv.Get() : value;
             byte[] rgba = null;
@@ -79,36 +96,37 @@ public sealed partial class EffectRunner
                 try
                 {
                     imageDataUrl = await _browser.RgbaToDataUrl(
-                        rgba, wx, wy, c.InspectedThread % wx, c.InspectedThread / wx, 0.7);
+                        rgba, wx, wy, inspectedThread % wx, inspectedThread / wx, 0.7);
                 }
                 catch { }
             }
         }
 
-        dispatch(new ImmediateEvalFinished(new ImmediateEntry(c.Expression, resultStr, isError, imageDataUrl)));
+        dispatch(new ImmediateEvalFinished(new ImmediateEntry(expression, resultStr, isError, imageDataUrl)));
         try { await _browser.ScrollImmediateToBottom(); } catch { }
     }
 
     // Re-runs the shader up to the target step and evaluates an expression in
     // that scope. The hook aborts the run once the target step is reached.
-    private async Task<(HLSLValue Value, string Error)> EvaluateExpression(EvaluateImmediate c)
+    private async Task<(HLSLValue Value, string Error)> EvaluateExpression(
+        string expression, string debugCode, int stepIndex, ShaderConfig config,
+        FrameCapture captured, int debugVertexIndex, string docPath)
     {
         try
         {
-            var parserConfig = ShaderInvocationBuilder.MakeParserConfig(c.DocPath);
-            var invocation = await _invocationBuilder.BuildAsync(c.Config, c.Captured, c.DebugVertexIndex);
-            var runner = new HLSLRunner(Math.Max(1, c.Config.WarpX), Math.Max(1, c.Config.WarpY));
+            var parserConfig = ShaderInvocationBuilder.MakeParserConfig(docPath);
+            var invocation = await _invocationBuilder.BuildAsync(config, captured, debugVertexIndex);
+            var runner = new HLSLRunner(Math.Max(1, config.WarpX), Math.Max(1, config.WarpY));
             invocation.SetUniforms(runner);
 
             HLSLValue result = null;
             Exception evalError = null;
             int stepCount = 0;
-            int target = c.StepIndex;
             runner.DebugHookBeforeStatement = _ =>
             {
-                if (stepCount == target)
+                if (stepCount == stepIndex)
                 {
-                    try { result = runner.EvaluateExpression(c.Expression); }
+                    try { result = runner.EvaluateExpression(expression); }
                     catch (Exception ex) { evalError = ex; }
                     throw new OperationCanceledException();
                 }
@@ -118,7 +136,7 @@ public sealed partial class EffectRunner
             using (new ConsoleCapture())
             {
                 bool cancelledInLoad = false;
-                try { runner.ProcessCode(c.DebugCode, parserConfig); }
+                try { runner.ProcessCode(debugCode, parserConfig); }
                 catch (OperationCanceledException) { cancelledInLoad = true; }
                 if (!cancelledInLoad)
                 {

@@ -8,9 +8,9 @@ namespace HLSLInterpreter.Debugger.Services;
 
 public static class DebuggerServices
 {
-    // Registers the MVU runtime, the effect runner, and the interop facades. The
-    // hosts add their own PermalinkOptions, InitialCodeOptions,
-    // TabbedEditorOptions, and FileDialogService before calling this.
+    // Registers the MVU runtime, the effects, and the interop facades. The hosts
+    // add their own PermalinkOptions, InitialCodeOptions, TabbedEditorOptions,
+    // and FileDialogService before calling this.
     public static IServiceCollection AddDebuggerServices(this IServiceCollection services)
     {
         services.AddScoped<ShaderExecutor>();
@@ -20,9 +20,12 @@ public static class DebuggerServices
         services.AddScoped<GpuInterop>();
         services.AddScoped<CanvasInterop>();
         services.AddScoped<BrowserInterop>();
-        services.AddScoped<EffectRunner>();
-        services.AddScoped(sp => new MvuProgram(
-            AppState.Initial, Update.Run, sp.GetRequiredService<EffectRunner>()));
+        services.AddScoped<Effects>();
+        services.AddScoped(sp =>
+        {
+            var fx = sp.GetRequiredService<Effects>();
+            return new MvuProgram(AppState.Initial, (model, message) => Update.Run(fx, model, message));
+        });
         return services;
     }
 }
