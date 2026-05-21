@@ -1,5 +1,5 @@
 @using HLSL
-@inherits DebuggerComponent<AppState>
+@inherits DebuggerComponent<DebuggerModel>
 @inject BrowserInterop Browser
 
 @{
@@ -104,7 +104,7 @@
 </div>
 
 @code {
-    protected override AppState Select(AppState s) => s;
+    protected override DebuggerModel Select(DebuggerModel s) => s;
 
     private ShaderConfig Config => Slice.Editor.ActiveDocument?.Config ?? new ShaderConfig();
 

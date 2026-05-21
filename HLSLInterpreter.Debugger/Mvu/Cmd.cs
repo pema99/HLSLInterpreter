@@ -1,6 +1,6 @@
 namespace HLSLInterpreter.Debugger.Mvu;
 
-// What an update step asks the runtime to do next. Built through Effects, or
+// What an update step asks the runtime to do next. Built through DebuggerEffects, or
 // directly via these factories, and interpreted by DebuggerProgram.
 public abstract record Cmd
 {

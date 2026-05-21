@@ -1,4 +1,4 @@
-@inherits DebuggerComponent<AppState>
+@inherits DebuggerComponent<DebuggerModel>
 
 @{
     var run = Slice.Run;
@@ -100,7 +100,7 @@
 </div>
 
 @code {
-    protected override AppState Select(AppState s) => s;
+    protected override DebuggerModel Select(DebuggerModel s) => s;
 
     private bool legendOpen;
 

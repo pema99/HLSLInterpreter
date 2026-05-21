@@ -44,7 +44,7 @@
 </div>
 
 @code {
-    protected override DebugState Select(AppState s) => s.Debug;
+    protected override DebugState Select(DebuggerModel s) => s.Debug;
 
     private bool collapsed;
     private string immediateInput = "";

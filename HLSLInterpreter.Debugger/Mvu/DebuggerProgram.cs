@@ -1,5 +1,3 @@
-using HLSLInterpreter.Debugger.State;
-
 namespace HLSLInterpreter.Debugger.Mvu;
 
 // The debugger's MVU runtime: it holds the single application model, runs the
@@ -10,18 +8,18 @@ namespace HLSLInterpreter.Debugger.Mvu;
 // the running pump.
 public sealed partial class DebuggerProgram : IDisposable
 {
-    private readonly Effects _effects;
+    private readonly DebuggerEffects _effects;
     private readonly Queue<Msg> _queue = new();
     private readonly CancellationTokenSource _cts = new();
     private bool _pumping;
 
-    public AppState Model { get; private set; }
+    public DebuggerModel Model { get; private set; }
 
     // Raised after every model swap. Subscribers re-select their own slice and
     // decide for themselves whether the change concerns them.
     public event Action Changed;
 
-    public DebuggerProgram(AppState initial, Effects effects)
+    public DebuggerProgram(DebuggerModel initial, DebuggerEffects effects)
     {
         Model = initial;
         _effects = effects;

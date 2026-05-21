@@ -1,13 +1,12 @@
 using HLSL;
 using HLSLInterpreter.Debugger.Core;
 using HLSLInterpreter.Debugger.Services;
-using HLSLInterpreter.Debugger.State;
 
 namespace HLSLInterpreter.Debugger.Mvu;
 
 // Debug effects: recording an execution trace and evaluating an immediate-window
 // expression in the scope of the current debug step.
-public sealed partial class Effects
+public sealed partial class DebuggerEffects
 {
     public Cmd RecordTrace(
         string code, ShaderConfig config, FrameCapture captured, bool snapshotGpu,

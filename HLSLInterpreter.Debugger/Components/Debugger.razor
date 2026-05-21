@@ -1,12 +1,12 @@
 @page "/"
-@inherits DebuggerComponent<AppState>
+@inherits DebuggerComponent<DebuggerModel>
 @inject NavigationManager Nav
 @inject InitialCodeOptions InitialCode
 @inject PermalinkOptions PermalinkBase
 @inject TabbedEditorOptions TabbedEditor
 @inject BrowserInterop Browser
 @inject FileDialogService FileDialogs
-@inject Effects Effects
+@inject DebuggerEffects DebuggerEffects
 @using Microsoft.JSInterop
 
 @{
@@ -140,7 +140,7 @@
 @if (ui.OpenModal == ModalKind.NewFile) { <NewFileModal /> }
 
 @code {
-    protected override AppState Select(AppState s) => s;
+    protected override DebuggerModel Select(DebuggerModel s) => s;
 
     private DotNetObjectReference<Debugger> _dotNetRef;
     private string _pendingShaderToy;
@@ -150,7 +150,7 @@
     {
         base.OnInitialized();
         _dotNetRef = DotNetObjectReference.Create(this);
-        Effects.DotNetRef = _dotNetRef;
+        DebuggerEffects.DotNetRef = _dotNetRef;
 
         if (TabbedEditor.Enabled)
             FileDialogs.FileDropped = (name, content, path) =>

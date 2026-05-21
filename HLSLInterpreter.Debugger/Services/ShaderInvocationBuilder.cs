@@ -1,6 +1,6 @@
 using HLSLInterpreter.Debugger.Core;
 using HLSLInterpreter.Debugger.Interop;
-using HLSLInterpreter.Debugger.State;
+using HLSLInterpreter.Debugger.Mvu;
 using UnityShaderParser.HLSL;
 
 namespace HLSLInterpreter.Debugger.Services;

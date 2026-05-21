@@ -1,6 +1,6 @@
 using System.Text;
 using HLSL;
-using HLSLInterpreter.Debugger.State;
+using HLSLInterpreter.Debugger.Mvu;
 using UnityShaderParser.Common;
 using UnityShaderParser.HLSL;
 

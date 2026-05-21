@@ -1,4 +1,3 @@
-using HLSLInterpreter.Debugger.State;
 using Microsoft.AspNetCore.Components;
 
 namespace HLSLInterpreter.Debugger.Mvu;
@@ -13,7 +12,7 @@ public abstract class DebuggerComponent<TSlice> : ComponentBase, IDisposable
 
     protected TSlice Slice { get; private set; } = default!;
 
-    protected abstract TSlice Select(AppState model);
+    protected abstract TSlice Select(DebuggerModel model);
 
     protected void Dispatch(Msg message) => Program.Dispatch(message);
 

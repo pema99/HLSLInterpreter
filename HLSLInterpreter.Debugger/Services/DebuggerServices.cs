@@ -1,7 +1,6 @@
 using HLSLInterpreter.Debugger.Core;
 using HLSLInterpreter.Debugger.Interop;
 using HLSLInterpreter.Debugger.Mvu;
-using HLSLInterpreter.Debugger.State;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace HLSLInterpreter.Debugger.Services;
@@ -20,9 +19,9 @@ public static class DebuggerServices
         services.AddScoped<GpuInterop>();
         services.AddScoped<CanvasInterop>();
         services.AddScoped<BrowserInterop>();
-        services.AddScoped<Effects>();
+        services.AddScoped<DebuggerEffects>();
         services.AddScoped(sp =>
-            new DebuggerProgram(AppState.Initial, sp.GetRequiredService<Effects>()));
+            new DebuggerProgram(DebuggerModel.Initial, sp.GetRequiredService<DebuggerEffects>()));
         return services;
     }
 }

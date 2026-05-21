@@ -1,4 +1,4 @@
-@inherits DebuggerComponent<AppState>
+@inherits DebuggerComponent<DebuggerModel>
 @inject CanvasInterop Canvas
 @using HLSL
 
@@ -24,7 +24,7 @@
 
     private ShaderImage _lastImage;
 
-    protected override AppState Select(AppState s) => s;
+    protected override DebuggerModel Select(DebuggerModel s) => s;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -42,7 +42,7 @@
 
     // The canvas overlay derived from the model: warp size, viewport mode, the
     // debug markers, and what a click should do.
-    private static Overlay BuildOverlay(AppState s)
+    private static Overlay BuildOverlay(DebuggerModel s)
     {
         var config = s.Editor.ActiveDocument?.Config ?? new ShaderConfig();
         int wx = Math.Max(1, config.WarpX);

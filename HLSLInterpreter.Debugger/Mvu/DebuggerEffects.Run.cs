@@ -4,7 +4,6 @@ using HLSL;
 using HLSLInterpreter.Debugger.Core;
 using HLSLInterpreter.Debugger.Interop;
 using HLSLInterpreter.Debugger.Services;
-using HLSLInterpreter.Debugger.State;
 using UnityShaderParser.HLSL;
 
 namespace HLSLInterpreter.Debugger.Mvu;
@@ -13,7 +12,7 @@ namespace HLSLInterpreter.Debugger.Mvu;
 // tiled run is detached so it can dispatch progress messages (it becomes
 // cancellable, then finishes) while the dispatch pump stays free. Each run owns
 // a cancellation source; starting a run cancels the previous one.
-public sealed partial class Effects
+public sealed partial class DebuggerEffects
 {
     private CancellationTokenSource _runCts;
 

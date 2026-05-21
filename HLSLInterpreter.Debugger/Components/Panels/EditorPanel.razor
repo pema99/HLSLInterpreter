@@ -40,7 +40,7 @@
     [Parameter] public EventCallback OnReady { get; set; }
     [Parameter] public string InitialCode { get; set; }
 
-    protected override EditorState Select(AppState s) => s.Editor;
+    protected override EditorState Select(DebuggerModel s) => s.Editor;
 
     private DotNetObjectReference<EditorPanel> _selfRef;
     private int _draggedTab = -1;

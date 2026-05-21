@@ -1,22 +1,21 @@
 using HLSL;
 using HLSLInterpreter.Debugger.Core;
-using HLSLInterpreter.Debugger.State;
 
 namespace HLSLInterpreter.Debugger.Mvu;
 
 // The pure update function. It maps (model, message) to the next model plus the
 // command to run. It performs no effect itself: every effect is expressed as a
-// Cmd (built through Effects, or the generic Cmd vocabulary) and handed to the
+// Cmd (built through DebuggerEffects, or the generic Cmd vocabulary) and handed to the
 // DebuggerProgram interpreter.
 //
 // Document text is not in the model: each document's content lives in its own
 // Monaco model, keyed by document Id. update creates and shows those models
-// through Effects, and pulls the live text on demand via FetchEditorText.
+// through DebuggerEffects, and pulls the live text on demand via FetchEditorText.
 public sealed partial class DebuggerProgram
 {
-    private (AppState State, Cmd Command) Update(AppState model, Msg message)
+    private (DebuggerModel State, Cmd Command) Update(DebuggerModel model, Msg message)
     {
-        AppState next;
+        DebuggerModel next;
         Cmd command;
         switch (message)
         {
@@ -725,7 +724,7 @@ public sealed partial class DebuggerProgram
 
     // ---- Shared helpers ----
 
-    private (AppState, Cmd) StartRunWithCode(AppState m, string code)
+    private (DebuggerModel, Cmd) StartRunWithCode(DebuggerModel m, string code)
     {
         var config = ActiveConfig(m);
         float initialTime = m.Run.CapturedFrame?.Time ?? 0f;
@@ -753,8 +752,8 @@ public sealed partial class DebuggerProgram
         ViewMode = DebugViewMode.Color,
     };
 
-    private (AppState, Cmd) DebugAtVertex(
-        AppState m, int vertexIndex, float time, int canvasW, int canvasH)
+    private (DebuggerModel, Cmd) DebugAtVertex(
+        DebuggerModel m, int vertexIndex, float time, int canvasW, int canvasH)
     {
         var config = ActiveConfig(m);
         int warpSize = Math.Max(1, config.WarpX * config.WarpY);
@@ -766,7 +765,7 @@ public sealed partial class DebuggerProgram
         return (next, _effects.FetchEditorText(code => new DebugWithCode(code)));
     }
 
-    private static AppState ExitDebugCore(AppState m)
+    private static DebuggerModel ExitDebugCore(DebuggerModel m)
     {
         var saved = m.Debug.SavedGroupOffset;
         var next = m with
@@ -792,7 +791,7 @@ public sealed partial class DebuggerProgram
     // Loads content into a document: a new tab when tabs are on, otherwise the
     // single document is reused. Returns the command that gives the document its
     // Monaco model (or replaces the model's content).
-    private (AppState, Cmd) LoadContent(AppState m, string name, string content)
+    private (DebuggerModel, Cmd) LoadContent(DebuggerModel m, string name, string content)
     {
         if (m.Editor.TabsEnabled || m.Editor.ActiveDocument == null)
         {
@@ -804,7 +803,7 @@ public sealed partial class DebuggerProgram
         return (renamed, _effects.SetModelContent(renamed.Editor.ActiveDocument.Id, content));
     }
 
-    private static AppState AddDoc(AppState m, string name, string path = null)
+    private static DebuggerModel AddDoc(DebuggerModel m, string name, string path = null)
     {
         var doc = new ShaderDocument
         {
@@ -825,7 +824,7 @@ public sealed partial class DebuggerProgram
         };
     }
 
-    private static int IndexOfPath(AppState m, string path)
+    private static int IndexOfPath(DebuggerModel m, string path)
     {
         var docs = m.Editor.Documents;
         for (int i = 0; i < docs.Count; i++)
@@ -833,12 +832,12 @@ public sealed partial class DebuggerProgram
         return -1;
     }
 
-    private static ShaderConfig ActiveConfig(AppState m) =>
+    private static ShaderConfig ActiveConfig(DebuggerModel m) =>
         m.Editor.ActiveDocument?.Config ?? new ShaderConfig();
 
-    private static string ActiveDocPath(AppState m) => m.Editor.ActiveDocument?.Path;
+    private static string ActiveDocPath(DebuggerModel m) => m.Editor.ActiveDocument?.Path;
 
-    private static AppState WithActiveConfig(AppState m, Func<ShaderConfig, ShaderConfig> update)
+    private static DebuggerModel WithActiveConfig(DebuggerModel m, Func<ShaderConfig, ShaderConfig> update)
     {
         var doc = m.Editor.ActiveDocument;
         if (doc == null) return m;
@@ -847,7 +846,7 @@ public sealed partial class DebuggerProgram
         return m with { Editor = m.Editor with { Documents = documents } };
     }
 
-    private static AppState WithActiveDoc(AppState m, Func<ShaderDocument, ShaderDocument> update)
+    private static DebuggerModel WithActiveDoc(DebuggerModel m, Func<ShaderDocument, ShaderDocument> update)
     {
         var doc = m.Editor.ActiveDocument;
         if (doc == null) return m;
@@ -856,7 +855,7 @@ public sealed partial class DebuggerProgram
         return m with { Editor = m.Editor with { Documents = documents } };
     }
 
-    private static AppState WithInspectedThread(AppState m, int thread)
+    private static DebuggerModel WithInspectedThread(DebuggerModel m, int thread)
     {
         var config = m.Editor.ActiveDocument?.Config;
         int max = config == null ? 0 : Math.Max(0, config.WarpX * config.WarpY - 1);
@@ -866,7 +865,7 @@ public sealed partial class DebuggerProgram
     // A canvas click resolves to a debug request. GPU mode must snapshot the
     // live frame (an effect); CPU mode reads the image size from the model, so
     // it is a plain message.
-    private Cmd DebugClickCmd(AppState m, Func<float, int, int, Msg> make)
+    private Cmd DebugClickCmd(DebuggerModel m, Func<float, int, int, Msg> make)
     {
         if (m.Run.Backend == RunBackend.Gpu)
             return _effects.SnapshotGpuFrame(make);
@@ -875,7 +874,7 @@ public sealed partial class DebuggerProgram
             : Cmd.None;
     }
 
-    private Cmd HighlightCmd(AppState m)
+    private Cmd HighlightCmd(DebuggerModel m)
     {
         if (!m.Debug.IsActive) return _effects.HighlightLine(0);
         bool onDoc = m.Editor.ActiveDocument?.Id == m.Debug.DebugDocumentId;
@@ -883,6 +882,6 @@ public sealed partial class DebuggerProgram
         return _effects.HighlightLine(line);
     }
 
-    private Cmd ThemeCmd(AppState m) =>
+    private Cmd ThemeCmd(DebuggerModel m) =>
         _effects.SetTheme(m.Ui.BonzomaticMode && !m.Debug.IsActive ? "hlsl-bonzomatic" : "hlsl-dark");
 }

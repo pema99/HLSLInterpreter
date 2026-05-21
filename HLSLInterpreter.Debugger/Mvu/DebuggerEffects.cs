@@ -11,7 +11,7 @@ namespace HLSLInterpreter.Debugger.Mvu;
 // lives: the active run's cancellation source, the canvas-sync diff cache, and
 // the .NET reference the GPU loop uses for click-to-debug. update reaches all
 // effects through this object.
-public sealed partial class Effects
+public sealed partial class DebuggerEffects
 {
     private readonly ShaderExecutor _executor;
     private readonly ShaderInvocationBuilder _invocationBuilder;
@@ -27,7 +27,7 @@ public sealed partial class Effects
     // back into .NET.
     public object DotNetRef { get; set; }
 
-    public Effects(
+    public DebuggerEffects(
         ShaderExecutor executor,
         ShaderInvocationBuilder invocationBuilder,
         GpuInterop gpu,

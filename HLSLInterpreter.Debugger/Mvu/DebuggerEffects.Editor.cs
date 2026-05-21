@@ -3,7 +3,7 @@ using HLSLInterpreter.Debugger.Services;
 namespace HLSLInterpreter.Debugger.Mvu;
 
 // Editor, file-dialog, and browser effects.
-public sealed partial class Effects
+public sealed partial class DebuggerEffects
 {
     public Cmd FetchEditorText(Func<string, Msg> then) =>
         Cmd.OfTask(async () => then(await GetEditorText()));
