@@ -4,7 +4,7 @@ using HLSLInterpreter.Debugger.State;
 namespace HLSLInterpreter.Debugger.Mvu;
 
 // Every event the app can produce is a Msg. A message named XWithCode is the
-// continuation of a FetchEditorText command: update needs the live Monaco text,
+// continuation of a FetchEditorText command: update needs the live editor text,
 // so it asks for it and resumes here.
 public abstract record Msg;
 
@@ -12,7 +12,7 @@ public enum StepKind { In, Over, Out, InBack, OverBack, OutBack, Continue, Conti
 
 // ---- Lifecycle ----
 public sealed record AppStarted(
-    string Url, string FallbackCode, string FallbackName, string FallbackPath, bool TabsEnabled) : Msg;
+    string Url, string FallbackName, string FallbackPath, bool TabsEnabled) : Msg;
 public sealed record CanvasReady : Msg;
 public sealed record DefaultMeshLoaded(Mesh Mesh) : Msg;
 
@@ -47,16 +47,13 @@ public sealed record ImmediateEvalFinished(ImmediateEntry Entry) : Msg;
 
 // ---- Editor and documents ----
 public sealed record TabSwitchRequested(int Index) : Msg;
-public sealed record TabSwitched(string CurrentCode, int Index) : Msg;
 public sealed record TabCloseRequested(int Index) : Msg;
 public sealed record TabMoveRequested(int From, int Desired) : Msg;
 public sealed record ObjPickRequested : Msg;
 public sealed record ObjMeshLoaded(string ObjText) : Msg;
 public sealed record OpenFileRequested : Msg;
 public sealed record FileOpened(string Path, string Content) : Msg;
-public sealed record FileOpenedWithCode(string CurrentCode, string Path, string Content) : Msg;
 public sealed record FileDropped(string Name, string Content, string Path) : Msg;
-public sealed record FileDroppedWithCode(string CurrentCode, string Name, string Content, string Path) : Msg;
 public sealed record SaveFileRequested(bool AsNew) : Msg;
 public sealed record SaveFileWithCode(string Code, bool AsNew) : Msg;
 public sealed record FileSaved(string Path) : Msg;
@@ -70,9 +67,6 @@ public sealed record ExampleLoaded(
     string Name, string Code, ShaderRenderMode? Mode, string FragEntry, string VertEntry,
     IReadOnlyList<TextureBinding> Textures, IReadOnlyList<SamplerBinding> Samplers) : Msg;
 public sealed record ShaderToyImported(string Hlsl) : Msg;
-public sealed record ContentLoaded(
-    string CurrentCode, string Name, string Content, ShaderRenderMode? Mode, string FragEntry, string VertEntry,
-    IReadOnlyList<TextureBinding> Textures, IReadOnlyList<SamplerBinding> Samplers, bool Run) : Msg;
 
 // ---- Config ----
 public sealed record RenderModeChanged(ShaderRenderMode Mode) : Msg;

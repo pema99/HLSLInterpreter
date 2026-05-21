@@ -1,9 +1,9 @@
-let monacoEditorInitialized = false;
 let _monacoEditor = null;
 let dotNetEditorRef = null;
 let dotNetDebugRef = null;
-let _breakpointDecorationIds = [];
-let _debugLineDecorationIds = [];
+let _models = new Map();        // document id -> { model, bpIds, lineIds }
+let _currentModelId = -1;
+let _lastBreakpointLines = [];
 let _imageSectionHeight = null;
 let _savedSectionHeights = null;
 let _glsl2hlslPromise = null;
@@ -45,7 +45,7 @@ export function dbgPickObj() {
     input.click();
 };
 
-export function initMonaco(containerId, initialCode, editorRef) {
+export function initMonaco(containerId, editorRef, docId, initialCode) {
     if (editorRef) dotNetEditorRef = editorRef;
     require.config({
         paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs' }
@@ -489,7 +489,6 @@ export function initMonaco(containerId, initialCode, editorRef) {
         });
 
         _monacoEditor = monaco.editor.create(document.getElementById(containerId), {
-            value: initialCode,
             language: 'hlsl',
             theme: 'hlsl-dark',
             fontFamily: "'JetBrains Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace",
@@ -585,7 +584,8 @@ export function initMonaco(containerId, initialCode, editorRef) {
             monaco.editor.remeasureFonts();
         });
 
-        monacoEditorInitialized = true;
+        createModel(docId, initialCode);
+        showModel(docId);
         resolve();
     });
     });
@@ -651,10 +651,8 @@ document.addEventListener('keydown', function (e) {
     }
 });
 
-// Update breakpoint decorations in Monaco gutter
-export function setBreakpoints(lines) {
-    if (!_monacoEditor) return;
-    var decorations = (lines || []).map(function (line) {
+function _breakpointDecos(lines) {
+    return (lines || []).map(function (line) {
         return {
             range: new monaco.Range(line, 1, line, 1),
             options: {
@@ -664,27 +662,36 @@ export function setBreakpoints(lines) {
             }
         };
     });
-    _breakpointDecorationIds = _monacoEditor.deltaDecorations(
-        _breakpointDecorationIds || [], decorations
-    );
+}
+
+// Breakpoints are global, so they show in every document's gutter.
+export function setBreakpoints(lines) {
+    _lastBreakpointLines = lines || [];
+    var decorations = _breakpointDecos(_lastBreakpointLines);
+    _models.forEach(function (e) {
+        e.bpIds = e.model.deltaDecorations(e.bpIds, decorations);
+    });
 };
 
-// Highlight the current debug line (0 to clear)
+// Highlight the current debug line (0 to clear). Only the visible model carries
+// the marker, so it is cleared from every model first.
 export function highlightDebugLine(lineNumber) {
-    if (!_monacoEditor) return;
-    var decorations = lineNumber > 0 ? [{
-        range: new monaco.Range(lineNumber, 1, lineNumber, 1),
-        options: {
-            isWholeLine: true,
-            className: 'dbg-current-line',
-            glyphMarginClassName: 'dbg-current-glyph',
-            overviewRuler: { color: '#ffcc00', position: monaco.editor.OverviewRulerLane.Center },
-        }
-    }] : [];
-    _debugLineDecorationIds = _monacoEditor.deltaDecorations(
-        _debugLineDecorationIds || [], decorations
-    );
-    if (lineNumber > 0) _monacoEditor.revealLineInCenter(lineNumber);
+    _models.forEach(function (e) {
+        if (e.lineIds.length) e.lineIds = e.model.deltaDecorations(e.lineIds, []);
+    });
+    var cur = _models.get(_currentModelId);
+    if (cur && lineNumber > 0) {
+        cur.lineIds = cur.model.deltaDecorations([], [{
+            range: new monaco.Range(lineNumber, 1, lineNumber, 1),
+            options: {
+                isWholeLine: true,
+                className: 'dbg-current-line',
+                glyphMarginClassName: 'dbg-current-glyph',
+                overviewRuler: { color: '#ffcc00', position: monaco.editor.OverviewRulerLane.Center },
+            }
+        }]);
+        if (_monacoEditor) _monacoEditor.revealLineInCenter(lineNumber);
+    }
 };
 
 // Paints a per-thread rgba grid onto `canvas`, upscaled with no smoothing,
@@ -855,16 +862,36 @@ export function disposeThreadGridResize() {
 })();
 
 export function getMonacoValue() {
-    if (_monacoEditor) {
-        return _monacoEditor.getValue();
-    }
-    return '';
+    return _monacoEditor ? _monacoEditor.getValue() : '';
 };
 
-export function setMonacoValue(value) {
-    if (_monacoEditor) {
-        _monacoEditor.setValue(value);
-    }
+// One Monaco model per document: the model owns the text and undo history, so
+// switching tabs is just swapping which model the editor shows. Document 0 is
+// created by initMonaco; every later call here runs after Monaco has loaded.
+export function createModel(id, content) {
+    var existing = _models.get(id);
+    if (existing) { existing.model.setValue(content); return; }
+    var model = monaco.editor.createModel(content, 'hlsl');
+    var entry = { model: model, bpIds: [], lineIds: [] };
+    if (_lastBreakpointLines.length)
+        entry.bpIds = model.deltaDecorations([], _breakpointDecos(_lastBreakpointLines));
+    _models.set(id, entry);
+};
+
+export function showModel(id) {
+    var e = _models.get(id);
+    if (e && _monacoEditor) { _monacoEditor.setModel(e.model); _currentModelId = id; }
+};
+
+export function setModelContent(id, content) {
+    var e = _models.get(id);
+    if (e) e.model.setValue(content);
+    else createModel(id, content);
+};
+
+export function disposeModel(id) {
+    var e = _models.get(id);
+    if (e) { e.model.dispose(); _models.delete(id); }
 };
 
 export function setMonacoTheme(theme) {

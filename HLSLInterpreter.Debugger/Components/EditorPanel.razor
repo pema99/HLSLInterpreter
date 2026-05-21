@@ -38,6 +38,7 @@
 
 @code {
     [Parameter] public EventCallback OnReady { get; set; }
+    [Parameter] public string InitialCode { get; set; }
 
     protected override EditorState Select(AppState s) => s.Editor;
 
@@ -48,7 +49,7 @@
     {
         if (!firstRender) return;
         _selfRef = DotNetObjectReference.Create(this);
-        await Editor.Init("monaco-container", Slice.ActiveDocument?.Code ?? "", _selfRef);
+        await Editor.Init("monaco-container", _selfRef, Slice.ActiveDocument?.Id ?? 0, InitialCode ?? "");
         await Editor.SetFontSize(Slice.FontSize);
         await OnReady.InvokeAsync();
     }

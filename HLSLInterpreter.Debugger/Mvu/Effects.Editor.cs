@@ -14,8 +14,18 @@ public sealed partial class Effects
         catch { return ""; }
     }
 
-    public Cmd SetEditorText(string code) =>
-        Cmd.OfTask(() => _editor.SetValue(code).AsTask());
+    // One Monaco model per document: the model owns the text and undo history.
+    public Cmd CreateModel(int docId, string content) =>
+        Cmd.OfTask(() => _editor.CreateModel(docId, content).AsTask());
+
+    public Cmd ShowModel(int docId) =>
+        Cmd.OfTask(() => _editor.ShowModel(docId).AsTask());
+
+    public Cmd SetModelContent(int docId, string content) =>
+        Cmd.OfTask(() => _editor.SetModelContent(docId, content).AsTask());
+
+    public Cmd DisposeModel(int docId) =>
+        Cmd.OfTask(() => _editor.DisposeModel(docId).AsTask());
 
     public Cmd SetEditorFontSize(int size) =>
         Cmd.OfTask(() => _editor.SetFontSize(size).AsTask());

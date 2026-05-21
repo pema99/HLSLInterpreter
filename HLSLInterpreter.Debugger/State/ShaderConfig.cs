@@ -24,15 +24,12 @@ public sealed record ShaderConfig
     public IReadOnlyList<SamplerBinding> Samplers { get; init; } = Array.Empty<SamplerBinding>();
 }
 
+// Text is not stored here: each document's content (and undo history) lives in
+// its own Monaco model, keyed by Id. update reads the live text on demand.
 public sealed record ShaderDocument
 {
     public int Id { get; init; }
     public string Name { get; init; } = "new.hlsl";
     public string Path { get; init; }
-
-    // Last-synced editor text. The active document's live text is in Monaco
-    // and synced into here on demand (tab switch, run, save).
-    public string Code { get; init; } = "";
-
     public ShaderConfig Config { get; init; } = new();
 }

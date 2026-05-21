@@ -15,14 +15,24 @@ public sealed class EditorInterop
     private async ValueTask<IJSObjectReference> Module() =>
         _module ??= await _js.InvokeAsync<IJSObjectReference>("import", ModulePath);
 
-    public async ValueTask Init(string containerId, string initialCode, object editorRef) =>
-        await (await Module()).InvokeVoidAsync("initMonaco", containerId, initialCode, editorRef);
+    public async ValueTask Init(string containerId, object editorRef, int docId, string initialCode) =>
+        await (await Module()).InvokeVoidAsync("initMonaco", containerId, editorRef, docId, initialCode);
 
     public async ValueTask<string> GetValue() =>
         await (await Module()).InvokeAsync<string>("getMonacoValue");
 
-    public async ValueTask SetValue(string value) =>
-        await (await Module()).InvokeVoidAsync("setMonacoValue", value);
+    // One Monaco model per document. The model owns the text and undo history.
+    public async ValueTask CreateModel(int id, string content) =>
+        await (await Module()).InvokeVoidAsync("createModel", id, content);
+
+    public async ValueTask ShowModel(int id) =>
+        await (await Module()).InvokeVoidAsync("showModel", id);
+
+    public async ValueTask SetModelContent(int id, string content) =>
+        await (await Module()).InvokeVoidAsync("setModelContent", id, content);
+
+    public async ValueTask DisposeModel(int id) =>
+        await (await Module()).InvokeVoidAsync("disposeModel", id);
 
     public async ValueTask SetTheme(string theme) =>
         await (await Module()).InvokeVoidAsync("setMonacoTheme", theme);

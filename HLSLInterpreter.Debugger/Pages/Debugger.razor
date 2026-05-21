@@ -105,7 +105,7 @@
     </header>
 
     <div class="main-split">
-        <EditorPanel OnReady="OnEditorReady" />
+        <EditorPanel InitialCode="@_initialCode" OnReady="OnEditorReady" />
 
         <div class="resize-h-handle" title="Drag to resize"></div>
 
@@ -144,6 +144,7 @@
 
     private DotNetObjectReference<Debugger> _dotNetRef;
     private string _pendingShaderToy;
+    private string _initialCode = "";
 
     protected override void OnInitialized()
     {
@@ -165,7 +166,15 @@
             catch (Exception ex) { Console.WriteLine("[shadertoy-url] decode failed: " + ex.Message); }
         }
 
-        Dispatch(new AppStarted(Nav.Uri, InitialCode.Code, InitialCode.Name, InitialCode.Path, TabbedEditor.Enabled));
+        _initialCode = string.IsNullOrEmpty(InitialCode.Code) ? DefaultShader.Code : InitialCode.Code;
+        var codeParam = PermalinkCodec.GetQueryParam(Nav.Uri, "c");
+        if (!string.IsNullOrEmpty(codeParam))
+        {
+            try { _initialCode = PermalinkCodec.DecompressCode(codeParam); }
+            catch (Exception ex) { Console.WriteLine("[permalink] code decode failed: " + ex.Message); }
+        }
+
+        Dispatch(new AppStarted(Nav.Uri, InitialCode.Name, InitialCode.Path, TabbedEditor.Enabled));
     }
 
     // Load the monkey mesh before the first render so the auto-run on editor
