@@ -7,8 +7,7 @@ namespace HLSLInterpreter.Debugger.Mvu;
 // The pure update function. It maps (model, message) to the next model plus the
 // command to run. It performs no effect itself: every effect is expressed as a
 // Cmd (built through Effects, or the generic Cmd vocabulary) and handed to the
-// MvuProgram interpreter. A canvas sync is appended after every message so the
-// JS canvas state always tracks the model.
+// DebuggerProgram interpreter.
 //
 // Document text is not in the model: each document's content lives in its own
 // Monaco model, keyed by document Id. update creates and shows those models

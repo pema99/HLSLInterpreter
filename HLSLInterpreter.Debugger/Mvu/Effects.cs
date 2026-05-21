@@ -6,7 +6,7 @@ using HLSLInterpreter.Debugger.Services;
 namespace HLSLInterpreter.Debugger.Mvu;
 
 // Builds the application's commands. Every method here returns a Cmd expressed
-// through the generic Cmd vocabulary; the MvuProgram interpreter is what runs
+// through the generic Cmd vocabulary; the DebuggerProgram interpreter is what runs
 // them. This is also where effect state that must outlive a single command
 // lives: the active run's cancellation source, the canvas-sync diff cache, and
 // the .NET reference the GPU loop uses for click-to-debug. update reaches all

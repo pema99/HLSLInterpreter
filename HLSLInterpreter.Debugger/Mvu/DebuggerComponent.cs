@@ -7,9 +7,9 @@ namespace HLSLInterpreter.Debugger.Mvu;
 // slice it needs and re-renders only when that slice changes, so an unrelated
 // part of the model changing does not re-run its render. User actions are
 // raised with Dispatch.
-public abstract class ProgramComponent<TSlice> : ComponentBase, IDisposable
+public abstract class DebuggerComponent<TSlice> : ComponentBase, IDisposable
 {
-    [Inject] protected MvuProgram Program { get; set; } = null!;
+    [Inject] protected DebuggerProgram Program { get; set; } = null!;
 
     protected TSlice Slice { get; private set; } = default!;
 

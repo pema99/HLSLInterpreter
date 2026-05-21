@@ -10,7 +10,7 @@ public delegate (AppState State, Cmd Command) UpdateFn(AppState model, Msg messa
 // ordering is defined and the loop is never re-entered: a message dispatched
 // from within an effect (or a JS callback) is simply enqueued for the running
 // pump. This type knows nothing app-specific: the command vocabulary is generic.
-public sealed class MvuProgram : IDisposable
+public sealed class DebuggerProgram : IDisposable
 {
     private readonly UpdateFn _update;
     private readonly Queue<Msg> _queue = new();
@@ -23,7 +23,7 @@ public sealed class MvuProgram : IDisposable
     // decide for themselves whether the change concerns them.
     public event Action Changed;
 
-    public MvuProgram(AppState initial, UpdateFn update)
+    public DebuggerProgram(AppState initial, UpdateFn update)
     {
         Model = initial;
         _update = update;

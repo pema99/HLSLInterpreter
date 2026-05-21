@@ -24,7 +24,7 @@ public static class DebuggerServices
         services.AddScoped(sp =>
         {
             var fx = sp.GetRequiredService<Effects>();
-            return new MvuProgram(AppState.Initial, (model, message) => Update.Run(fx, model, message));
+            return new DebuggerProgram(AppState.Initial, (model, message) => Update.Run(fx, model, message));
         });
         return services;
     }

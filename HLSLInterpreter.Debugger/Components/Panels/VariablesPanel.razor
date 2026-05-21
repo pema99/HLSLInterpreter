@@ -1,5 +1,5 @@
 @using HLSL
-@inherits ProgramComponent<DebugState>
+@inherits DebuggerComponent<DebugState>
 
 <div class="debug-section debug-section-vars @(collapsed ? "section-collapsed" : "")">
     <div class="panel-header collapsible-header" @onclick="() => collapsed = !collapsed">
