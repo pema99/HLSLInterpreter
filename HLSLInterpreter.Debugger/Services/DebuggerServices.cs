@@ -16,14 +16,13 @@ public static class DebuggerServices
         services.AddScoped<ShaderExecutor>();
         services.AddScoped<ShaderInvocationBuilder>();
         services.AddScoped<ImageLibrary>();
-        services.AddScoped<IEditorInterop, EditorInterop>();
-        services.AddScoped<IGpuInterop, GpuInterop>();
-        services.AddScoped<ICanvasInterop, CanvasInterop>();
-        services.AddScoped<IBrowserInterop, BrowserInterop>();
+        services.AddScoped<EditorInterop>();
+        services.AddScoped<GpuInterop>();
+        services.AddScoped<CanvasInterop>();
+        services.AddScoped<BrowserInterop>();
         services.AddScoped<EffectRunner>();
-        services.AddScoped<IEffectRunner>(sp => sp.GetRequiredService<EffectRunner>());
         services.AddScoped(sp => new MvuProgram(
-            AppState.Initial, Update.Run, sp.GetRequiredService<IEffectRunner>()));
+            AppState.Initial, Update.Run, sp.GetRequiredService<EffectRunner>()));
         return services;
     }
 }

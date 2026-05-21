@@ -3,20 +3,7 @@ using Microsoft.JSInterop;
 namespace HLSLInterpreter.Debugger.Interop;
 
 // Typed wrapper over the Monaco editor exports in app.js.
-public interface IEditorInterop
-{
-    ValueTask Init(string containerId, string initialCode, object editorRef);
-    ValueTask<string> GetValue();
-    ValueTask SetValue(string value);
-    ValueTask SetTheme(string theme);
-    ValueTask SetFontSize(int size);
-    ValueTask SetReadOnly(bool readOnly);
-    ValueTask HighlightLine(int line);
-    ValueTask SetBreakpoints(IReadOnlyList<int> lines);
-    ValueTask<bool> IsTabDropAfter(int tabIndex, double clientX);
-}
-
-public sealed class EditorInterop : IEditorInterop
+public sealed class EditorInterop
 {
     private const string ModulePath = "./_content/HLSLInterpreter.Debugger/js/app.js";
 

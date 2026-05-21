@@ -9,19 +9,14 @@ namespace HLSLInterpreter.Debugger.Mvu;
 // An async effect dispatches a follow-up Msg when it completes. A handler must
 // never throw: a failed effect is reported by dispatching a message (or
 // swallowed), so the dispatch pump cannot be broken by an effect.
-public interface IEffectRunner
-{
-    Task RunAsync(Cmd command, Action<Msg> dispatch);
-}
-
-public sealed partial class EffectRunner : IEffectRunner
+public sealed partial class EffectRunner
 {
     private readonly ShaderExecutor _executor;
     private readonly ShaderInvocationBuilder _invocationBuilder;
-    private readonly IGpuInterop _gpu;
-    private readonly ICanvasInterop _canvas;
-    private readonly IEditorInterop _editor;
-    private readonly IBrowserInterop _browser;
+    private readonly GpuInterop _gpu;
+    private readonly CanvasInterop _canvas;
+    private readonly EditorInterop _editor;
+    private readonly BrowserInterop _browser;
     private readonly FileDialogService _fileDialogs;
 
     private readonly HLSLRunner _runner = new();
@@ -33,10 +28,10 @@ public sealed partial class EffectRunner : IEffectRunner
     public EffectRunner(
         ShaderExecutor executor,
         ShaderInvocationBuilder invocationBuilder,
-        IGpuInterop gpu,
-        ICanvasInterop canvas,
-        IEditorInterop editor,
-        IBrowserInterop browser,
+        GpuInterop gpu,
+        CanvasInterop canvas,
+        EditorInterop editor,
+        BrowserInterop browser,
         FileDialogService fileDialogs)
     {
         _executor = executor;

@@ -4,24 +4,7 @@ namespace HLSLInterpreter.Debugger.Interop;
 
 // Typed wrapper over the image canvas state in imagestate.js. Nullable arguments
 // map to JS null, which clears the corresponding overlay.
-public interface ICanvasInterop
-{
-    ValueTask SetPixels(byte[] pixels, int width, int height);
-    ValueTask SetPixelsRect(byte[] pixels, int x, int y, int width, int height);
-    ValueTask AllocPixels(int width, int height);
-    ValueTask<int[]> GetCpuCanvasSize();
-    ValueTask SetWarp(int warpX, int warpY);
-    ValueTask SetRegularMode(string mode);
-    ValueTask SetDebugMode(string mode);
-    ValueTask SetDebugPixel(int? x, int? y);
-    ValueTask SetThreadStates(int[] states);
-    ValueTask SetCpuClickHandler(int? warpX, int? warpY);
-    ValueTask SetDebugClickHandler(bool active);
-    ValueTask SetPickMode(string mode);
-    ValueTask SetMeshData(float[] positions, uint[] indices);
-}
-
-public sealed class CanvasInterop : ICanvasInterop
+public sealed class CanvasInterop
 {
     private const string ModulePath = "./_content/HLSLInterpreter.Debugger/js/imagestate.js";
 

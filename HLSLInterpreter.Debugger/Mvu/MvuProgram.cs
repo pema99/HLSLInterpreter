@@ -12,7 +12,7 @@ public delegate (AppState State, IReadOnlyList<Cmd> Commands) UpdateFn(AppState 
 public sealed class MvuProgram
 {
     private readonly UpdateFn _update;
-    private readonly IEffectRunner _effects;
+    private readonly EffectRunner _effects;
     private readonly Queue<Msg> _queue = new();
     private bool _pumping;
 
@@ -22,7 +22,7 @@ public sealed class MvuProgram
     // decide for themselves whether the change concerns them.
     public event Action Changed;
 
-    public MvuProgram(AppState initial, UpdateFn update, IEffectRunner effects)
+    public MvuProgram(AppState initial, UpdateFn update, EffectRunner effects)
     {
         Model = initial;
         _update = update;

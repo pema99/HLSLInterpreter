@@ -20,21 +20,7 @@ public sealed record GpuRenderRequest(
     IReadOnlyList<SamplerBinding> Samplers);
 
 // Typed wrapper over the WebGPU preview loop in gpu.js.
-public interface IGpuInterop
-{
-    ValueTask<bool> IsAvailable();
-    ValueTask Render(GpuRenderRequest request);
-    ValueTask Stop();
-    ValueTask Pause();
-    ValueTask Resume();
-    ValueTask Restart();
-    ValueTask<float[]> Snapshot();
-    ValueTask<float[]> View();
-    ValueTask<float[]> Projection(int canvasW, int canvasH);
-    ValueTask<float[]> Mouse();
-}
-
-public sealed class GpuInterop : IGpuInterop
+public sealed class GpuInterop
 {
     private const string ModulePath = "./_content/HLSLInterpreter.Debugger/js/gpu.js";
 

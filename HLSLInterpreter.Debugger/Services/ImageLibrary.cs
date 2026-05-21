@@ -5,13 +5,13 @@ namespace HLSLInterpreter.Debugger.Services;
 
 public sealed class ImageLibrary
 {
-    private readonly IBrowserInterop _browser;
+    private readonly BrowserInterop _browser;
     private Task _examplesLoad;
 
     public List<TextureBinding> Examples { get; } = new();
     public List<TextureBinding> RecentUploads { get; } = new();
 
-    public ImageLibrary(IBrowserInterop browser) => _browser = browser;
+    public ImageLibrary(BrowserInterop browser) => _browser = browser;
 
     public Task EnsureExamplesLoadingAsync() => _examplesLoad ??= LoadExamplesAsync();
 

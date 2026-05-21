@@ -5,28 +5,7 @@ namespace HLSLInterpreter.Debugger.Interop;
 
 // Typed wrapper over the host and document helpers in app.js: file IO,
 // clipboard, the glsl2hlsl transpiler, image rendering, and DOM layout glue.
-public interface IBrowserInterop
-{
-    ValueTask SetDebuggerRef(object reference);
-    ValueTask<string> FetchText(string url);
-    ValueTask<PickedImage> FetchImage(string url);
-    ValueTask<PickedImage> PickImage();
-    ValueTask PickObj();
-    ValueTask RevokeBlobUrl(string url);
-    ValueTask CopyToClipboard(string text);
-    ValueTask DownloadTextFile(string fileName, string content);
-    ValueTask<string> TranspileGlsl(string glsl);
-    ValueTask<string> RgbaToDataUrl(byte[] rgba, int width, int height,
-        int inspectedX, int inspectedY, double sizeScale);
-    ValueTask ScrollImmediateToBottom();
-    ValueTask SaveSectionHeights();
-    ValueTask RestoreSectionHeights();
-    ValueTask RestoreImageSectionHeight();
-    ValueTask InitThreadGridResize(string containerId, int cols, int rows);
-    ValueTask DisposeThreadGridResize();
-}
-
-public sealed class BrowserInterop : IBrowserInterop
+public sealed class BrowserInterop
 {
     private const string ModulePath = "./_content/HLSLInterpreter.Debugger/js/app.js";
 

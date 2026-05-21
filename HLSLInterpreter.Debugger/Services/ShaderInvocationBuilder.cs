@@ -9,9 +9,9 @@ namespace HLSLInterpreter.Debugger.Services;
 // matrices, mouse) from the GPU interop. Everything model-derived is passed in.
 public sealed class ShaderInvocationBuilder
 {
-    private readonly IGpuInterop _gpu;
+    private readonly GpuInterop _gpu;
 
-    public ShaderInvocationBuilder(IGpuInterop gpu) => _gpu = gpu;
+    public ShaderInvocationBuilder(GpuInterop gpu) => _gpu = gpu;
 
     public async Task<ShaderInvocation> BuildAsync(ShaderConfig config, FrameCapture captured, int debugVertexIndex)
     {
