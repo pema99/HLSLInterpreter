@@ -10,12 +10,16 @@ public enum ModalKind { None, Settings, Hotkeys, Textures, Examples, ShaderToyIm
 public sealed record ShaderImage(byte[] Pixels, int Width, int Height);
 public sealed record RunError(string Message, Exception Exception);
 public sealed record FrameCapture(float Time, int CanvasW, int CanvasH);
+public sealed record ImmediateEntry(string Expression, string Result, bool IsError, string ImageDataUrl);
 
 public sealed record EditorState
 {
     public IReadOnlyList<ShaderDocument> Documents { get; init; } = Array.Empty<ShaderDocument>();
     public int ActiveIndex { get; init; }
     public int FontSize { get; init; } = 16;
+    public int NextDocumentId { get; init; }
+    public Mesh DefaultMesh { get; init; } = Mesh.CreateCube();
+    public bool TabsEnabled { get; init; }
 
     public ShaderDocument ActiveDocument =>
         ActiveIndex >= 0 && ActiveIndex < Documents.Count ? Documents[ActiveIndex] : null;
@@ -47,6 +51,8 @@ public sealed record DebugState
     public string DebugCode { get; init; } = "";
     public DebugBottomMode BottomMode { get; init; } = DebugBottomMode.ThreadStates;
     public int DebugVertexIndex { get; init; } = -1;
+    public (int X, int Y)? SavedGroupOffset { get; init; }
+    public IReadOnlyList<ImmediateEntry> ImmediateHistory { get; init; } = Array.Empty<ImmediateEntry>();
 
     public TraceStep CurrentStep => Trace?.StepAt(StepIndex);
 }
@@ -57,6 +63,7 @@ public sealed record UiState
     public bool MenuOpen { get; init; }
     public bool BonzomaticMode { get; init; }
     public bool ImageCollapsed { get; init; }
+    public bool PermalinkToastVisible { get; init; }
 }
 
 public sealed record AppState
