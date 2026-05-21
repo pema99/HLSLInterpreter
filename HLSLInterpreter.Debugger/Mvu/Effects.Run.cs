@@ -26,6 +26,9 @@ public sealed partial class Effects
     public Cmd RenderViewMode(DebugViewMode mode, ExecutionMetrics metrics, ShaderImage image) =>
         Cmd.OfTask(() => RenderViewModeImpl(mode, metrics, image));
 
+    public Cmd SetMeshData(Mesh mesh) =>
+        Cmd.OfTask(() => _canvas.SetMeshData(mesh?.Positions, mesh?.Indices).AsTask());
+
     public Cmd SetGpuPaused(bool paused) =>
         Cmd.OfTask(() => SetGpuPausedImpl(paused));
 

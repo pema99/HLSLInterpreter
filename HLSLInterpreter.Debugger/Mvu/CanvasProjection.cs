@@ -1,13 +1,12 @@
 using HLSL;
-using HLSLInterpreter.Debugger.Core;
 using HLSLInterpreter.Debugger.State;
 
 namespace HLSLInterpreter.Debugger.Mvu;
 
 public sealed record Point(int X, int Y);
 
-// The full canvas and editor-theme state derived from the model. update computes
-// one of these after every message; SyncCanvas hands it to JS in a single push.
+// The canvas overlay state derived from the model. CanvasView selects one of
+// these as its slice and pushes it to JS whenever it changes.
 public sealed record CanvasProjection(
     int WarpX, int WarpY,
     string RegularMode,
@@ -16,9 +15,7 @@ public sealed record CanvasProjection(
     int[] ThreadStates,
     Point CpuClick,
     bool DebugClick,
-    string PickMode,
-    Mesh PickMesh,
-    string Theme)
+    string PickMode)
 {
     public static CanvasProjection Compute(AppState s)
     {
@@ -50,11 +47,10 @@ public sealed record CanvasProjection(
         bool vertexPick = !debugging
             && config.RenderMode == ShaderRenderMode.VertFrag
             && config.DebugTarget == DebugTarget.Vertex;
-        string theme = s.Ui.BonzomaticMode && !debugging ? "hlsl-bonzomatic" : "hlsl-dark";
 
         return new CanvasProjection(
             wx, wy, regularMode, debugMode, debugPixel, threadStates,
             cpuClick ? new Point(wx, wy) : null, debugging,
-            vertexPick ? "vertex" : "pixel", vertexPick ? config.Mesh : null, theme);
+            vertexPick ? "vertex" : "pixel");
     }
 }

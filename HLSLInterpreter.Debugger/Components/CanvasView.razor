@@ -1,0 +1,32 @@
+@inherits ProgramComponent<CanvasProjection>
+@inject CanvasInterop Canvas
+
+@* The image canvas. The component's own lifecycle is the "canvas exists" signal:
+   on first render it asks for a repaint, and every render pushes the overlay
+   state to JS. No document-wide observer, no cached state. *@
+<div class="image-container @CssClass" id="@ContainerId" data-mode-target="@ModeTarget"
+     style="@(Hidden ? "display:none" : "")"
+     @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true" @oncontextmenu="@(() => {})">
+    <canvas class="image-canvas color-canvas-2d"></canvas>
+    @if (WithGpuCanvas)
+    {
+        <canvas id="color-canvas-gpu" class="image-canvas"></canvas>
+    }
+    <canvas class="image-overlay"></canvas>
+</div>
+
+@code {
+    [Parameter] public string ContainerId { get; set; }
+    [Parameter] public string ModeTarget { get; set; }
+    [Parameter] public string CssClass { get; set; }
+    [Parameter] public bool Hidden { get; set; }
+    [Parameter] public bool WithGpuCanvas { get; set; }
+
+    protected override CanvasProjection Select(AppState s) => CanvasProjection.Compute(s);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await Canvas.ApplyState(ContainerId, Slice);
+        if (firstRender) Dispatch(new CanvasReady());
+    }
+}

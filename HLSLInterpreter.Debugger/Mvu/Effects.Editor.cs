@@ -33,6 +33,9 @@ public sealed partial class Effects
     public Cmd SetEditorReadOnly(bool readOnly) =>
         Cmd.OfTask(() => _editor.SetReadOnly(readOnly).AsTask());
 
+    public Cmd SetTheme(string theme) =>
+        Cmd.OfTask(() => _editor.SetTheme(theme).AsTask());
+
     public Cmd HighlightLine(int line) =>
         Cmd.OfTask(() => _editor.HighlightLine(line).AsTask());
 

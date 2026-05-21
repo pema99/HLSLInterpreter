@@ -1,8 +1,7 @@
-// Cached state for the Color Output's painted image, viewport mode, and click
-// handlers. C# pushes updates via the imgSet* setters. A MutationObserver
-// watches for .image-container[data-mode-target] elements appearing and
-// applies the cached state to each one, so it doesn't matter whether a
-// container exists when C# pushes its state.
+// Painting and overlay setup for the Color Output canvas. There is no cached
+// canvas state here: a CanvasView component pushes the overlay projection on
+// render and asks for a repaint when it mounts, and the run effects paint pixels
+// straight onto the <canvas>, which is itself the buffer.
 import {
     dbgInitViewport, dbgSetViewportImageSize, dbgSetViewportWarp, dbgSetViewportMode,
     dbgSetViewportPickMode, dbgSetDebugPixel, dbgSetViewportThreadStates,
@@ -11,56 +10,35 @@ import {
 import { gpuSnapshot, gpuPause } from './gpu.js';
 import { getDebuggerRef } from './host.js';
 
-const state = {
-    pixels: null, width: 0, height: 0,
-    warpX: 1, warpY: 1,
-    regularMode: 'cpu',
-    debugMode: 'idle',
-    debugPixel: null,
-    threadStates: null,
-    cpuClick: null,
-    debugClickActive: false,
-    pickMode: 'pixel',  // 'pixel' or 'vertex'
-    meshPositions: null,
-    meshIndices: null,
-};
+// The mesh is needed for vertex picking. It changes rarely and is pushed on its
+// own cadence, so it is the one thing retained here between calls.
+let _meshPositions = null;
+let _meshIndices = null;
 
-function paint(canvas) {
-    if (!canvas || !state.pixels || !state.width || !state.height) return;
-    canvas.width = state.width;
-    canvas.height = state.height;
-    canvas.getContext('2d').putImageData(
-        new ImageData(new Uint8ClampedArray(state.pixels), state.width, state.height), 0, 0);
+function the2dCanvas() {
+    return document.querySelector('.image-container .color-canvas-2d');
 }
 
-function applyTo(container) {
-    if (!container || !container.dataset || !container.dataset.modeTarget) return;
+// Apply the overlay projection to one container. Called by CanvasView on render.
+export function applyCanvasState(containerId, p) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    dbgInitViewport(containerId);
+
     const target = container.dataset.modeTarget;
-    const id = container.id;
+    const mode = target === 'regular' ? p.regularMode : p.debugMode;
 
-    paint(container.querySelector('.color-canvas-2d'));
-
-    dbgInitViewport(id);
-
-    const mode = target === 'regular' ? state.regularMode : state.debugMode;
-
-    // In GPU mode, gpu.js pushes the canvas pixel size itself.
-    if (mode !== 'gpu')
-        dbgSetViewportImageSize(id, state.width || 1, state.height || 1);
-
-    dbgSetViewportWarp(id, state.warpX, state.warpY);
-    dbgSetViewportMode(id, mode);
-    dbgSetViewportPickMode(id, state.pickMode, state.meshPositions, state.meshIndices);
+    dbgSetViewportWarp(containerId, p.warpX, p.warpY);
+    dbgSetViewportMode(containerId, mode);
+    dbgSetViewportPickMode(containerId, p.pickMode, _meshPositions, _meshIndices);
 
     if (target === 'debug') {
-        if (state.debugPixel)
-            dbgSetDebugPixel(id, state.debugPixel.x, state.debugPixel.y);
-        if (state.threadStates)
-            dbgSetViewportThreadStates(id, state.threadStates);
+        if (p.debugPixel) dbgSetDebugPixel(containerId, p.debugPixel.x, p.debugPixel.y);
+        if (p.threadStates) dbgSetViewportThreadStates(containerId, p.threadStates);
     }
 
-    if (target === 'regular' && state.pickMode === 'vertex') {
-        dbgSetClickHandler(id, (px, py, vertexIndex) => {
+    if (target === 'regular' && p.pickMode === 'vertex') {
+        dbgSetClickHandler(containerId, (px, py, vertexIndex) => {
             const ref = getDebuggerRef();
             if (vertexIndex == null || !ref) return;
             if (mode === 'gpu') {
@@ -69,118 +47,89 @@ function applyTo(container) {
                 gpuPause();
                 ref.invokeMethodAsync('StartDebugAtVertex', vertexIndex, snap[0], snap[1], snap[2]);
             } else {
-                ref.invokeMethodAsync('StartDebugAtVertex', vertexIndex, 0, state.width || 1, state.height || 1);
+                const c = the2dCanvas();
+                ref.invokeMethodAsync('StartDebugAtVertex', vertexIndex, 0,
+                    c ? c.width : 1, c ? c.height : 1);
             }
         });
     } else if (target === 'regular' && mode === 'gpu') {
-        dbgSetClickHandler(id, (px, py) => {
+        dbgSetClickHandler(containerId, (px, py) => {
             const snap = gpuSnapshot();
             const ref = getDebuggerRef();
             if (!snap || !ref) return;
             gpuPause();
             ref.invokeMethodAsync('StartDebugAtPixel', px, py, snap[0], snap[1], snap[2]);
         });
-    } else if (target === 'regular' && state.cpuClick) {
-        const wx = state.cpuClick.x, wy = state.cpuClick.y;
-        dbgSetClickHandler(id, (px, py) => {
+    } else if (target === 'regular' && p.cpuClick) {
+        dbgSetClickHandler(containerId, (px, py) => {
             const ref = getDebuggerRef();
             if (!ref) return;
-            ref.invokeMethodAsync('StartDebugAtPixel', px, py, 0, state.width || wx, state.height || wy);
+            const c = the2dCanvas();
+            ref.invokeMethodAsync('StartDebugAtPixel', px, py, 0,
+                c ? c.width : p.cpuClick.x, c ? c.height : p.cpuClick.y);
         });
-    } else if (target === 'debug' && state.debugClickActive) {
-        dbgSetClickHandler(id, (px, py) => {
+    } else if (target === 'debug' && p.debugClick) {
+        dbgSetClickHandler(containerId, (px, py) => {
             const ref = getDebuggerRef();
-            if (!ref) return;
-            ref.invokeMethodAsync('SetInspectedPixel', px, py);
+            if (ref) ref.invokeMethodAsync('SetInspectedPixel', px, py);
         });
     } else {
-        dbgSetClickHandler(id, null);
+        dbgSetClickHandler(containerId, null);
     }
 }
 
-function applyAll() {
-    document.querySelectorAll('.image-container[data-mode-target]').forEach(applyTo);
+function paintFull(canvas, pixels, width, height) {
+    if (!canvas) return;
+    if (pixels && !(pixels instanceof Uint8ClampedArray)) pixels = new Uint8ClampedArray(pixels);
+    canvas.width = width;
+    canvas.height = height;
+    canvas.getContext('2d').putImageData(new ImageData(pixels, width, height), 0, 0);
 }
 
-new MutationObserver(records => {
-    for (const r of records) {
-        for (const node of r.addedNodes) {
-            if (node.nodeType !== 1) continue;
-            if (node.matches?.('.image-container[data-mode-target]')) applyTo(node);
-            node.querySelectorAll?.('.image-container[data-mode-target]').forEach(applyTo);
-        }
-    }
-}).observe(document.body, { childList: true, subtree: true });
-
-export function imgSetPixels(pixels, width, height) {
-    // Wrap into a writable typed array so imgSetPixelsRect can mutate in place.
-    if (pixels && !(pixels instanceof Uint8ClampedArray)) {
-        pixels = new Uint8ClampedArray(pixels);
-    }
-    state.pixels = pixels;
-    state.width = width;
-    state.height = height;
-    applyAll();
-    document.querySelectorAll('.image-container[data-mode-target]').forEach(c => {
-        dbgResetView(c.id);
-    });
+export function setPixels(pixels, width, height) {
+    const container = document.querySelector('.image-container');
+    if (!container) return;
+    paintFull(container.querySelector('.color-canvas-2d'), pixels, width, height);
+    dbgSetViewportImageSize(container.id, width, height);
+    dbgResetView(container.id);
 }
 
-export function imgSetPixelsRect(pixels, x, y, rectW, rectH) {
-    if (!state.pixels || state.width <= 0 || state.height <= 0) return;
-    const fullW = state.width;
-    const fullH = state.height;
-    // Alias the incoming buffer without copying so putImageData can read it directly.
+export function allocPixels(width, height) {
+    const container = document.querySelector('.image-container');
+    if (!container) return;
+    const canvas = container.querySelector('.color-canvas-2d');
+    if (canvas) {
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, width, height);
+    }
+    dbgSetViewportImageSize(container.id, width, height);
+    dbgResetView(container.id);
+}
+
+// Paint one tile straight onto the canvas; the canvas accumulates the frame.
+export function setPixelsRect(pixels, x, y, rectW, rectH) {
+    const canvas = the2dCanvas();
+    if (!canvas) return;
     let src;
     if (pixels instanceof Uint8ClampedArray) src = pixels;
     else if (ArrayBuffer.isView(pixels)) src = new Uint8ClampedArray(pixels.buffer, pixels.byteOffset, pixels.byteLength);
     else src = new Uint8ClampedArray(pixels);
-    for (let row = 0; row < rectH; row++) {
-        const dstY = y + row;
-        if (dstY < 0 || dstY >= fullH) continue;
-        const copyW = Math.min(rectW, fullW - x);
-        if (copyW <= 0) continue;
-        const srcStart = row * rectW * 4;
-        const dstStart = (dstY * fullW + x) * 4;
-        state.pixels.set(src.subarray(srcStart, srcStart + copyW * 4), dstStart);
-    }
-    document.querySelectorAll('.image-container[data-mode-target] .color-canvas-2d').forEach(canvas => {
-        if (!canvas || canvas.width !== fullW || canvas.height !== fullH) return;
-        canvas.getContext('2d').putImageData(new ImageData(src, rectW, rectH), x, y);
-    });
+    canvas.getContext('2d').putImageData(new ImageData(src, rectW, rectH), x, y);
 }
 
-export function imgAllocPixels(width, height) {
-    const pixels = new Uint8ClampedArray(width * height * 4);
-    for (let i = 3; i < pixels.length; i += 4) pixels[i] = 255;
-    imgSetPixels(pixels, width, height);
+export function setMeshData(positions, indices) {
+    _meshPositions = positions;
+    _meshIndices = indices;
 }
 
 export function cpuCanvasSize() {
-    const el = document.getElementById('image-container');
+    const el = document.querySelector('.image-container');
     if (!el) return [256, 256];
     const dpr = window.devicePixelRatio || 1;
     const cw = Math.max(1, Math.floor(el.clientWidth * dpr));
     const ch = Math.max(1, Math.floor(el.clientHeight * dpr));
     return [cw, ch];
-}
-
-// C# pushes the whole canvas overlay projection in one call after every message.
-export function imgSetState(p) {
-    state.warpX = p.warpX;
-    state.warpY = p.warpY;
-    state.regularMode = p.regularMode;
-    state.debugMode = p.debugMode;
-    state.debugPixel = p.debugPixel;
-    state.threadStates = p.threadStates;
-    state.cpuClick = p.cpuClick;
-    state.debugClickActive = !!p.debugClick;
-    state.pickMode = p.pickMode === 'vertex' ? 'vertex' : 'pixel';
-    applyAll();
-}
-
-export function imgSetMeshData(positions, indices) {
-    state.meshPositions = positions;
-    state.meshIndices = indices;
-    applyAll();
 }

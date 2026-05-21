@@ -61,10 +61,7 @@
                     <div class="exec-state-body" id="thread-grid-container">
                         @if (showImage)
                         {
-                            <div class="image-container" id="image-container-debug" data-mode-target="debug">
-                                <canvas class="image-canvas color-canvas-2d"></canvas>
-                                <canvas class="image-overlay"></canvas>
-                            </div>
+                            <CanvasView ContainerId="image-container-debug" ModeTarget="debug" />
                         }
                         else
                         {

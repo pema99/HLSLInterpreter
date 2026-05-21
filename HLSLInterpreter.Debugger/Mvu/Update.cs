@@ -63,15 +63,18 @@ public static class Update
             }
 
             case CanvasReady:
+                // A canvas just mounted: repaint it and re-push the mesh.
                 next = model;
-                command = Cmd.None;
+                command = Cmd.Batch(
+                    fx.RenderViewMode(model.Run.ViewMode, model.Run.Metrics, model.Run.Image),
+                    fx.SetMeshData(ActiveConfig(model).Mesh));
                 break;
 
             case DefaultMeshLoaded x:
                 next = WithActiveConfig(
                     model with { Editor = model.Editor with { DefaultMesh = x.Mesh } },
                     c => c with { Mesh = x.Mesh });
-                command = Cmd.None;
+                command = fx.SetMeshData(x.Mesh);
                 break;
 
             case RunRequested:
@@ -224,7 +227,7 @@ public static class Update
                     ImmediateHistory = Array.Empty<ImmediateEntry>(),
                 };
                 next = model with { Run = run, Debug = debug };
-                command = Cmd.Batch(fx.SetEditorReadOnly(true), HighlightCmd(fx, next));
+                command = Cmd.Batch(fx.SetEditorReadOnly(true), HighlightCmd(fx, next), ThemeCmd(fx, next));
                 break;
             }
 
@@ -233,6 +236,7 @@ public static class Update
                 command = Cmd.Batch(
                     fx.SetEditorReadOnly(false),
                     fx.HighlightLine(0),
+                    ThemeCmd(fx, next),
                     fx.FetchEditorText(code => new RunWithCode(code)));
                 break;
 
@@ -440,7 +444,9 @@ public static class Update
                     break;
                 }
                 next = WithActiveConfig(model, c => c with { Mesh = mesh });
-                command = fx.FetchEditorText(code => new RunWithCode(code));
+                command = Cmd.Batch(
+                    fx.SetMeshData(mesh),
+                    fx.FetchEditorText(code => new RunWithCode(code)));
                 break;
             }
 
@@ -687,6 +693,7 @@ public static class Update
                     next = next with { Run = next.Run with { GpuPreviewEnabled = true } };
                     cmds.Add(fx.FetchEditorText(code => new RunWithCode(code)));
                 }
+                cmds.Add(ThemeCmd(fx, next));
                 command = Cmd.Batch(cmds);
                 break;
             }
@@ -715,7 +722,7 @@ public static class Update
                 break;
         }
 
-        return (next, Cmd.Batch(command, fx.SyncCanvas(CanvasProjection.Compute(next))));
+        return (next, command);
     }
 
     // ---- Shared helpers ----
@@ -866,4 +873,7 @@ public static class Update
         int line = onDoc && m.Debug.Trace != null ? m.Debug.Trace.LineAt(m.Debug.StepIndex) : 0;
         return fx.HighlightLine(line);
     }
+
+    private static Cmd ThemeCmd(Effects fx, AppState m) =>
+        fx.SetTheme(m.Ui.BonzomaticMode && !m.Debug.IsActive ? "hlsl-bonzomatic" : "hlsl-dark");
 }
