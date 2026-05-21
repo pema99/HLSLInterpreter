@@ -137,10 +137,11 @@ public sealed partial class DebuggerProgram
                     && model.Debug.DebugVertexIndex < 0)
                 {
                     var cap = model.Run.CapturedFrame;
-                    (next, command) = DebugAtVertex(model, 0,
+                    next = model;
+                    command = Cmd.OfMsg(new DebugAtVertexRequested(0,
                         cap?.Time ?? 0f,
                         cap?.CanvasW ?? Math.Max(1, config.WarpX),
-                        cap?.CanvasH ?? Math.Max(1, config.WarpY));
+                        cap?.CanvasH ?? Math.Max(1, config.WarpY)));
                     break;
                 }
                 next = model;
@@ -564,9 +565,7 @@ public sealed partial class DebuggerProgram
                     next = WithActiveConfig(next, c => c with { VertexEntryPoint = x.VertEntry });
                 if (x.Textures != null) next = WithActiveConfig(next, c => c with { Textures = x.Textures });
                 if (x.Samplers != null) next = WithActiveConfig(next, c => c with { Samplers = x.Samplers });
-                Cmd runCmd;
-                (next, runCmd) = StartRunWithCode(next, x.Code);
-                cmds.Add(runCmd);
+                cmds.Add(Cmd.OfMsg(new RunWithCode(x.Code)));
                 command = Cmd.Batch(cmds);
                 break;
             }
@@ -598,9 +597,7 @@ public sealed partial class DebuggerProgram
                     Textures = textures,
                     Samplers = Array.Empty<SamplerBinding>(),
                 });
-                Cmd runCmd;
-                (next, runCmd) = StartRunWithCode(next, x.Hlsl);
-                cmds.Add(runCmd);
+                cmds.Add(Cmd.OfMsg(new RunWithCode(x.Hlsl)));
                 command = Cmd.Batch(cmds);
                 break;
             }
