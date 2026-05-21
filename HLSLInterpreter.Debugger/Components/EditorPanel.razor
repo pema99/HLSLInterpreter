@@ -88,17 +88,17 @@
         var resolved = value is ReferenceValue rv ? rv.Get() : value;
 
         byte[] rgba = null;
-        try { rgba = ValueImageRenderer.RenderVariableImage(resolved, wx, wy); }
+        try { rgba = HLSLValueDisplay.RenderPreviewImage(resolved, wx, wy); }
         catch (Exception ex) { Console.WriteLine($"[hover] image render failed for '{identifier}': {ex.Message}"); }
 
         string[] perThread = null;
         if (debug.DebugVertexIndex >= 0)
             perThread = Enumerable.Range(0, wx * wy)
-                .Select(i => HLSLValueFormatter.Format(resolved, i)).ToArray();
+                .Select(i => HLSLValueDisplay.Format(resolved, i)).ToArray();
 
         return new HoverInfo
         {
-            Value = HLSLValueFormatter.Format(value, debug.InspectedThread),
+            Value = HLSLValueDisplay.Format(value, debug.InspectedThread),
             Width = wx,
             Height = wy,
             Rgba = rgba,
@@ -115,5 +115,17 @@
     {
         _selfRef?.Dispose();
         base.Dispose();
+    }
+
+    // Hover tooltip payload sent to JS by GetHoverInfo.
+    public sealed class HoverInfo
+    {
+        public string Value { get; set; } = "";
+        public int Width { get; set; }
+        public int Height { get; set; }
+        public byte[] Rgba { get; set; }
+        public int InspectedX { get; set; }
+        public int InspectedY { get; set; }
+        public string[] PerThreadValues { get; set; }
     }
 }

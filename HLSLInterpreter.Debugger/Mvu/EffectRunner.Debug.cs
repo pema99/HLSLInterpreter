@@ -37,7 +37,7 @@ public sealed partial class EffectRunner
             ShaderImage image = null;
             if (!trace.HasError && trace.Result != null)
             {
-                var pixels = ValueImageRenderer.TryExtractImage(trace.Result, wx, wy);
+                var pixels = HLSLValueDisplay.RenderOutputImage(trace.Result, wx, wy);
                 if (pixels != null)
                 {
                     image = new ShaderImage(pixels, wx, wy);
@@ -68,11 +68,11 @@ public sealed partial class EffectRunner
         }
         else
         {
-            resultStr = HLSLValueFormatter.Format(value, c.InspectedThread);
+            resultStr = HLSLValueDisplay.Format(value, c.InspectedThread);
             isError = false;
             var resolved = value is ReferenceValue rv ? rv.Get() : value;
             byte[] rgba = null;
-            try { rgba = ValueImageRenderer.RenderVariableImage(resolved, wx, wy); }
+            try { rgba = HLSLValueDisplay.RenderPreviewImage(resolved, wx, wy); }
             catch { }
             if (rgba != null)
             {

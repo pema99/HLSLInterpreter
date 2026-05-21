@@ -1,6 +1,39 @@
 using HLSL;
+using UnityShaderParser.HLSL;
 
 namespace HLSLInterpreter.Debugger.Core;
+
+public readonly record struct StatementEvent(HLSLSyntaxNode Node, HLSLRunner Runner, int OutputLength);
+
+public sealed class ExecutionOptions
+{
+    public static readonly ExecutionOptions None = new();
+
+    public Action<StatementEvent> BeforeStatement { get; init; }
+    public Action<StatementEvent> AfterStatement { get; init; }
+
+    // Attach the hooks before the program is loaded so global initializers are
+    // observed. The trace recorder needs this, plain runs and metrics do not.
+    public bool ObserveProgramLoad { get; init; }
+
+    // Redirect Console.Out for this run. Disabled for tiled full-frame tiles,
+    // where one outer redirect spans all tiles instead.
+    public bool CaptureConsole { get; init; } = true;
+}
+
+public sealed record RunOutcome(
+    HLSLValue Result,
+    string Output,
+    bool HasError,
+    string ErrorMessage,
+    Exception Exception)
+{
+    public static RunOutcome Success(HLSLValue result, string output) =>
+        new(result, output, false, null, null);
+
+    public static RunOutcome Failure(string output, string message, Exception exception) =>
+        new(null, output, true, message, exception);
+}
 
 // Runs one shader invocation on the CPU interpreter and returns a RunOutcome.
 // Single-warp runs, tiled full-frame runs, and trace recording all go through here.

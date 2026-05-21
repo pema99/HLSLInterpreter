@@ -1,6 +1,6 @@
 using System.IO.Compression;
 using System.Text;
-using HLSLInterpreter.Debugger.Services;
+using HLSLInterpreter.Debugger.State;
 
 namespace HLSLInterpreter.Debugger.Core;
 

@@ -1,7 +1,10 @@
 using HLSLInterpreter.Debugger.Core;
-using HLSLInterpreter.Debugger.Services;
 
 namespace HLSLInterpreter.Debugger.State;
+
+public enum ShaderRenderMode { Pixel, VertFrag }
+public enum DebugTarget { Pixel, Vertex }
+public enum CpuMode { SingleWarp, FullFrame, FullFrameWithMetrics }
 
 // Per-document shader settings. Owned by the document that uses them, so a tab
 // switch is just a change of active document, not a rewrite of global state.

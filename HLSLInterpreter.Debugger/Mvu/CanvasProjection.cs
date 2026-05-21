@@ -1,6 +1,5 @@
 using HLSL;
 using HLSLInterpreter.Debugger.Core;
-using HLSLInterpreter.Debugger.Services;
 using HLSLInterpreter.Debugger.State;
 
 namespace HLSLInterpreter.Debugger.Mvu;

@@ -3,9 +3,10 @@ using HLSLInterpreter.Debugger.State;
 
 namespace HLSLInterpreter.Debugger.Mvu;
 
-// The concrete command set. A Cmd is a description of a side effect: update
-// returns it, the effect runner carries it out. A command that produces a
-// result dispatches a follow-up message when it completes.
+// A Cmd is a description of a side effect: update returns it, the effect runner
+// carries it out. A command that produces a result dispatches a follow-up
+// message when it completes.
+public abstract record Cmd;
 
 // ---- Editor ----
 public sealed record FetchEditorText(Func<string, Msg> Then) : Cmd;

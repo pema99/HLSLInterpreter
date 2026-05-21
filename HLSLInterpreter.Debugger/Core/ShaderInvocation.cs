@@ -1,5 +1,5 @@
 using HLSL;
-using HLSLInterpreter.Debugger.Services;
+using HLSLInterpreter.Debugger.State;
 using UnityShaderParser.HLSL;
 
 namespace HLSLInterpreter.Debugger.Core;

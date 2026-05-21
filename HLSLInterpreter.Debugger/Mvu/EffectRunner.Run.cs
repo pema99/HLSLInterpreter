@@ -58,7 +58,7 @@ public sealed partial class EffectRunner
                     outcome.Output, new RunError(outcome.ErrorMessage, outcome.Exception), null, null));
                 return;
             }
-            var pixels = ValueImageRenderer.TryExtractImage(outcome.Result, wx, wy);
+            var pixels = HLSLValueDisplay.RenderOutputImage(outcome.Result, wx, wy);
             ShaderImage image = null;
             if (pixels != null)
             {
@@ -139,7 +139,7 @@ public sealed partial class EffectRunner
                 if (cts.IsCancellationRequested) return null;
                 var outcome = RenderTile(runner, program, invocation, tx, ty, metrics);
                 if (outcome.HasError) return outcome;
-                var tilePixels = ValueImageRenderer.TryExtractImage(outcome.Result, wx, wy);
+                var tilePixels = HLSLValueDisplay.RenderOutputImage(outcome.Result, wx, wy);
                 if (tilePixels == null) continue;
                 BlitTile(tilePixels, tx * wx, ty * wy, wx, wy, canvasW, canvasH, fullPixels);
                 await _canvas.SetPixelsRect(tilePixels, tx * wx, ty * wy, wx, wy);
@@ -191,7 +191,7 @@ public sealed partial class EffectRunner
                 continue;
             }
             if (cts.IsCancellationRequested) continue;
-            var tilePixels = ValueImageRenderer.TryExtractImage(outcome.Result, wx, wy);
+            var tilePixels = HLSLValueDisplay.RenderOutputImage(outcome.Result, wx, wy);
             if (tilePixels == null) continue;
             BlitTile(tilePixels, tx * wx, ty * wy, wx, wy, canvasW, canvasH, fullPixels);
             await _canvas.SetPixelsRect(tilePixels, tx * wx, ty * wy, wx, wy);

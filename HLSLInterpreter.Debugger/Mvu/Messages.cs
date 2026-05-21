@@ -1,12 +1,12 @@
 using HLSLInterpreter.Debugger.Core;
-using HLSLInterpreter.Debugger.Services;
 using HLSLInterpreter.Debugger.State;
 
 namespace HLSLInterpreter.Debugger.Mvu;
 
-// The concrete message set. Every event the app can produce is one of these.
-// A message named XWithCode is the continuation of a FetchEditorText command:
-// update needs the live Monaco text, so it asks for it and resumes here.
+// Every event the app can produce is a Msg. A message named XWithCode is the
+// continuation of a FetchEditorText command: update needs the live Monaco text,
+// so it asks for it and resumes here.
+public abstract record Msg;
 
 public enum StepKind { In, Over, Out, InBack, OverBack, OutBack, Continue, ContinueBack }
 
