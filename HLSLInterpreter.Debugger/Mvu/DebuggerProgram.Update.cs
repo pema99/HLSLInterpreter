@@ -123,11 +123,6 @@ public sealed partial class DebuggerProgram
                 command = _effects.RenderViewMode(x.Mode, model.Run.Metrics, model.Run.Image);
                 break;
 
-            case ImageCollapseToggled:
-                next = model with { Ui = model.Ui with { ImageCollapsed = !model.Ui.ImageCollapsed } };
-                command = Cmd.None;
-                break;
-
             case DebugRequested:
             {
                 var config = ActiveConfig(model);
@@ -452,7 +447,7 @@ public sealed partial class DebuggerProgram
             }
 
             case OpenFileRequested:
-                next = model with { Ui = model.Ui with { MenuOpen = false } };
+                next = model;
                 command = _effects.OpenFileDialog();
                 break;
 
@@ -490,7 +485,7 @@ public sealed partial class DebuggerProgram
             }
 
             case SaveFileRequested x:
-                next = model with { Ui = model.Ui with { MenuOpen = false } };
+                next = model;
                 command = _effects.FetchEditorText(code => new SaveFileWithCode(code, x.AsNew));
                 break;
 
@@ -509,7 +504,7 @@ public sealed partial class DebuggerProgram
                 break;
 
             case DownloadRequested:
-                next = model with { Ui = model.Ui with { MenuOpen = false } };
+                next = model;
                 command = _effects.FetchEditorText(code => new DownloadWithCode(code));
                 break;
 
@@ -654,7 +649,7 @@ public sealed partial class DebuggerProgram
                 break;
 
             case ModalRequested x:
-                next = model with { Ui = model.Ui with { OpenModal = x.Kind, MenuOpen = false } };
+                next = model with { Ui = model.Ui with { OpenModal = x.Kind } };
                 command = Cmd.None;
                 break;
 
@@ -663,19 +658,9 @@ public sealed partial class DebuggerProgram
                 command = Cmd.None;
                 break;
 
-            case MenuToggled:
-                next = model with { Ui = model.Ui with { MenuOpen = !model.Ui.MenuOpen } };
-                command = Cmd.None;
-                break;
-
-            case MenuClosed:
-                next = model with { Ui = model.Ui with { MenuOpen = false } };
-                command = Cmd.None;
-                break;
-
             case BonzomaticToggled:
             {
-                next = model with { Ui = model.Ui with { MenuOpen = false } };
+                next = model;
                 var cmds = new List<Cmd>();
                 if (next.Debug.IsActive)
                 {
@@ -696,7 +681,7 @@ public sealed partial class DebuggerProgram
             }
 
             case PermalinkCopyRequested x:
-                next = model with { Ui = model.Ui with { MenuOpen = false } };
+                next = model;
                 command = _effects.FetchEditorText(code => new PermalinkCopyWithCode(code, x.BaseUrl));
                 break;
 
@@ -731,7 +716,6 @@ public sealed partial class DebuggerProgram
         var next = m with
         {
             Run = BeginRunReset(m.Run, keepCaptured: false),
-            Ui = m.Ui with { ImageCollapsed = false },
         };
         if (m.Run.GpuPreviewEnabled)
         {

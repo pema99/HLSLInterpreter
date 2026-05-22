@@ -24,7 +24,6 @@ public sealed record GpuPauseToggled : Msg;
 public sealed record GpuTimeRestartRequested : Msg;
 public sealed record GpuPreviewToggled(bool Enabled) : Msg;
 public sealed record ViewModeChanged(DebugViewMode Mode) : Msg;
-public sealed record ImageCollapseToggled : Msg;
 
 // ---- Debug ----
 public sealed record DebugRequested : Msg;
@@ -83,8 +82,6 @@ public sealed record TexturesSaved(
 // ---- UI ----
 public sealed record ModalRequested(ModalKind Kind) : Msg;
 public sealed record ModalDismissed : Msg;
-public sealed record MenuToggled : Msg;
-public sealed record MenuClosed : Msg;
 public sealed record BonzomaticToggled : Msg;
 public sealed record PermalinkCopyRequested(string BaseUrl) : Msg;
 public sealed record PermalinkCopyWithCode(string Code, string BaseUrl) : Msg;

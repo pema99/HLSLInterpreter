@@ -101,9 +101,7 @@ public sealed record DebugState
 public sealed record UiState
 {
     public ModalKind OpenModal { get; init; } = ModalKind.None;
-    public bool MenuOpen { get; init; }
     public bool BonzomaticMode { get; init; }
-    public bool ImageCollapsed { get; init; }
 
     // Bumped on each permalink copy. The toast element is keyed on this, so a
     // copy re-creates it and its CSS fade animation replays.

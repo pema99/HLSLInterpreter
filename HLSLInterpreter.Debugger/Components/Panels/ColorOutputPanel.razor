@@ -6,11 +6,10 @@
     bool isGpu = run.Backend == RunBackend.Gpu;
     bool isRunning = run.Status != RunStatus.Idle;
     bool isDebugging = Slice.Debug.IsActive;
-    bool collapsed = Slice.Ui.ImageCollapsed;
     bool showLegend = run.Metrics != null && !isGpu && !isDebugging && run.ViewMode != DebugViewMode.Color;
 }
 <div class="debug-section debug-section-image @(collapsed ? "section-collapsed" : "")">
-    <div class="panel-header collapsible-header" @onclick="@(() => Dispatch(new ImageCollapseToggled()))">
+    <div class="panel-header collapsible-header" @onclick="() => collapsed = !collapsed">
         <div class="panel-header-left">
             <span class="collapse-icon @(collapsed ? "" : "expanded")">&#x203A;</span>
             <span>Color Output</span>
@@ -102,6 +101,7 @@
 @code {
     protected override DebuggerModel Select(DebuggerModel s) => s;
 
+    private bool collapsed;
     private bool legendOpen;
 
     private void OnGpuToggleChanged(ChangeEventArgs e) =>

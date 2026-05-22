@@ -24,11 +24,12 @@
     <header class="topbar">
         <div class="topbar-left">
             <div class="menu-button-wrap">
-                <button class="btn-menu" @onclick="@(() => Dispatch(new MenuToggled()))" title="Menu"><i class="mdi mdi-menu"></i></button>
-                @if (ui.MenuOpen)
+                <button class="btn-menu" @onclick="() => _menuOpen = !_menuOpen" title="Menu"><i class="mdi mdi-menu"></i></button>
+                @if (_menuOpen)
                 {
-                    <div class="menu-backdrop" @onclick="@(() => Dispatch(new MenuClosed()))"></div>
-                    <div class="menu-dropdown">
+                    <div class="menu-backdrop" @onclick="() => _menuOpen = false"></div>
+                    @* Any click inside the dropdown bubbles here and closes the menu. *@
+                    <div class="menu-dropdown" @onclick="() => _menuOpen = false">
                         @if (TabbedEditor.Enabled)
                         {
                             <button class="menu-item" @onclick="@(() => Dispatch(new ModalRequested(ModalKind.NewFile)))">New file</button>
@@ -145,6 +146,7 @@
     private DotNetObjectReference<Debugger> _dotNetRef;
     private string _pendingShaderToy;
     private string _initialCode = "";
+    private bool _menuOpen;
 
     protected override void OnInitialized()
     {
