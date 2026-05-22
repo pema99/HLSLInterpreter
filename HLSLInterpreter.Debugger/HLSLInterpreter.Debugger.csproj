@@ -20,9 +20,7 @@
 
   <!-- gpu.js fetches HLSLTest.hlsl and prepends it to the user shader. -->
   <Target Name="CopyHLSLTestPreamble" BeforeTargets="ResolveStaticWebAssetsInputs;BeforeBuild">
-    <Copy SourceFiles="..\HLSLInterpreter\HLSLTest.hlsl"
-          DestinationFiles="wwwroot\lib\HLSLTest.hlsl"
-          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="..\HLSLInterpreter\HLSLTest.hlsl" DestinationFiles="wwwroot\lib\HLSLTest.hlsl" SkipUnchangedFiles="true" />
   </Target>
 
   <!-- ExamplesModal fetches index.txt to enumerate available examples. -->
@@ -30,9 +28,7 @@
     <ItemGroup>
       <_ExampleShader Include="wwwroot\ExampleShaders\*.hlsl" />
     </ItemGroup>
-    <WriteLinesToFile File="wwwroot\ExampleShaders\index.txt"
-                      Lines="@(_ExampleShader -> '%(Filename)%(Extension)')"
-                      Overwrite="true" />
+    <WriteLinesToFile File="wwwroot\ExampleShaders\index.txt" Lines="@(_ExampleShader -> '%(Filename)%(Extension)')" Overwrite="true" />
   </Target>
 
   <!-- LibraryPickerModal fetches index.txt to enumerate available example textures. -->
@@ -40,9 +36,7 @@
     <ItemGroup>
       <_ExampleTexture Include="wwwroot\ExampleTextures\*.png;wwwroot\ExampleTextures\*.jpg;wwwroot\ExampleTextures\*.jpeg" />
     </ItemGroup>
-    <WriteLinesToFile File="wwwroot\ExampleTextures\index.txt"
-                      Lines="@(_ExampleTexture -> '%(Filename)%(Extension)')"
-                      Overwrite="true" />
+    <WriteLinesToFile File="wwwroot\ExampleTextures\index.txt" Lines="@(_ExampleTexture -> '%(Filename)%(Extension)')" Overwrite="true" />
   </Target>
 
 </Project>

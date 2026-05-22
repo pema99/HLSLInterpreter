@@ -148,7 +148,7 @@
     protected override void OnInitialized()
     {
         base.OnInitialized();
-        Interop.Js = JS;
+        JsInterop.Js = JS;
         _dotNetRef = DotNetObjectReference.Create(this);
         GpuInterop.DotNetRef = _dotNetRef;
 

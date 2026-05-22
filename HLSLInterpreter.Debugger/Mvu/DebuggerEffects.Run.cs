@@ -2,7 +2,6 @@ using System.Threading;
 using System.Threading.Channels;
 using HLSL;
 using HLSLInterpreter.Debugger.Core;
-using HLSLInterpreter.Debugger.Interop;
 using HLSLInterpreter.Debugger.Services;
 using UnityShaderParser.HLSL;
 

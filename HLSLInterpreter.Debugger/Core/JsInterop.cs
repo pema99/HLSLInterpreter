@@ -5,7 +5,7 @@ namespace HLSLInterpreter.Debugger.Interop;
 
 // Typed wrappers over the app's JS modules. The interop layer is static: there
 // is one IJSRuntime for the whole app, set once at startup by the host.
-public static class Interop
+public static class JsInterop
 {
     public static IJSRuntime Js { get; set; }
 }
@@ -16,7 +16,7 @@ public static class EditorInterop
     private const string ModulePath = "./_content/HLSLInterpreter.Debugger/js/editor.js";
     private static IJSObjectReference _module;
     private static async ValueTask<IJSObjectReference> Module() =>
-        _module ??= await Interop.Js.InvokeAsync<IJSObjectReference>("import", ModulePath);
+        _module ??= await JsInterop.Js.InvokeAsync<IJSObjectReference>("import", ModulePath);
 
     public static async ValueTask Init(string containerId, object editorRef, int docId, string initialCode) =>
         await (await Module()).InvokeVoidAsync("initMonaco", containerId, editorRef, docId, initialCode);
@@ -61,7 +61,7 @@ public static class BrowserInterop
     private const string ModulePath = "./_content/HLSLInterpreter.Debugger/js/host.js";
     private static IJSObjectReference _module;
     private static async ValueTask<IJSObjectReference> Module() =>
-        _module ??= await Interop.Js.InvokeAsync<IJSObjectReference>("import", ModulePath);
+        _module ??= await JsInterop.Js.InvokeAsync<IJSObjectReference>("import", ModulePath);
 
     public static async ValueTask SetDebuggerRef(object reference) =>
         await (await Module()).InvokeVoidAsync("setDebuggerRef", reference);
@@ -125,7 +125,7 @@ public static class GpuInterop
     private const string ModulePath = "./_content/HLSLInterpreter.Debugger/js/gpu.js";
     private static IJSObjectReference _module;
     private static async ValueTask<IJSObjectReference> Module() =>
-        _module ??= await Interop.Js.InvokeAsync<IJSObjectReference>("import", ModulePath);
+        _module ??= await JsInterop.Js.InvokeAsync<IJSObjectReference>("import", ModulePath);
 
     // Set once by the shell so the GPU render loop can report click-to-debug
     // back into .NET.
@@ -162,7 +162,7 @@ public static class CanvasInterop
     private const string ModulePath = "./_content/HLSLInterpreter.Debugger/js/viewport.js";
     private static IJSObjectReference _module;
     private static async ValueTask<IJSObjectReference> Module() =>
-        _module ??= await Interop.Js.InvokeAsync<IJSObjectReference>("import", ModulePath);
+        _module ??= await JsInterop.Js.InvokeAsync<IJSObjectReference>("import", ModulePath);
 
     public static async ValueTask SetPixels(byte[] pixels, int width, int height) =>
         await (await Module()).InvokeVoidAsync("setPixels", pixels, width, height);
