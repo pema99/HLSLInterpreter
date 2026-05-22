@@ -468,8 +468,6 @@ void Texture_Write_Global()
 | `MOCK_RESOURCE(resource, MockType)` | Binds a mock struct to a global resource variable. |
 
 ## Limitations
-The main limitation of the interpreter is that it is very slow - think hundreds or thousands of time slower than running on a GPU. The interpreter is written primarily with correctness in mind, and I've made no attempt to optimize it more than necessary. Don't expect to run interesting shaders at high resolutions without waiting several seconds for a frame! The thread count is configurable, and most usecases will want to run just a few threads.
+The main limitation of the interpreter is that it is very slow - think hundreds or thousands of time slower than running on a GPU. Don't expect to run interesting shaders at high resolutions without waiting several seconds for a frame! The thread count is configurable, and most usecases will want to run just a few threads.
 
-The interpreter is capable of simulating 1 warp/wavefront of arbitrary size. If you need multiple warps, you can use multiple instances of the interpreter ([example](https://github.com/pema99/HLSLInterpreter/blob/7a5ae52c439afe29fd38b20cf2589e16dba03325/HLSLInterpreter.Examples/Program.cs#L124)). If run in parallel, beware that atomic operations and barriers are no-ops, so you'll have to manually handle synchronization if multiple CPU threads access the same memory.
-
-The library is still a work in progress, so bugs be plenty.
+The interpreter is capable of simulating 1 thread group of arbitrary size. If you need multiple groups, you can use multiple instances of the interpreter ([example](https://github.com/pema99/HLSLInterpreter/blob/7a5ae52c439afe29fd38b20cf2589e16dba03325/HLSLInterpreter.Examples/Program.cs#L124)). If run in parallel, beware that atomic operations and barriers are no-ops, so you'll have to manually handle synchronization if multiple CPU threads access the same memory.
