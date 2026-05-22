@@ -1,4 +1,4 @@
-namespace HLSLInterpreter.Debugger.Execution;
+namespace HLSLInterpreter.Debugger.Utils;
 
 public static class DefaultShader
 {
