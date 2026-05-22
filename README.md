@@ -1,7 +1,7 @@
 # HLSLInterpreter
 A experimental library for interpreting HLSL shader code on the CPU. The library includes a framework for creating automated tests for shaders, which run entirely on the CPU.
 
-The interpreter is relatively self contained, and can also be used for other applications that want to run shader code, such as [this fancy web demo](https://pema.dev/hlsl/).
+The interpreter is relatively self contained, and can also be used for other applications that want to run shader code, such as [this fancy web demo](https://pema.dev/hlsl/) (source code [here](https://github.com/pema99/HLSLDebugger)).
 
 ## Table of contents
 - [Basic usage](#basic-usage)
