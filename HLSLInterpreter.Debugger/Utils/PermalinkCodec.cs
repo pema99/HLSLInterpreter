@@ -1,8 +1,9 @@
 using System.IO.Compression;
 using System.Text;
-using HLSLInterpreter.Debugger.Mvu;
+using HLSLInterpreter.Debugger.Core;
+using HLSLInterpreter.Debugger.Execution;
 
-namespace HLSLInterpreter.Debugger.Core;
+namespace HLSLInterpreter.Debugger.Utils;
 
 public sealed record PermalinkSettings(
     string EntryPoint,

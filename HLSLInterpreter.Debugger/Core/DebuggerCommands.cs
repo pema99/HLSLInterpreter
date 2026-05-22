@@ -1,4 +1,4 @@
-namespace HLSLInterpreter.Debugger.Mvu;
+namespace HLSLInterpreter.Debugger.Core;
 
 // What an update step asks the runtime to do next. Built through DebuggerEffects, or
 // directly via these factories, and interpreted by DebuggerProgram.

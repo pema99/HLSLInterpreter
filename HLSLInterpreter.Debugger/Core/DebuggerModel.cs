@@ -1,11 +1,11 @@
-using HLSLInterpreter.Debugger.Core;
+using HLSLInterpreter.Debugger.Execution;
+using HLSLInterpreter.Debugger.Utils;
 
-namespace HLSLInterpreter.Debugger.Mvu;
+namespace HLSLInterpreter.Debugger.Core;
 
 // The debugger's immutable model tree, and the per-document shader settings it
 // nests. One state record; update produces the next.
 
-public enum ShaderRenderMode { Pixel, VertFrag }
 public enum DebugTarget { Pixel, Vertex }
 public enum CpuMode { SingleWarp, FullFrame, FullFrameWithMetrics }
 

@@ -2,7 +2,7 @@ using HLSL;
 using UnityShaderParser.Common;
 using UnityShaderParser.HLSL;
 
-namespace HLSLInterpreter.Debugger.Core;
+namespace HLSLInterpreter.Debugger.Execution;
 
 // A shader either parsed lazily from source or supplied as pre-parsed nodes.
 // Pre-parsed nodes let a tiled run reuse one parse across many warps.

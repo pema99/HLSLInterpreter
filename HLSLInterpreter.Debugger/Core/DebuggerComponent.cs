@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Components;
 
-namespace HLSLInterpreter.Debugger.Mvu;
+namespace HLSLInterpreter.Debugger.Core;
 
 // Base for components that render global state. A component selects the single
 // slice it needs and re-renders only when that slice changes, so an unrelated

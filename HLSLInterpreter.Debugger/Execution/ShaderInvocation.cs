@@ -1,8 +1,10 @@
 using HLSL;
-using HLSLInterpreter.Debugger.Mvu;
 using UnityShaderParser.HLSL;
+using HLSLInterpreter.Debugger.Utils;
 
-namespace HLSLInterpreter.Debugger.Core;
+namespace HLSLInterpreter.Debugger.Execution;
+
+public enum ShaderRenderMode { Pixel, VertFrag }
 
 public sealed record ShaderInvocation(
     ShaderRenderMode Mode,

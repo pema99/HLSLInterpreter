@@ -1,4 +1,4 @@
-namespace HLSLInterpreter.Debugger.Core;
+namespace HLSLInterpreter.Debugger.Utils;
 
 // Redirects Console.Out for the lifetime of the instance. The interpreter emits
 // shader output through Console.WriteLine, so capturing it needs this redirect.

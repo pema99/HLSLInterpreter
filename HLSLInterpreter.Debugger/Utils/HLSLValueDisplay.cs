@@ -2,7 +2,7 @@ using System.Globalization;
 using HLSL;
 using UnityShaderParser.HLSL;
 
-namespace HLSLInterpreter.Debugger.Core;
+namespace HLSLInterpreter.Debugger.Utils;
 
 // Turns interpreter values into display forms: text via Format, or an rgba
 // image via RenderPreviewImage and RenderOutputImage.

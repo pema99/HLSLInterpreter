@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Components.Web;
 using BlazorDesktop.Hosting;
 using HLSLInterpreter.Debugger.Desktop.Components;
 using HLSLInterpreter.Debugger.Desktop;
-using HLSLInterpreter.Debugger.Mvu;
+using HLSLInterpreter.Debugger.Core;
 using HLSLInterpreter.Debugger.Services;
 
 var builder = BlazorDesktopHostBuilder.CreateDefault(args);

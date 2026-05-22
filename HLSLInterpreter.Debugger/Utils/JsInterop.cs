@@ -1,6 +1,7 @@
+using HLSLInterpreter.Debugger.Execution;
 using Microsoft.JSInterop;
 
-namespace HLSLInterpreter.Debugger.Core;
+namespace HLSLInterpreter.Debugger.Utils;
 
 // Typed wrappers over the app's JS modules. The interop layer is static: there
 // is one IJSRuntime for the whole app, set once at startup by the host.

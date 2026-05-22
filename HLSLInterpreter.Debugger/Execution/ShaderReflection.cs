@@ -1,10 +1,9 @@
 using System.Text;
 using HLSL;
-using HLSLInterpreter.Debugger.Mvu;
 using UnityShaderParser.Common;
 using UnityShaderParser.HLSL;
 
-namespace HLSLInterpreter.Debugger.Core;
+namespace HLSLInterpreter.Debugger.Execution;
 
 public sealed record VertexInput(string SemanticBase, int SemanticIndex, int Dimensions);
 

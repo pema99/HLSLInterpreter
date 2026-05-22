@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace HLSLInterpreter.Debugger.Core;
+namespace HLSLInterpreter.Debugger.Execution;
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum TextureFilter

@@ -1,18 +1,88 @@
-using System.Threading;
+using System.Runtime;
 using System.Threading.Channels;
 using HLSL;
-using HLSLInterpreter.Debugger.Core;
+using HLSLInterpreter.Debugger.Execution;
+using HLSLInterpreter.Debugger.Utils;
 using HLSLInterpreter.Debugger.Services;
 using UnityShaderParser.HLSL;
 
-namespace HLSLInterpreter.Debugger.Mvu;
+namespace HLSLInterpreter.Debugger.Core;
 
-// Run effects: GPU preview, CPU single-warp, and CPU tiled full-frame. The
-// tiled run is detached so it can dispatch progress messages (it becomes
-// cancellable, then finishes) while the dispatch pump stays free. Each run owns
-// a cancellation source; starting a run cancels the previous one.
-public sealed partial class DebuggerEffects
+// Builds the application's commands. Every method here returns a Cmd; the
+// DebuggerProgram interpreter runs them. The active run's cancellation source is
+// the one piece of effect state that must outlive a single command.
+public sealed class DebuggerEffects
 {
+    private readonly ShaderExecutor _executor = new();
+    private readonly HLSLRunner _runner = new();
+    private readonly FileDialogService _fileDialogs;
+
+    public DebuggerEffects(FileDialogService fileDialogs) => _fileDialogs = fileDialogs;
+
+    // Gathers the per-frame inputs a ShaderInvocation needs (canvas size, camera
+    // matrices, mouse). Everything model-derived is passed in.
+    private async Task<ShaderInvocation> BuildAsync(ShaderConfig config, FrameCapture captured, int debugVertexIndex)
+    {
+        int wx = Math.Max(1, config.WarpX);
+        int wy = Math.Max(1, config.WarpY);
+        int canvasW = captured?.CanvasW ?? wx;
+        int canvasH = captured?.CanvasH ?? wy;
+
+        float[] view = null;
+        float[] projection = null;
+        if (config.RenderMode == ShaderRenderMode.VertFrag)
+        {
+            view = await GpuInterop.View();
+            projection = await GpuInterop.Projection(canvasW, canvasH);
+        }
+
+        float[] mouse;
+        try { mouse = await GpuInterop.Mouse(); }
+        catch { mouse = new float[] { 0f, 0f, 0f, 0f }; }
+
+        return new ShaderInvocation(
+            Mode: config.RenderMode,
+            FragmentEntryPoint: config.FragmentEntryPoint,
+            VertexEntryPoint: config.VertexEntryPoint,
+            Mesh: config.Mesh,
+            WarpX: wx,
+            WarpY: wy,
+            GroupOffsetX: config.GroupOffsetX,
+            GroupOffsetY: config.GroupOffsetY,
+            CanvasW: canvasW,
+            CanvasH: canvasH,
+            Time: captured?.Time ?? 0f,
+            View: view,
+            Projection: projection,
+            Mouse: mouse,
+            DebugVertexIndex: debugVertexIndex,
+            Textures: config.Textures,
+            Samplers: config.Samplers);
+    }
+
+    private static HLSLParserConfig MakeParserConfig(string docPath) =>
+        new HLSLParserConfig
+        {
+            BasePath = docPath != null ? System.IO.Path.GetDirectoryName(docPath) ?? "" : "",
+        };
+
+    // Aggressively reclaims memory between runs. Interpreting a full frame
+    // allocates heavily, so this keeps the working set down.
+    private static void Reclaim()
+    {
+        if (OperatingSystem.IsBrowser())
+        {
+            GC.Collect();
+            return;
+        }
+        var previous = GCSettings.LargeObjectHeapCompactionMode;
+        GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
+        GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+        GCSettings.LargeObjectHeapCompactionMode = previous;
+    }
+
     private CancellationTokenSource _runCts;
 
     public Cmd RunCpu(string code, ShaderConfig config, string docPath) =>
@@ -48,7 +118,7 @@ public sealed partial class DebuggerEffects
     {
         var cts = BeginRun();
         try { await GpuInterop.Stop(); } catch { }
-        RuntimeMemory.Reclaim();
+        Reclaim();
 
         var parserConfig = MakeParserConfig(docPath);
         int wx = Math.Max(1, config.WarpX);
@@ -282,7 +352,7 @@ public sealed partial class DebuggerEffects
     {
         BeginRun();
         try { await GpuInterop.Stop(); } catch { }
-        RuntimeMemory.Reclaim();
+        Reclaim();
 
         if (!await GpuInterop.IsAvailable())
         {
@@ -354,4 +424,221 @@ public sealed partial class DebuggerEffects
         }
         catch { }
     }
+
+    public Cmd RecordTrace(
+        string code, ShaderConfig config, FrameCapture captured, bool snapshotGpu,
+        int debugVertexIndex, int documentId, string docPath) =>
+        Cmd.OfEffect((dispatch, _) =>
+            RecordTraceImpl(code, config, captured, snapshotGpu, debugVertexIndex, documentId, docPath, dispatch));
+
+    // A canvas click in GPU mode: snapshot the live frame, pause the preview,
+    // and start the debug session via the message `make` builds. CPU mode needs
+    // no effect, so update maps that click straight to a message.
+    public Cmd SnapshotGpuFrame(Func<float, int, int, Msg> make) =>
+        Cmd.OfEffect(async dispatch =>
+        {
+            var snap = await GpuInterop.Snapshot();
+            if (snap == null || snap.Length < 3) return;
+            await GpuInterop.Pause();
+            dispatch(make(snap[0], (int)snap[1], (int)snap[2]));
+        });
+
+    public Cmd EvaluateImmediate(
+        string expression, string debugCode, int stepIndex, ShaderConfig config,
+        FrameCapture captured, int inspectedThread, int debugVertexIndex, string docPath) =>
+        Cmd.OfEffect((dispatch, _) =>
+            EvaluateImmediateImpl(
+                expression, debugCode, stepIndex, config, captured, inspectedThread, debugVertexIndex, docPath, dispatch));
+
+    private async Task RecordTraceImpl(
+        string code, ShaderConfig config, FrameCapture captured, bool snapshotGpu,
+        int debugVertexIndex, int documentId, string docPath, Action<Msg> dispatch)
+    {
+        try
+        {
+            if (snapshotGpu)
+            {
+                try
+                {
+                    var snap = await GpuInterop.Snapshot();
+                    if (snap != null && snap.Length >= 3 && snap[1] > 0 && snap[2] > 0)
+                        captured = new FrameCapture(snap[0], (int)snap[1], (int)snap[2]);
+                }
+                catch { }
+            }
+            try { await GpuInterop.Pause(); } catch { }
+            Reclaim();
+
+            var parserConfig = MakeParserConfig(docPath);
+            var invocation = await BuildAsync(config, captured, debugVertexIndex);
+            var program = ShaderProgram.FromSource(code, parserConfig);
+            var trace = TraceRecorder.Record(_executor, new HLSLRunner(), program, invocation);
+
+            int wx = Math.Max(1, config.WarpX);
+            int wy = Math.Max(1, config.WarpY);
+            ShaderImage image = null;
+            if (!trace.HasError && trace.Result != null)
+            {
+                var pixels = HLSLValueDisplay.RenderOutputImage(trace.Result, wx, wy);
+                if (pixels != null) image = new ShaderImage(pixels, wx, wy);
+            }
+            dispatch(new DebugTraceRecorded(trace, code, documentId, captured, image));
+        }
+        catch (Exception ex)
+        {
+            dispatch(new RunFinished("", new RunError(ex.Message, ex), null, null));
+        }
+    }
+
+    private async Task EvaluateImmediateImpl(
+        string expression, string debugCode, int stepIndex, ShaderConfig config,
+        FrameCapture captured, int inspectedThread, int debugVertexIndex, string docPath, Action<Msg> dispatch)
+    {
+        var (value, error) = await EvaluateExpression(
+            expression, debugCode, stepIndex, config, captured, debugVertexIndex, docPath);
+
+        int wx = Math.Max(1, config.WarpX);
+        int wy = Math.Max(1, config.WarpY);
+        string resultStr;
+        bool isError;
+        string imageDataUrl = null;
+        if (error != null)
+        {
+            resultStr = error;
+            isError = true;
+        }
+        else
+        {
+            resultStr = HLSLValueDisplay.Format(value, inspectedThread);
+            isError = false;
+            var resolved = value is ReferenceValue rv ? rv.Get() : value;
+            byte[] rgba = null;
+            try { rgba = HLSLValueDisplay.RenderPreviewImage(resolved, wx, wy); }
+            catch { }
+            if (rgba != null)
+            {
+                try
+                {
+                    imageDataUrl = await BrowserInterop.RgbaToDataUrl(
+                        rgba, wx, wy, inspectedThread % wx, inspectedThread / wx, 0.7);
+                }
+                catch { }
+            }
+        }
+
+        dispatch(new ImmediateEvalFinished(new ImmediateEntry(expression, resultStr, isError, imageDataUrl)));
+        try { await BrowserInterop.ScrollImmediateToBottom(); } catch { }
+    }
+
+    // Re-runs the shader up to the target step and evaluates an expression in
+    // that scope. The hook aborts the run once the target step is reached.
+    private async Task<(HLSLValue Value, string Error)> EvaluateExpression(
+        string expression, string debugCode, int stepIndex, ShaderConfig config,
+        FrameCapture captured, int debugVertexIndex, string docPath)
+    {
+        try
+        {
+            var parserConfig = MakeParserConfig(docPath);
+            var invocation = await BuildAsync(config, captured, debugVertexIndex);
+            var runner = new HLSLRunner(Math.Max(1, config.WarpX), Math.Max(1, config.WarpY));
+            invocation.SetUniforms(runner);
+
+            HLSLValue result = null;
+            Exception evalError = null;
+            int stepCount = 0;
+            runner.DebugHookBeforeStatement = _ =>
+            {
+                if (stepCount == stepIndex)
+                {
+                    try { result = runner.EvaluateExpression(expression); }
+                    catch (Exception ex) { evalError = ex; }
+                    throw new OperationCanceledException();
+                }
+                stepCount++;
+            };
+
+            using (new ConsoleCapture())
+            {
+                bool cancelledInLoad = false;
+                try { runner.ProcessCode(debugCode, parserConfig); }
+                catch (OperationCanceledException) { cancelledInLoad = true; }
+                if (!cancelledInLoad)
+                {
+                    try { invocation.Execute(runner); }
+                    catch (OperationCanceledException) { }
+                }
+            }
+
+            if (evalError != null) return (null, evalError.Message);
+            if (result == null)
+                return (null, "(step not reached - expression may be after this point)");
+            return (result, null);
+        }
+        catch (Exception ex)
+        {
+            return (null, ex.Message);
+        }
+    }
+
+    public Cmd FetchEditorText(Func<string, Msg> then) =>
+        Cmd.OfTask(async () => then(await GetEditorText()));
+
+    private async Task<string> GetEditorText()
+    {
+        try { return await EditorInterop.GetValue(); }
+        catch { return ""; }
+    }
+
+    // One Monaco model per document: the model owns the text and undo history.
+    public Cmd CreateModel(int docId, string content) =>
+        Cmd.OfTask(() => EditorInterop.CreateModel(docId, content).AsTask());
+
+    public Cmd ShowModel(int docId) =>
+        Cmd.OfTask(() => EditorInterop.ShowModel(docId).AsTask());
+
+    public Cmd SetModelContent(int docId, string content) =>
+        Cmd.OfTask(() => EditorInterop.SetModelContent(docId, content).AsTask());
+
+    public Cmd DisposeModel(int docId) =>
+        Cmd.OfTask(() => EditorInterop.DisposeModel(docId).AsTask());
+
+    public Cmd SetEditorFontSize(int size) =>
+        Cmd.OfTask(() => EditorInterop.SetFontSize(size).AsTask());
+
+    public Cmd SetEditorReadOnly(bool readOnly) =>
+        Cmd.OfTask(() => EditorInterop.SetReadOnly(readOnly).AsTask());
+
+    public Cmd SetTheme(string theme) =>
+        Cmd.OfTask(() => EditorInterop.SetTheme(theme).AsTask());
+
+    public Cmd HighlightLine(int line) =>
+        Cmd.OfTask(() => EditorInterop.HighlightLine(line).AsTask());
+
+    public Cmd SetBreakpoints(int docId, IReadOnlyList<int> lines) =>
+        Cmd.OfTask(() => EditorInterop.SetBreakpoints(docId, lines).AsTask());
+
+    public Cmd OpenFileDialog() =>
+        Cmd.OfTask(async () =>
+        {
+            var (path, content) = await _fileDialogs.OpenFile();
+            return (Msg)new FileOpened(path, content);
+        });
+
+    public Cmd SaveFileDialog(string code, string currentPath, bool asNew) =>
+        Cmd.OfEffect(async dispatch =>
+        {
+            string path = asNew
+                ? await _fileDialogs.SaveFileAs(code)
+                : await _fileDialogs.SaveFile(code, currentPath);
+            if (path != null) dispatch(new FileSaved(path));
+        });
+
+    public Cmd DownloadFile(string fileName, string content) =>
+        Cmd.OfTask(() => BrowserInterop.DownloadTextFile(fileName, content).AsTask());
+
+    public Cmd PickObjFile() =>
+        Cmd.OfTask(() => BrowserInterop.PickObj().AsTask());
+
+    public Cmd CopyToClipboard(string text) =>
+        Cmd.OfTask(() => BrowserInterop.CopyToClipboard(text).AsTask());
 }

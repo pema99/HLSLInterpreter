@@ -1,4 +1,5 @@
-using HLSLInterpreter.Debugger.Core;
+using HLSLInterpreter.Debugger.Execution;
+using HLSLInterpreter.Debugger.Utils;
 
 namespace HLSLInterpreter.Debugger.Services;
 

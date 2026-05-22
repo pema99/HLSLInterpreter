@@ -1,6 +1,7 @@
-using HLSLInterpreter.Debugger.Core;
+using HLSLInterpreter.Debugger.Execution;
+using HLSLInterpreter.Debugger.Utils;
 
-namespace HLSLInterpreter.Debugger.Mvu;
+namespace HLSLInterpreter.Debugger.Core;
 
 // Every event the app can produce is a Msg. A message named XWithCode is the
 // continuation of a FetchEditorText command: update needs the live editor text,

@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace HLSLInterpreter.Debugger.Core;
+namespace HLSLInterpreter.Debugger.Utils;
 
 public sealed class Mesh
 {

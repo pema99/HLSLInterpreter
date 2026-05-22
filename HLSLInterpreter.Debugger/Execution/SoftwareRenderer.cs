@@ -1,7 +1,8 @@
 using HLSL;
 using UnityShaderParser.HLSL;
+using HLSLInterpreter.Debugger.Utils;
 
-namespace HLSLInterpreter.Debugger.Core;
+namespace HLSLInterpreter.Debugger.Execution;
 
 public static class SoftwareRenderer
 {

@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
-using HLSLInterpreter.Debugger.Mvu;
+using HLSLInterpreter.Debugger.Core;
 using HLSLInterpreter.Debugger.Services;
 using HLSLInterpreter.Debugger.Web;
 
