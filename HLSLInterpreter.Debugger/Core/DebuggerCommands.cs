@@ -1,7 +1,7 @@
 namespace HLSLInterpreter.Debugger.Core;
 
-// What an update step asks the runtime to do next. Built through DebuggerEffects, or
-// directly via these factories, and interpreted by DebuggerProgram.
+// What an update step asks the runtime to do next. Built via these factories,
+// and interpreted by DebuggerProgram.
 public abstract record Cmd
 {
     public static readonly Cmd None = new BatchCmd([]);
@@ -13,6 +13,7 @@ public abstract record Cmd
 
     public static Cmd OfTask(Func<Task<Msg>> run) => new TaskCmd(_ => run());
     public static Cmd OfTask(Func<Task> run) => new TaskUnitCmd(_ => run());
+    public static Cmd OfTask(Func<ValueTask> run) => new TaskUnitCmd(_ => run().AsTask());
 
     public static Cmd OfEffect(Func<Action<Msg>, CancellationToken, Task> run) => new EffectCmd(run);
     public static Cmd OfEffect(Func<Action<Msg>, Task> run) => new EffectCmd((dispatch, _) => run(dispatch));

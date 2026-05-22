@@ -3,21 +3,18 @@ using System.Threading.Channels;
 using HLSL;
 using HLSLInterpreter.Debugger.Execution;
 using HLSLInterpreter.Debugger.Utils;
-using HLSLInterpreter.Debugger.Services;
 using UnityShaderParser.HLSL;
 
 namespace HLSLInterpreter.Debugger.Core;
 
-// Builds the application's commands. Every method here returns a Cmd; the
-// DebuggerProgram interpreter runs them. The active run's cancellation source is
-// the one piece of effect state that must outlive a single command.
-public sealed class DebuggerEffects
+// Runs the user's shader for the debugger: the CPU and GPU runs, trace
+// recording, immediate evaluation, and view-mode rendering, each wrapped as a
+// Cmd. The active run's cancellation source is the one piece of state that must
+// outlive a single command.
+public sealed class DebuggerExecutionEngine
 {
     private readonly ShaderExecutor _executor = new();
-    private readonly HLSLRunner _runner = new();
-    private readonly FileDialogService _fileDialogs;
-
-    public DebuggerEffects(FileDialogService fileDialogs) => _fileDialogs = fileDialogs;
+    private readonly HLSLRunner _hlslRunner = new();
 
     // Gathers the per-frame inputs a ShaderInvocation needs (canvas size, camera
     // matrices, mouse). Everything model-derived is passed in.
@@ -94,14 +91,8 @@ public sealed class DebuggerEffects
     public Cmd RenderViewMode(DebugViewMode mode, ExecutionMetrics metrics, ShaderImage image) =>
         Cmd.OfTask(() => RenderViewModeImpl(mode, metrics, image));
 
-    public Cmd SetMeshData(Mesh mesh) =>
-        Cmd.OfTask(() => CanvasInterop.SetMeshData(mesh?.Positions, mesh?.Indices).AsTask());
-
     public Cmd SetGpuPaused(bool paused) =>
         Cmd.OfTask(() => SetGpuPausedImpl(paused));
-
-    public Cmd RestartGpuTime() =>
-        Cmd.OfTask(() => GpuInterop.Restart().AsTask());
 
     public Cmd CancelRun() =>
         Cmd.OfTask(() => { try { _runCts?.Cancel(); } catch { } return Task.CompletedTask; });
@@ -135,7 +126,7 @@ public sealed class DebuggerEffects
         {
             var invocation = await BuildAsync(config, null, -1);
             var program = ShaderProgram.FromSource(code, parserConfig);
-            var outcome = _executor.Execute(_runner, program, invocation, ExecutionOptions.None);
+            var outcome = _executor.Execute(_hlslRunner, program, invocation, ExecutionOptions.None);
 
             if (outcome.HasError)
             {
@@ -571,65 +562,4 @@ public sealed class DebuggerEffects
         }
     }
 
-    public Cmd FetchEditorText(Func<string, Msg> then) =>
-        Cmd.OfTask(async () => then(await GetEditorText()));
-
-    private async Task<string> GetEditorText()
-    {
-        try { return await EditorInterop.GetValue(); }
-        catch { return ""; }
-    }
-
-    // One Monaco model per document: the model owns the text and undo history.
-    public Cmd CreateModel(int docId, string content) =>
-        Cmd.OfTask(() => EditorInterop.CreateModel(docId, content).AsTask());
-
-    public Cmd ShowModel(int docId) =>
-        Cmd.OfTask(() => EditorInterop.ShowModel(docId).AsTask());
-
-    public Cmd SetModelContent(int docId, string content) =>
-        Cmd.OfTask(() => EditorInterop.SetModelContent(docId, content).AsTask());
-
-    public Cmd DisposeModel(int docId) =>
-        Cmd.OfTask(() => EditorInterop.DisposeModel(docId).AsTask());
-
-    public Cmd SetEditorFontSize(int size) =>
-        Cmd.OfTask(() => EditorInterop.SetFontSize(size).AsTask());
-
-    public Cmd SetEditorReadOnly(bool readOnly) =>
-        Cmd.OfTask(() => EditorInterop.SetReadOnly(readOnly).AsTask());
-
-    public Cmd SetTheme(string theme) =>
-        Cmd.OfTask(() => EditorInterop.SetTheme(theme).AsTask());
-
-    public Cmd HighlightLine(int line) =>
-        Cmd.OfTask(() => EditorInterop.HighlightLine(line).AsTask());
-
-    public Cmd SetBreakpoints(int docId, IReadOnlyList<int> lines) =>
-        Cmd.OfTask(() => EditorInterop.SetBreakpoints(docId, lines).AsTask());
-
-    public Cmd OpenFileDialog() =>
-        Cmd.OfTask(async () =>
-        {
-            var (path, content) = await _fileDialogs.OpenFile();
-            return (Msg)new FileOpened(System.IO.Path.GetFileName(path), path, content);
-        });
-
-    public Cmd SaveFileDialog(string code, string currentPath, bool asNew) =>
-        Cmd.OfEffect(async dispatch =>
-        {
-            string path = asNew
-                ? await _fileDialogs.SaveFileAs(code)
-                : await _fileDialogs.SaveFile(code, currentPath);
-            if (path != null) dispatch(new FileSaved(path));
-        });
-
-    public Cmd DownloadFile(string fileName, string content) =>
-        Cmd.OfTask(() => BrowserInterop.DownloadTextFile(fileName, content).AsTask());
-
-    public Cmd PickObjFile() =>
-        Cmd.OfTask(() => BrowserInterop.PickObj().AsTask());
-
-    public Cmd CopyToClipboard(string text) =>
-        Cmd.OfTask(() => BrowserInterop.CopyToClipboard(text).AsTask());
 }

@@ -26,7 +26,7 @@ builder.Services.AddSingleton(new HostOptionsService
 builder.Services.AddSingleton<FileDialogService, WpfFileDialogService>();
 builder.Services.AddSingleton<ImageLibraryService>();
 builder.Services.AddSingleton(sp => new DebuggerProgram(
-    new DebuggerEffects(sp.GetRequiredService<FileDialogService>())));
+    new DebuggerExecutionEngine(), sp.GetRequiredService<FileDialogService>()));
 
 builder.Window.UseTitle("HLSL Interpreter");
 builder.Window.UseWidth(1600);
