@@ -8,10 +8,10 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
-builder.Services.AddSingleton(new DebuggerHostOptions());
+builder.Services.AddSingleton(new HostOptionsService());
 builder.Services.AddSingleton<FileDialogService>();
-builder.Services.AddScoped<ImageLibrary>();
-builder.Services.AddScoped(sp => new DebuggerProgram(
+builder.Services.AddSingleton<ImageLibraryService>();
+builder.Services.AddSingleton(sp => new DebuggerProgram(
     DebuggerModel.Initial,
     new DebuggerEffects(sp.GetRequiredService<FileDialogService>())));
 

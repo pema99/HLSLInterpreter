@@ -18,7 +18,7 @@ if (args.Length > 0 && File.Exists(args[0]))
     initialCode = File.ReadAllText(args[0]);
     initialName = Path.GetFileName(args[0]);
 }
-builder.Services.AddSingleton(new DebuggerHostOptions
+builder.Services.AddSingleton(new HostOptionsService
 {
     InitialCode = initialCode,
     InitialName = initialName,
@@ -27,8 +27,8 @@ builder.Services.AddSingleton(new DebuggerHostOptions
     TabsEnabled = true,
 });
 builder.Services.AddSingleton<FileDialogService, WpfFileDialogService>();
-builder.Services.AddScoped<ImageLibrary>();
-builder.Services.AddScoped(sp => new DebuggerProgram(
+builder.Services.AddSingleton<ImageLibraryService>();
+builder.Services.AddSingleton(sp => new DebuggerProgram(
     DebuggerModel.Initial,
     new DebuggerEffects(sp.GetRequiredService<FileDialogService>())));
 

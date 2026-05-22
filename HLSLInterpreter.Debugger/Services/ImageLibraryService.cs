@@ -2,7 +2,7 @@ using HLSLInterpreter.Debugger.Core;
 
 namespace HLSLInterpreter.Debugger.Services;
 
-public sealed class ImageLibrary
+public sealed class ImageLibraryService
 {
     private Task _examplesLoad;
 
