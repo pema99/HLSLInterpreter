@@ -13,7 +13,7 @@ public abstract record Cmd
 
     public static Cmd OfTask(Func<Task<Msg>> run) => new TaskCmd(_ => run());
     public static Cmd OfTask(Func<Task> run) => new TaskUnitCmd(_ => run());
-    public static Cmd OfTask(Func<ValueTask> run) => new TaskUnitCmd(_ => run().AsTask());
+    public static Cmd OfValueTask(Func<ValueTask> run) => new TaskUnitCmd(_ => run().AsTask());
 
     public static Cmd OfEffect(Func<Action<Msg>, CancellationToken, Task> run) => new EffectCmd(run);
     public static Cmd OfEffect(Func<Action<Msg>, Task> run) => new EffectCmd((dispatch, _) => run(dispatch));

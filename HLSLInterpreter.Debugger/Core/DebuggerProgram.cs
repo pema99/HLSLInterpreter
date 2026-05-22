@@ -147,7 +147,7 @@ public sealed class DebuggerProgram : IDisposable
                 next = WithActiveConfig(
                     model with { Editor = model.Editor with { DefaultMesh = x.Mesh } },
                     c => c with { Mesh = x.Mesh });
-                command = Cmd.OfTask(() => CanvasInterop.SetMeshData(x.Mesh?.Positions, x.Mesh?.Indices));
+                command = Cmd.OfValueTask(() => CanvasInterop.SetMeshData(x.Mesh?.Positions, x.Mesh?.Indices));
                 break;
 
             case RunRequested:
@@ -163,8 +163,22 @@ public sealed class DebuggerProgram : IDisposable
                 break;
 
             case RunStarted x:
-                (next, command) = StartRunWithCode(model, x.Code);
+            {
+                var config = model.Editor.ActiveDocument.Config;
+                float initialTime = model.Run.CapturedFrame?.Time ?? 0f;
+                next = model with { Run = BeginRunReset(model.Run, keepCaptured: false) };
+                if (model.Run.GpuPreviewEnabled)
+                {
+                    next = next with { Run = next.Run with { Backend = RunBackend.Gpu } };
+                    command = _engine.RunGpu(x.Code, config, initialTime, next.Run.GpuPaused, model.Editor.ActiveDocument.Path);
+                }
+                else
+                {
+                    command = _engine.RunCpu(
+                        x.Code, config, model.Editor.ActiveDocument.Path, model.Run.CanvasWidth, model.Run.CanvasHeight);
+                }
                 break;
+            }
 
             case RunBecameCancellable:
                 next = model with { Run = model.Run with { Status = RunStatus.Cancellable } };
@@ -193,7 +207,7 @@ public sealed class DebuggerProgram : IDisposable
 
             case GpuTimeRestartRequested:
                 next = model;
-                command = Cmd.OfTask(() => GpuInterop.Restart());
+                command = Cmd.OfValueTask(() => GpuInterop.Restart());
                 break;
 
             case GpuPreviewToggled x:
@@ -213,7 +227,7 @@ public sealed class DebuggerProgram : IDisposable
 
             case DebugRequested:
             {
-                var config = ActiveConfig(model);
+                var config = model.Editor.ActiveDocument.Config;
                 if (config.RenderMode == ShaderRenderMode.VertFrag
                     && config.DebugTarget == DebugTarget.Vertex
                     && model.Debug.DebugVertexIndex < 0)
@@ -246,18 +260,36 @@ public sealed class DebuggerProgram : IDisposable
             }
 
             case DebugClicked x:
+            {
                 next = model;
-                command = DebugClickCmd(model, (t, w, h) => new DebugAtRequested(x.Target, x.X, x.Y, t, w, h));
+                // A canvas click resolves to a debug request. GPU mode snapshots
+                // the live frame (an effect); CPU mode reads the image size from
+                // the model, so it is a plain message.
+                if (model.Run.Backend == RunBackend.Gpu)
+                    command = _engine.SnapshotGpuFrame(
+                        (t, w, h) => new DebugAtRequested(x.Target, x.X, x.Y, t, w, h));
+                else
+                    command = model.Run.Image is { } img
+                        ? Cmd.OfMsg(new DebugAtRequested(x.Target, x.X, x.Y, 0, img.Width, img.Height))
+                        : Cmd.None;
                 break;
+            }
 
             case DebugAtRequested x:
             {
                 if (x.Target == DebugTarget.Vertex)
                 {
-                    (next, command) = DebugAtVertex(model, x.X, x.Time, x.CanvasW, x.CanvasH);
+                    var vConfig = model.Editor.ActiveDocument.Config;
+                    int warpSize = Math.Max(1, vConfig.WarpX * vConfig.WarpY);
+                    next = WithInspectedThread(model, x.X % warpSize);
+                    next = next with { Debug = next.Debug with { DebugVertexIndex = x.X } };
+                    next = next with { Run = next.Run with { CapturedFrame = new FrameCapture(x.Time, x.CanvasW, x.CanvasH) } };
+                    if (next.Debug.BottomMode != DebugBottomMode.ThreadStates)
+                        next = next with { Debug = next.Debug with { BottomMode = DebugBottomMode.ThreadStates } };
+                    command = FetchEditorText(code => new DebugStarted(code));
                     break;
                 }
-                var config = ActiveConfig(model);
+                var config = model.Editor.ActiveDocument.Config;
                 int wx = Math.Max(1, config.WarpX);
                 int wy = Math.Max(1, config.WarpY);
                 next = model with
@@ -308,15 +340,15 @@ public sealed class DebuggerProgram : IDisposable
                 };
                 next = model with { Run = run, Debug = debug };
                 command = Cmd.Batch(
-                    Cmd.OfTask(() => EditorInterop.SetReadOnly(true)), HighlightCmd(next), ThemeCmd(next));
+                    Cmd.OfValueTask(() => EditorInterop.SetReadOnly(true)), HighlightCmd(next), ThemeCmd(next));
                 break;
             }
 
             case DebugExitRequested:
                 next = ExitDebugCore(model);
                 command = Cmd.Batch(
-                    Cmd.OfTask(() => EditorInterop.SetReadOnly(false)),
-                    Cmd.OfTask(() => EditorInterop.HighlightLine(0)),
+                    Cmd.OfValueTask(() => EditorInterop.SetReadOnly(false)),
+                    Cmd.OfValueTask(() => EditorInterop.HighlightLine(0)),
                     ThemeCmd(next),
                     FetchEditorText(code => new RunStarted(code)));
                 break;
@@ -337,7 +369,7 @@ public sealed class DebuggerProgram : IDisposable
                     {
                         if (docs[i].Id == debugId)
                         {
-                            cmds.Add(Cmd.OfTask(() => EditorInterop.ShowModel(docs[i].Id)));
+                            cmds.Add(Cmd.OfValueTask(() => EditorInterop.ShowModel(docs[i].Id)));
                             next = model with { Editor = model.Editor with { ActiveIndex = i } };
                             break;
                         }
@@ -372,7 +404,7 @@ public sealed class DebuggerProgram : IDisposable
                 var breakpoints = new HashSet<int>(doc.Breakpoints);
                 if (!breakpoints.Add(x.Line)) breakpoints.Remove(x.Line);
                 next = WithActiveDoc(model, d => d with { Breakpoints = breakpoints });
-                command = Cmd.OfTask(() => EditorInterop.SetBreakpoints(doc.Id, breakpoints.ToArray()));
+                command = Cmd.OfValueTask(() => EditorInterop.SetBreakpoints(doc.Id, breakpoints.ToArray()));
                 break;
             }
 
@@ -388,7 +420,7 @@ public sealed class DebuggerProgram : IDisposable
 
             case InspectedPixelChanged x:
             {
-                var config = ActiveConfig(model);
+                var config = model.Editor.ActiveDocument.Config;
                 next = config.WarpX <= 0 ? model : WithInspectedThread(model, x.Py * config.WarpX + x.Px);
                 command = Cmd.None;
                 break;
@@ -406,8 +438,8 @@ public sealed class DebuggerProgram : IDisposable
                 command = debug.Trace == null || debug.StepIndex < 0 || string.IsNullOrEmpty(debug.DebugCode)
                     ? Cmd.None
                     : _engine.EvaluateImmediate(
-                        x.Expression, debug.DebugCode, debug.StepIndex, ActiveConfig(model),
-                        model.Run.CapturedFrame, debug.InspectedThread, debug.DebugVertexIndex, ActiveDocPath(model));
+                        x.Expression, debug.DebugCode, debug.StepIndex, model.Editor.ActiveDocument.Config,
+                        model.Run.CapturedFrame, debug.InspectedThread, debug.DebugVertexIndex, model.Editor.ActiveDocument.Path);
                 break;
             }
 
@@ -431,7 +463,7 @@ public sealed class DebuggerProgram : IDisposable
                     break;
                 }
                 next = model with { Editor = model.Editor with { ActiveIndex = x.Index } };
-                command = Cmd.Batch(Cmd.OfTask(() => EditorInterop.ShowModel(next.Editor.ActiveDocument.Id)), HighlightCmd(next));
+                command = Cmd.Batch(Cmd.OfValueTask(() => EditorInterop.ShowModel(next.Editor.ActiveDocument.Id)), HighlightCmd(next));
                 break;
 
             case TabCloseRequested x:
@@ -443,13 +475,13 @@ public sealed class DebuggerProgram : IDisposable
                     command = Cmd.None;
                     break;
                 }
-                var cmds = new List<Cmd> { Cmd.OfTask(() => EditorInterop.DisposeModel(docs[x.Index].Id)) };
+                var cmds = new List<Cmd> { Cmd.OfValueTask(() => EditorInterop.DisposeModel(docs[x.Index].Id)) };
                 next = model;
                 if (next.Debug.IsActive && docs[x.Index].Id == next.Debug.DebugDocumentId)
                 {
                     next = ExitDebugCore(next);
-                    cmds.Add(Cmd.OfTask(() => EditorInterop.SetReadOnly(false)));
-                    cmds.Add(Cmd.OfTask(() => EditorInterop.HighlightLine(0)));
+                    cmds.Add(Cmd.OfValueTask(() => EditorInterop.SetReadOnly(false)));
+                    cmds.Add(Cmd.OfValueTask(() => EditorInterop.HighlightLine(0)));
                 }
                 bool activeChanges = x.Index == next.Editor.ActiveIndex;
                 var documents = next.Editor.Documents.ToList();
@@ -466,7 +498,7 @@ public sealed class DebuggerProgram : IDisposable
                 };
                 if (activeChanges)
                 {
-                    cmds.Add(Cmd.OfTask(() => EditorInterop.ShowModel(next.Editor.ActiveDocument.Id)));
+                    cmds.Add(Cmd.OfValueTask(() => EditorInterop.ShowModel(next.Editor.ActiveDocument.Id)));
                     cmds.Add(HighlightCmd(next));
                 }
                 command = Cmd.Batch(cmds);
@@ -502,7 +534,7 @@ public sealed class DebuggerProgram : IDisposable
 
             case ObjPickRequested:
                 next = model;
-                command = Cmd.OfTask(() => BrowserInterop.PickObj());
+                command = Cmd.OfValueTask(() => BrowserInterop.PickObj());
                 break;
 
             case ObjMeshLoaded x:
@@ -526,7 +558,7 @@ public sealed class DebuggerProgram : IDisposable
                 }
                 next = WithActiveConfig(model, c => c with { Mesh = mesh });
                 command = Cmd.Batch(
-                    Cmd.OfTask(() => CanvasInterop.SetMeshData(mesh?.Positions, mesh?.Indices)),
+                    Cmd.OfValueTask(() => CanvasInterop.SetMeshData(mesh?.Positions, mesh?.Indices)),
                     FetchEditorText(code => new RunStarted(code)));
                 break;
             }
@@ -543,19 +575,25 @@ public sealed class DebuggerProgram : IDisposable
             case FileOpened x:
             {
                 if (x.Content == null) { next = model; command = Cmd.None; break; }
-                int existing = string.IsNullOrEmpty(x.Path) ? -1 : IndexOfPath(model, x.Path);
+                int existing = -1;
+                if (!string.IsNullOrEmpty(x.Path))
+                {
+                    var docs = model.Editor.Documents;
+                    for (int i = 0; i < docs.Count; i++)
+                        if (docs[i].Path == x.Path) { existing = i; break; }
+                }
                 if (existing >= 0)
                 {
                     if (existing == model.Editor.ActiveIndex) { next = model; command = Cmd.None; break; }
                     next = model with { Editor = model.Editor with { ActiveIndex = existing } };
-                    command = Cmd.Batch(Cmd.OfTask(() => EditorInterop.ShowModel(next.Editor.ActiveDocument.Id)), HighlightCmd(next));
+                    command = Cmd.Batch(Cmd.OfValueTask(() => EditorInterop.ShowModel(next.Editor.ActiveDocument.Id)), HighlightCmd(next));
                     break;
                 }
                 next = AddDoc(model, x.Name, string.IsNullOrEmpty(x.Path) ? null : x.Path);
                 int newId = next.Editor.ActiveDocument.Id;
                 command = Cmd.Batch(
-                    Cmd.OfTask(() => EditorInterop.CreateModel(newId, x.Content)),
-                    Cmd.OfTask(() => EditorInterop.ShowModel(newId)));
+                    Cmd.OfValueTask(() => EditorInterop.CreateModel(newId, x.Content)),
+                    Cmd.OfValueTask(() => EditorInterop.ShowModel(newId)));
                 break;
             }
 
@@ -570,7 +608,7 @@ public sealed class DebuggerProgram : IDisposable
                 {
                     string path = x.AsNew
                         ? await _fileDialogs.SaveFileAs(x.Code)
-                        : await _fileDialogs.SaveFile(x.Code, ActiveDocPath(model));
+                        : await _fileDialogs.SaveFile(x.Code, model.Editor.ActiveDocument.Path);
                     if (path != null) dispatch(new FileSaved(path));
                 });
                 break;
@@ -594,7 +632,7 @@ public sealed class DebuggerProgram : IDisposable
                 next = model;
                 var doc = model.Editor.ActiveDocument;
                 string fileName = string.IsNullOrWhiteSpace(doc?.Name) ? "shader.hlsl" : doc.Name;
-                command = Cmd.OfTask(() => BrowserInterop.DownloadTextFile(fileName, x.Code));
+                command = Cmd.OfValueTask(() => BrowserInterop.DownloadTextFile(fileName, x.Code));
                 break;
             }
 
@@ -605,12 +643,23 @@ public sealed class DebuggerProgram : IDisposable
                 if (next.Debug.IsActive)
                 {
                     next = ExitDebugCore(next);
-                    cmds.Add(Cmd.OfTask(() => EditorInterop.SetReadOnly(false)));
-                    cmds.Add(Cmd.OfTask(() => EditorInterop.HighlightLine(0)));
+                    cmds.Add(Cmd.OfValueTask(() => EditorInterop.SetReadOnly(false)));
+                    cmds.Add(Cmd.OfValueTask(() => EditorInterop.HighlightLine(0)));
                 }
-                Cmd loadCmd;
-                (next, loadCmd) = LoadContent(next, x.Name, x.Code);
-                cmds.Add(loadCmd);
+                // New tab when tabs are on, otherwise reuse the single document.
+                if (next.Editor.TabsEnabled || next.Editor.ActiveDocument == null)
+                {
+                    next = AddDoc(next, x.Name);
+                    int id = next.Editor.ActiveDocument.Id;
+                    cmds.Add(Cmd.OfValueTask(() => EditorInterop.CreateModel(id, x.Code)));
+                    cmds.Add(Cmd.OfValueTask(() => EditorInterop.ShowModel(id)));
+                }
+                else
+                {
+                    next = WithActiveDoc(next, d => d with { Name = x.Name });
+                    int id = next.Editor.ActiveDocument.Id;
+                    cmds.Add(Cmd.OfValueTask(() => EditorInterop.SetModelContent(id, x.Code)));
+                }
                 if (x.Mode.HasValue) next = WithActiveConfig(next, c => c with { RenderMode = x.Mode.Value });
                 if (!string.IsNullOrWhiteSpace(x.FragEntry))
                     next = WithActiveConfig(next, c => c with { FragmentEntryPoint = x.FragEntry });
@@ -665,7 +714,7 @@ public sealed class DebuggerProgram : IDisposable
 
             case FontSizeChanged x:
                 next = model with { Editor = model.Editor with { FontSize = x.Size } };
-                command = Cmd.OfTask(() => EditorInterop.SetFontSize(x.Size));
+                command = Cmd.OfValueTask(() => EditorInterop.SetFontSize(x.Size));
                 break;
 
             case TexturesSaved x:
@@ -692,8 +741,8 @@ public sealed class DebuggerProgram : IDisposable
                 if (next.Debug.IsActive)
                 {
                     next = ExitDebugCore(next);
-                    cmds.Add(Cmd.OfTask(() => EditorInterop.SetReadOnly(false)));
-                    cmds.Add(Cmd.OfTask(() => EditorInterop.HighlightLine(0)));
+                    cmds.Add(Cmd.OfValueTask(() => EditorInterop.SetReadOnly(false)));
+                    cmds.Add(Cmd.OfValueTask(() => EditorInterop.HighlightLine(0)));
                 }
                 bool enabled = !next.Ui.BonzomaticMode;
                 next = next with { Ui = next.Ui with { BonzomaticMode = enabled } };
@@ -714,14 +763,14 @@ public sealed class DebuggerProgram : IDisposable
 
             case PermalinkCopyStarted x:
             {
-                var config = ActiveConfig(model);
+                var config = model.Editor.ActiveDocument.Config;
                 var settings = new PermalinkSettings(
                     config.FragmentEntryPoint, config.WarpX, config.WarpY,
                     config.GroupOffsetX, config.GroupOffsetY, model.Run.GpuPreviewEnabled,
                     config.RenderMode, config.VertexEntryPoint, config.CpuMode);
                 string url = PermalinkCodec.BuildUrl(x.BaseUrl, x.Code, settings);
                 next = model with { Ui = model.Ui with { PermalinkToastKey = model.Ui.PermalinkToastKey + 1 } };
-                command = Cmd.OfTask(() => BrowserInterop.CopyToClipboard(url));
+                command = Cmd.OfValueTask(() => BrowserInterop.CopyToClipboard(url));
                 break;
             }
 
@@ -736,22 +785,6 @@ public sealed class DebuggerProgram : IDisposable
 
     // ---- Shared helpers ----
 
-    private (DebuggerModel, Cmd) StartRunWithCode(DebuggerModel m, string code)
-    {
-        var config = ActiveConfig(m);
-        float initialTime = m.Run.CapturedFrame?.Time ?? 0f;
-        var next = m with
-        {
-            Run = BeginRunReset(m.Run, keepCaptured: false),
-        };
-        if (m.Run.GpuPreviewEnabled)
-        {
-            next = next with { Run = next.Run with { Backend = RunBackend.Gpu } };
-            return (next, _engine.RunGpu(code, config, initialTime, next.Run.GpuPaused, ActiveDocPath(m)));
-        }
-        return (next, _engine.RunCpu(code, config, ActiveDocPath(m), m.Run.CanvasWidth, m.Run.CanvasHeight));
-    }
-
     private static RunState BeginRunReset(RunState r, bool keepCaptured) => r with
     {
         Status = RunStatus.Running,
@@ -762,19 +795,6 @@ public sealed class DebuggerProgram : IDisposable
         CapturedFrame = keepCaptured ? r.CapturedFrame : null,
         ViewMode = DebugViewMode.Color,
     };
-
-    private (DebuggerModel, Cmd) DebugAtVertex(
-        DebuggerModel m, int vertexIndex, float time, int canvasW, int canvasH)
-    {
-        var config = ActiveConfig(m);
-        int warpSize = Math.Max(1, config.WarpX * config.WarpY);
-        var next = WithInspectedThread(m, vertexIndex % warpSize);
-        next = next with { Debug = next.Debug with { DebugVertexIndex = vertexIndex } };
-        next = next with { Run = next.Run with { CapturedFrame = new FrameCapture(time, canvasW, canvasH) } };
-        if (next.Debug.BottomMode != DebugBottomMode.ThreadStates)
-            next = next with { Debug = next.Debug with { BottomMode = DebugBottomMode.ThreadStates } };
-        return (next, FetchEditorText(code => new DebugStarted(code)));
-    }
 
     private static DebuggerModel ExitDebugCore(DebuggerModel m)
     {
@@ -799,23 +819,6 @@ public sealed class DebuggerProgram : IDisposable
         return next;
     }
 
-    // Loads content into a document: a new tab when tabs are on, otherwise the
-    // single document is reused. Returns the command that gives the document its
-    // Monaco model (or replaces the model's content).
-    private (DebuggerModel, Cmd) LoadContent(DebuggerModel m, string name, string content)
-    {
-        if (m.Editor.TabsEnabled || m.Editor.ActiveDocument == null)
-        {
-            var added = AddDoc(m, name);
-            int id = added.Editor.ActiveDocument.Id;
-            return (added, Cmd.Batch(
-                Cmd.OfTask(() => EditorInterop.CreateModel(id, content)),
-                Cmd.OfTask(() => EditorInterop.ShowModel(id))));
-        }
-        var renamed = WithActiveDoc(m, d => d with { Name = name });
-        return (renamed, Cmd.OfTask(() => EditorInterop.SetModelContent(renamed.Editor.ActiveDocument.Id, content)));
-    }
-
     private static DebuggerModel AddDoc(DebuggerModel m, string name, string path = null)
     {
         var doc = new ShaderDocument
@@ -836,19 +839,6 @@ public sealed class DebuggerProgram : IDisposable
             }
         };
     }
-
-    private static int IndexOfPath(DebuggerModel m, string path)
-    {
-        var docs = m.Editor.Documents;
-        for (int i = 0; i < docs.Count; i++)
-            if (docs[i].Path == path) return i;
-        return -1;
-    }
-
-    private static ShaderConfig ActiveConfig(DebuggerModel m) =>
-        m.Editor.ActiveDocument?.Config ?? new ShaderConfig();
-
-    private static string ActiveDocPath(DebuggerModel m) => m.Editor.ActiveDocument?.Path;
 
     private static DebuggerModel WithActiveConfig(DebuggerModel m, Func<ShaderConfig, ShaderConfig> update)
     {
@@ -875,38 +865,26 @@ public sealed class DebuggerProgram : IDisposable
         return m with { Debug = m.Debug with { InspectedThread = Math.Clamp(thread, 0, max) } };
     }
 
-    // A canvas click resolves to a debug request. GPU mode must snapshot the
-    // live frame (an effect); CPU mode reads the image size from the model, so
-    // it is a plain message.
-    private Cmd DebugClickCmd(DebuggerModel m, Func<float, int, int, Msg> make)
-    {
-        if (m.Run.Backend == RunBackend.Gpu)
-            return _engine.SnapshotGpuFrame(make);
-        return m.Run.Image is { } img
-            ? Cmd.OfMsg(make(0, img.Width, img.Height))
-            : Cmd.None;
-    }
-
     private Cmd HighlightCmd(DebuggerModel m)
     {
-        if (!m.Debug.IsActive) return Cmd.OfTask(() => EditorInterop.HighlightLine(0));
+        if (!m.Debug.IsActive) return Cmd.OfValueTask(() => EditorInterop.HighlightLine(0));
         bool onDoc = m.Editor.ActiveDocument?.Id == m.Debug.DebugDocumentId;
         int line = onDoc && m.Debug.Trace != null ? m.Debug.Trace.LineAt(m.Debug.StepIndex) : 0;
-        return Cmd.OfTask(() => EditorInterop.HighlightLine(line));
+        return Cmd.OfValueTask(() => EditorInterop.HighlightLine(line));
     }
 
     private Cmd ThemeCmd(DebuggerModel m) =>
-        Cmd.OfTask(() => EditorInterop.SetTheme(
+        Cmd.OfValueTask(() => EditorInterop.SetTheme(
             m.Ui.BonzomaticMode && !m.Debug.IsActive ? "hlsl-bonzomatic" : "hlsl-dark"));
 
     // update needs the live editor text but cannot await, so it asks for the
     // text and resumes in the XStarted message the continuation builds.
     private Cmd FetchEditorText(Func<string, Msg> then) =>
-        Cmd.OfTask(async () => then(await GetEditorText()));
-
-    private static async Task<string> GetEditorText()
-    {
-        try { return await EditorInterop.GetValue(); }
-        catch { return ""; }
-    }
+        Cmd.OfTask(async () =>
+        {
+            string code;
+            try { code = await EditorInterop.GetValue(); }
+            catch { code = ""; }
+            return then(code);
+        });
 }

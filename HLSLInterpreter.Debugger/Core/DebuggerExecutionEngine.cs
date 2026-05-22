@@ -83,16 +83,123 @@ public sealed class DebuggerExecutionEngine
     private CancellationTokenSource _runCts;
 
     public Cmd RunCpu(string code, ShaderConfig config, string docPath, int canvasW, int canvasH) =>
-        Cmd.OfEffect((dispatch, _) => RunCpuImpl(code, config, docPath, canvasW, canvasH, dispatch));
+        Cmd.OfEffect(async (dispatch, ct) =>
+        {
+            var cts = BeginRun();
+            try { await GpuInterop.Stop(); } catch { }
+            Reclaim();
+
+            var parserConfig = MakeParserConfig(docPath);
+            int wx = Math.Max(1, config.WarpX);
+            int wy = Math.Max(1, config.WarpY);
+
+            if (config.CpuMode != CpuMode.SingleWarp)
+            {
+                _ = RunCpuFullFrame(code, config, parserConfig, wx, wy, canvasW, canvasH, dispatch, cts);
+                return;
+            }
+
+            try
+            {
+                var invocation = await BuildAsync(config, null, -1);
+                var program = ShaderProgram.FromSource(code, parserConfig);
+                var outcome = _executor.Execute(_hlslRunner, program, invocation, ExecutionOptions.None);
+
+                if (outcome.HasError)
+                {
+                    dispatch(new RunFinished(
+                        outcome.Output, new RunError(outcome.ErrorMessage, outcome.Exception), null, null));
+                    return;
+                }
+                var pixels = HLSLValueDisplay.RenderOutputImage(outcome.Result, wx, wy);
+                var image = pixels != null ? new ShaderImage(pixels, wx, wy) : null;
+                dispatch(new RunFinished(outcome.Output, null, image, null));
+            }
+            catch (Exception ex)
+            {
+                dispatch(new RunFinished("", new RunError(ex.Message, ex), null, null));
+            }
+        });
 
     public Cmd RunGpu(string code, ShaderConfig config, float initialTime, bool paused, string docPath) =>
-        Cmd.OfEffect((dispatch, _) => RunGpuImpl(code, config, initialTime, paused, docPath, dispatch));
+        Cmd.OfEffect(async (dispatch, _) =>
+        {
+            BeginRun();
+            try { await GpuInterop.Stop(); } catch { }
+            Reclaim();
+
+            if (!await GpuInterop.IsAvailable())
+            {
+                dispatch(new RunFinished("", new RunError(
+                    "WebGPU is not available in this browser. Use Debug to step through on the CPU interpreter instead.",
+                    null), null, null));
+                return;
+            }
+            try
+            {
+                int wx = Math.Max(1, config.WarpX);
+                int wy = Math.Max(1, config.WarpY);
+                var parserConfig = MakeParserConfig(docPath);
+                var assembled = ShaderReflection.AssembleVertexShader(
+                    code, config.VertexEntryPoint, config.FragmentEntryPoint, config.RenderMode, parserConfig);
+                string mode = config.RenderMode == ShaderRenderMode.VertFrag ? "vertfrag" : "pixel";
+                float[] meshVertices = null;
+                uint[] meshIndices = null;
+                if (config.RenderMode == ShaderRenderMode.VertFrag)
+                {
+                    meshVertices = config.Mesh.GetInterleavedVertices();
+                    meshIndices = config.Mesh.Indices;
+                }
+                await GpuInterop.Render(new GpuRenderRequest(
+                    CanvasId: "color-canvas-gpu",
+                    Source: assembled.Source,
+                    FragmentEntryPoint: config.FragmentEntryPoint,
+                    WarpX: wx,
+                    WarpY: wy,
+                    Mode: mode,
+                    VertexEntryPoint: assembled.VertexEntry,
+                    VertexInputs: assembled.VertexInputs,
+                    MeshVertices: meshVertices,
+                    MeshIndices: meshIndices,
+                    Time: initialTime,
+                    Textures: config.Textures,
+                    Samplers: config.Samplers));
+                if (paused)
+                {
+                    try { await GpuInterop.Pause(); } catch { }
+                }
+                dispatch(new RunFinished("", null, null, null));
+            }
+            catch (Exception ex)
+            {
+                dispatch(new RunFinished("", new RunError(ex.Message, ex), null, null));
+            }
+        });
 
     public Cmd RenderViewMode(DebugViewMode mode, ExecutionMetrics metrics, ShaderImage image) =>
-        Cmd.OfTask(() => RenderViewModeImpl(mode, metrics, image));
+        Cmd.OfTask(async () =>
+        {
+            if (mode != DebugViewMode.Color && metrics != null)
+            {
+                var pixels = metrics.Render(mode);
+                if (pixels != null) await CanvasInterop.SetPixels(pixels, metrics.CanvasW, metrics.CanvasH);
+            }
+            else if (image != null)
+            {
+                await CanvasInterop.SetPixels(image.Pixels, image.Width, image.Height);
+            }
+        });
 
     public Cmd SetGpuPaused(bool paused) =>
-        Cmd.OfTask(() => SetGpuPausedImpl(paused));
+        Cmd.OfTask(async () =>
+        {
+            try
+            {
+                if (paused) await GpuInterop.Pause();
+                else await GpuInterop.Resume();
+            }
+            catch { }
+        });
 
     public Cmd CancelRun() =>
         Cmd.OfTask(() => { try { _runCts?.Cancel(); } catch { } return Task.CompletedTask; });
@@ -105,97 +212,54 @@ public sealed class DebuggerExecutionEngine
         return _runCts;
     }
 
-    private async Task RunCpuImpl(
-        string code, ShaderConfig config, string docPath, int canvasW, int canvasH, Action<Msg> dispatch)
-    {
-        var cts = BeginRun();
-        try { await GpuInterop.Stop(); } catch { }
-        Reclaim();
-
-        var parserConfig = MakeParserConfig(docPath);
-        int wx = Math.Max(1, config.WarpX);
-        int wy = Math.Max(1, config.WarpY);
-
-        if (config.CpuMode != CpuMode.SingleWarp)
-        {
-            _ = RunCpuFullFrameSafe(code, config, parserConfig, wx, wy, canvasW, canvasH, dispatch, cts);
-            return;
-        }
-
-        try
-        {
-            var invocation = await BuildAsync(config, null, -1);
-            var program = ShaderProgram.FromSource(code, parserConfig);
-            var outcome = _executor.Execute(_hlslRunner, program, invocation, ExecutionOptions.None);
-
-            if (outcome.HasError)
-            {
-                dispatch(new RunFinished(
-                    outcome.Output, new RunError(outcome.ErrorMessage, outcome.Exception), null, null));
-                return;
-            }
-            var pixels = HLSLValueDisplay.RenderOutputImage(outcome.Result, wx, wy);
-            var image = pixels != null ? new ShaderImage(pixels, wx, wy) : null;
-            dispatch(new RunFinished(outcome.Output, null, image, null));
-        }
-        catch (Exception ex)
-        {
-            dispatch(new RunFinished("", new RunError(ex.Message, ex), null, null));
-        }
-    }
-
-    private async Task RunCpuFullFrameSafe(
-        string code, ShaderConfig config, HLSLParserConfig parserConfig,
-        int wx, int wy, int canvasW, int canvasH, Action<Msg> dispatch, CancellationTokenSource cts)
-    {
-        try { await RunCpuFullFrame(code, config, parserConfig, wx, wy, canvasW, canvasH, dispatch, cts); }
-        catch (Exception ex)
-        {
-            dispatch(new RunFinished("", new RunError(ex.Message, ex), null, null));
-        }
-    }
-
     private async Task RunCpuFullFrame(
         string code, ShaderConfig config, HLSLParserConfig parserConfig,
         int wx, int wy, int canvasW, int canvasH, Action<Msg> dispatch, CancellationTokenSource cts)
     {
-        // viewport.js has not reported a size yet: fall back to a sane square.
-        if (canvasW <= 0) canvasW = Math.Max(wx, 256);
-        if (canvasH <= 0) canvasH = Math.Max(wy, 256);
-        var invocation = (await BuildAsync(config, null, -1))
-            with { CanvasW = canvasW, CanvasH = canvasH };
-        if (config.RenderMode == ShaderRenderMode.VertFrag)
-            invocation = invocation with { Projection = await GpuInterop.Projection(canvasW, canvasH) };
-
-        int tilesX = (canvasW + wx - 1) / wx;
-        int tilesY = (canvasH + wy - 1) / wy;
-
-        var fullPixels = new byte[canvasW * canvasH * 4];
-        for (int i = 3; i < fullPixels.Length; i += 4) fullPixels[i] = 255;
-        await CanvasInterop.AllocPixels(canvasW, canvasH);
-
-        var metrics = config.CpuMode == CpuMode.FullFrameWithMetrics
-            ? new ExecutionMetrics(canvasW, canvasH, wx, wy)
-            : null;
-
-        dispatch(new RunBecameCancellable());
-
-        RunOutcome tileError;
-        string output;
-        using (var capture = new ConsoleCapture())
+        try
         {
-            tileError = OperatingSystem.IsBrowser()
-                ? await RunTilesSerial(code, parserConfig, invocation, wx, wy, canvasW, canvasH, tilesX, tilesY, fullPixels, metrics, cts)
-                : await RunTilesParallel(code, parserConfig, invocation, wx, wy, canvasW, canvasH, tilesX, tilesY, fullPixels, metrics, cts);
-            output = capture.ToString();
-        }
+            // viewport.js has not reported a size yet: fall back to a sane square.
+            if (canvasW <= 0) canvasW = Math.Max(wx, 256);
+            if (canvasH <= 0) canvasH = Math.Max(wy, 256);
+            var invocation = (await BuildAsync(config, null, -1))
+                with { CanvasW = canvasW, CanvasH = canvasH };
+            if (config.RenderMode == ShaderRenderMode.VertFrag)
+                invocation = invocation with { Projection = await GpuInterop.Projection(canvasW, canvasH) };
 
-        if (tileError != null)
-        {
-            dispatch(new RunFinished(output, new RunError(tileError.ErrorMessage, tileError.Exception), null, null));
-            return;
+            int tilesX = (canvasW + wx - 1) / wx;
+            int tilesY = (canvasH + wy - 1) / wy;
+
+            var fullPixels = new byte[canvasW * canvasH * 4];
+            for (int i = 3; i < fullPixels.Length; i += 4) fullPixels[i] = 255;
+            await CanvasInterop.AllocPixels(canvasW, canvasH);
+
+            var metrics = config.CpuMode == CpuMode.FullFrameWithMetrics
+                ? new ExecutionMetrics(canvasW, canvasH, wx, wy)
+                : null;
+
+            dispatch(new RunBecameCancellable());
+
+            RunOutcome tileError;
+            string output;
+            using (var capture = new ConsoleCapture())
+            {
+                tileError = OperatingSystem.IsBrowser()
+                    ? await RunTilesSerial(code, parserConfig, invocation, wx, wy, canvasW, canvasH, tilesX, tilesY, fullPixels, metrics, cts)
+                    : await RunTilesParallel(code, parserConfig, invocation, wx, wy, canvasW, canvasH, tilesX, tilesY, fullPixels, metrics, cts);
+                output = capture.ToString();
+            }
+
+            if (tileError != null)
+            {
+                dispatch(new RunFinished(output, new RunError(tileError.ErrorMessage, tileError.Exception), null, null));
+                return;
+            }
+            dispatch(new RunFinished(output, null, new ShaderImage(fullPixels, canvasW, canvasH), metrics));
         }
-        dispatch(new RunFinished(output, null, new ShaderImage(fullPixels, canvasW, canvasH), metrics));
+        catch (Exception ex)
+        {
+            dispatch(new RunFinished("", new RunError(ex.Message, ex), null, null));
+        }
     }
 
     // Each tile re-visits the AST after a fresh Reset so interpreter state
@@ -291,28 +355,23 @@ public sealed class DebuggerExecutionEngine
                 BeforeStatement = e => before(e.Node),
                 AfterStatement = e => after(e.Node),
             };
-            tileInvocation.OnTextureFetch = MakeTextureFetchHook(metrics, runner, tx, ty);
+            int threadCount = metrics.WarpX * metrics.WarpY;
+            int warpW = metrics.WarpX, warpH = metrics.WarpY;
+            int canvasW = metrics.CanvasW, canvasH = metrics.CanvasH;
+            tileInvocation.OnTextureFetch = () =>
+            {
+                var state = runner.GetExecutionState();
+                for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
+                {
+                    if (!state.IsThreadActive(threadIndex)) continue;
+                    int px = tx * warpW + (threadIndex % warpW);
+                    int py = ty * warpH + (threadIndex / warpW);
+                    if (px < canvasW && py < canvasH)
+                        metrics.PixelFetches[py * canvasW + px]++;
+                }
+            };
         }
         return _executor.Execute(runner, program, tileInvocation, options);
-    }
-
-    private static Action MakeTextureFetchHook(ExecutionMetrics metrics, HLSLRunner runner, int tx, int ty)
-    {
-        int threadCount = metrics.WarpX * metrics.WarpY;
-        int warpW = metrics.WarpX, warpH = metrics.WarpY;
-        int canvasW = metrics.CanvasW, canvasH = metrics.CanvasH;
-        return () =>
-        {
-            var state = runner.GetExecutionState();
-            for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
-            {
-                if (!state.IsThreadActive(threadIndex)) continue;
-                int px = tx * warpW + (threadIndex % warpW);
-                int py = ty * warpH + (threadIndex / warpW);
-                if (px < canvasW && py < canvasH)
-                    metrics.PixelFetches[py * canvasW + px]++;
-            }
-        };
     }
 
     private static void BlitTile(
@@ -329,89 +388,46 @@ public sealed class DebuggerExecutionEngine
         }
     }
 
-    private async Task RunGpuImpl(
-        string code, ShaderConfig config, float initialTime, bool paused, string docPath, Action<Msg> dispatch)
-    {
-        BeginRun();
-        try { await GpuInterop.Stop(); } catch { }
-        Reclaim();
-
-        if (!await GpuInterop.IsAvailable())
-        {
-            dispatch(new RunFinished("", new RunError(
-                "WebGPU is not available in this browser. Use Debug to step through on the CPU interpreter instead.",
-                null), null, null));
-            return;
-        }
-        try
-        {
-            int wx = Math.Max(1, config.WarpX);
-            int wy = Math.Max(1, config.WarpY);
-            var parserConfig = MakeParserConfig(docPath);
-            var assembled = ShaderReflection.AssembleVertexShader(
-                code, config.VertexEntryPoint, config.FragmentEntryPoint, config.RenderMode, parserConfig);
-            string mode = config.RenderMode == ShaderRenderMode.VertFrag ? "vertfrag" : "pixel";
-            float[] meshVertices = null;
-            uint[] meshIndices = null;
-            if (config.RenderMode == ShaderRenderMode.VertFrag)
-            {
-                meshVertices = config.Mesh.GetInterleavedVertices();
-                meshIndices = config.Mesh.Indices;
-            }
-            await GpuInterop.Render(new GpuRenderRequest(
-                CanvasId: "color-canvas-gpu",
-                Source: assembled.Source,
-                FragmentEntryPoint: config.FragmentEntryPoint,
-                WarpX: wx,
-                WarpY: wy,
-                Mode: mode,
-                VertexEntryPoint: assembled.VertexEntry,
-                VertexInputs: assembled.VertexInputs,
-                MeshVertices: meshVertices,
-                MeshIndices: meshIndices,
-                Time: initialTime,
-                Textures: config.Textures,
-                Samplers: config.Samplers));
-            if (paused)
-            {
-                try { await GpuInterop.Pause(); } catch { }
-            }
-            dispatch(new RunFinished("", null, null, null));
-        }
-        catch (Exception ex)
-        {
-            dispatch(new RunFinished("", new RunError(ex.Message, ex), null, null));
-        }
-    }
-
-    private async Task RenderViewModeImpl(DebugViewMode mode, ExecutionMetrics metrics, ShaderImage image)
-    {
-        if (mode != DebugViewMode.Color && metrics != null)
-        {
-            var pixels = metrics.Render(mode);
-            if (pixels != null) await CanvasInterop.SetPixels(pixels, metrics.CanvasW, metrics.CanvasH);
-        }
-        else if (image != null)
-        {
-            await CanvasInterop.SetPixels(image.Pixels, image.Width, image.Height);
-        }
-    }
-
-    private async Task SetGpuPausedImpl(bool paused)
-    {
-        try
-        {
-            if (paused) await GpuInterop.Pause();
-            else await GpuInterop.Resume();
-        }
-        catch { }
-    }
-
     public Cmd RecordTrace(
         string code, ShaderConfig config, FrameCapture captured, bool snapshotGpu,
         int debugVertexIndex, int documentId, string docPath) =>
-        Cmd.OfEffect((dispatch, _) =>
-            RecordTraceImpl(code, config, captured, snapshotGpu, debugVertexIndex, documentId, docPath, dispatch));
+        Cmd.OfEffect(async (dispatch, _) =>
+        {
+            try
+            {
+                if (snapshotGpu)
+                {
+                    try
+                    {
+                        var snap = await GpuInterop.Snapshot();
+                        if (snap != null && snap.Length >= 3 && snap[1] > 0 && snap[2] > 0)
+                            captured = new FrameCapture(snap[0], (int)snap[1], (int)snap[2]);
+                    }
+                    catch { }
+                }
+                try { await GpuInterop.Pause(); } catch { }
+                Reclaim();
+
+                var parserConfig = MakeParserConfig(docPath);
+                var invocation = await BuildAsync(config, captured, debugVertexIndex);
+                var program = ShaderProgram.FromSource(code, parserConfig);
+                var trace = TraceRecorder.Record(_executor, new HLSLRunner(), program, invocation);
+
+                int wx = Math.Max(1, config.WarpX);
+                int wy = Math.Max(1, config.WarpY);
+                ShaderImage image = null;
+                if (!trace.HasError && trace.Result != null)
+                {
+                    var pixels = HLSLValueDisplay.RenderOutputImage(trace.Result, wx, wy);
+                    if (pixels != null) image = new ShaderImage(pixels, wx, wy);
+                }
+                dispatch(new DebugTraceRecorded(trace, code, documentId, captured, image));
+            }
+            catch (Exception ex)
+            {
+                dispatch(new RunFinished("", new RunError(ex.Message, ex), null, null));
+            }
+        });
 
     // A canvas click in GPU mode: snapshot the live frame, pause the preview,
     // and start the debug session via the message `make` builds. CPU mode needs
@@ -428,89 +444,43 @@ public sealed class DebuggerExecutionEngine
     public Cmd EvaluateImmediate(
         string expression, string debugCode, int stepIndex, ShaderConfig config,
         FrameCapture captured, int inspectedThread, int debugVertexIndex, string docPath) =>
-        Cmd.OfEffect((dispatch, _) =>
-            EvaluateImmediateImpl(
-                expression, debugCode, stepIndex, config, captured, inspectedThread, debugVertexIndex, docPath, dispatch));
-
-    private async Task RecordTraceImpl(
-        string code, ShaderConfig config, FrameCapture captured, bool snapshotGpu,
-        int debugVertexIndex, int documentId, string docPath, Action<Msg> dispatch)
-    {
-        try
+        Cmd.OfEffect(async (dispatch, _) =>
         {
-            if (snapshotGpu)
-            {
-                try
-                {
-                    var snap = await GpuInterop.Snapshot();
-                    if (snap != null && snap.Length >= 3 && snap[1] > 0 && snap[2] > 0)
-                        captured = new FrameCapture(snap[0], (int)snap[1], (int)snap[2]);
-                }
-                catch { }
-            }
-            try { await GpuInterop.Pause(); } catch { }
-            Reclaim();
-
-            var parserConfig = MakeParserConfig(docPath);
-            var invocation = await BuildAsync(config, captured, debugVertexIndex);
-            var program = ShaderProgram.FromSource(code, parserConfig);
-            var trace = TraceRecorder.Record(_executor, new HLSLRunner(), program, invocation);
+            var (value, error) = await EvaluateExpression(
+                expression, debugCode, stepIndex, config, captured, debugVertexIndex, docPath);
 
             int wx = Math.Max(1, config.WarpX);
             int wy = Math.Max(1, config.WarpY);
-            ShaderImage image = null;
-            if (!trace.HasError && trace.Result != null)
+            string resultStr;
+            bool isError;
+            string imageDataUrl = null;
+            if (error != null)
             {
-                var pixels = HLSLValueDisplay.RenderOutputImage(trace.Result, wx, wy);
-                if (pixels != null) image = new ShaderImage(pixels, wx, wy);
+                resultStr = error;
+                isError = true;
             }
-            dispatch(new DebugTraceRecorded(trace, code, documentId, captured, image));
-        }
-        catch (Exception ex)
-        {
-            dispatch(new RunFinished("", new RunError(ex.Message, ex), null, null));
-        }
-    }
-
-    private async Task EvaluateImmediateImpl(
-        string expression, string debugCode, int stepIndex, ShaderConfig config,
-        FrameCapture captured, int inspectedThread, int debugVertexIndex, string docPath, Action<Msg> dispatch)
-    {
-        var (value, error) = await EvaluateExpression(
-            expression, debugCode, stepIndex, config, captured, debugVertexIndex, docPath);
-
-        int wx = Math.Max(1, config.WarpX);
-        int wy = Math.Max(1, config.WarpY);
-        string resultStr;
-        bool isError;
-        string imageDataUrl = null;
-        if (error != null)
-        {
-            resultStr = error;
-            isError = true;
-        }
-        else
-        {
-            resultStr = HLSLValueDisplay.Format(value, inspectedThread);
-            isError = false;
-            var resolved = value is ReferenceValue rv ? rv.Get() : value;
-            byte[] rgba = null;
-            try { rgba = HLSLValueDisplay.RenderPreviewImage(resolved, wx, wy); }
-            catch { }
-            if (rgba != null)
+            else
             {
-                try
-                {
-                    imageDataUrl = await BrowserInterop.RgbaToDataUrl(
-                        rgba, wx, wy, inspectedThread % wx, inspectedThread / wx, 0.7);
-                }
+                resultStr = HLSLValueDisplay.Format(value, inspectedThread);
+                isError = false;
+                var resolved = value is ReferenceValue rv ? rv.Get() : value;
+                byte[] rgba = null;
+                try { rgba = HLSLValueDisplay.RenderPreviewImage(resolved, wx, wy); }
                 catch { }
+                if (rgba != null)
+                {
+                    try
+                    {
+                        imageDataUrl = await BrowserInterop.RgbaToDataUrl(
+                            rgba, wx, wy, inspectedThread % wx, inspectedThread / wx, 0.7);
+                    }
+                    catch { }
+                }
             }
-        }
 
-        dispatch(new ImmediateEvalFinished(new ImmediateEntry(expression, resultStr, isError, imageDataUrl)));
-        try { await BrowserInterop.ScrollImmediateToBottom(); } catch { }
-    }
+            dispatch(new ImmediateEvalFinished(new ImmediateEntry(expression, resultStr, isError, imageDataUrl)));
+            try { await BrowserInterop.ScrollImmediateToBottom(); } catch { }
+        });
 
     // Re-runs the shader up to the target step and evaluates an expression in
     // that scope. The hook aborts the run once the target step is reached.
