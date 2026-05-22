@@ -1,12 +1,9 @@
-using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using HLSLInterpreter.Debugger.Core;
 using HLSLInterpreter.Debugger.Services;
-using HLSLInterpreter.Debugger.Web;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
-builder.RootComponents.Add<App>("#app");
-builder.RootComponents.Add<HeadOutlet>("head::after");
+builder.RootComponents.Add<HLSLInterpreter.Debugger.Components.Debugger>("#app");
 
 builder.Services.AddSingleton(new HostOptionsService());
 builder.Services.AddSingleton<FileDialogService>();

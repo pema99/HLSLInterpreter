@@ -1,15 +1,12 @@
 using System.IO;
-using Microsoft.AspNetCore.Components.Web;
 using BlazorDesktop.Hosting;
-using HLSLInterpreter.Debugger.Desktop.Components;
 using HLSLInterpreter.Debugger.Desktop;
 using HLSLInterpreter.Debugger.Core;
 using HLSLInterpreter.Debugger.Services;
 
 var builder = BlazorDesktopHostBuilder.CreateDefault(args);
 
-builder.RootComponents.Add<Routes>("#app");
-builder.RootComponents.Add<HeadOutlet>("head::after");
+builder.RootComponents.Add<HLSLInterpreter.Debugger.Components.Debugger>("#app");
 
 string? initialCode = null;
 string? initialName = null;
