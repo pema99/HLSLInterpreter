@@ -3,9 +3,8 @@ using HLSLInterpreter.Debugger.Utils;
 
 namespace HLSLInterpreter.Debugger.Core;
 
-// Every event the app can produce is a Msg. A message named XStarted is the
-// continuation of a FetchEditorText command: update needs the live editor text,
-// so it asks for it and resumes here.
+// Every event the app can produce is a Msg. The XStarted messages carry editor
+// text fetched by a preceding command.
 public abstract record Msg;
 
 public enum StepKind { In, Over, Out, InBack, OverBack, OutBack, Continue, ContinueBack }

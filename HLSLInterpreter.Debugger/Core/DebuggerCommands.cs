@@ -1,7 +1,6 @@
 namespace HLSLInterpreter.Debugger.Core;
 
-// What an update step asks the runtime to do next. Built via these factories,
-// and interpreted by DebuggerProgram.
+// What an update step asks the runtime to do next, interpreted by DebuggerProgram.
 public abstract record Cmd
 {
     public static readonly Cmd None = new BatchCmd([]);

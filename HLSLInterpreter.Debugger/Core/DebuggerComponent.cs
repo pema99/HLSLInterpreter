@@ -2,10 +2,8 @@ using Microsoft.AspNetCore.Components;
 
 namespace HLSLInterpreter.Debugger.Core;
 
-// Base for components that render global state. A component selects the single
-// slice it needs and re-renders only when that slice changes, so an unrelated
-// part of the model changing does not re-run its render. User actions are
-// raised with Dispatch.
+// Base for components bound to a slice of the model. A component re-renders only
+// when its own slice changes.
 public abstract class DebuggerComponent<TSlice> : ComponentBase, IDisposable
 {
     [Inject] protected DebuggerProgram Program { get; set; } = null!;

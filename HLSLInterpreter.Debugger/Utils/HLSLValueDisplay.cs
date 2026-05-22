@@ -5,8 +5,7 @@ using UnityShaderParser.HLSL;
 
 namespace HLSLInterpreter.Debugger.Utils;
 
-// Turns interpreter values into display forms: text via Format, or an rgba
-// image via RenderPreviewImage and RenderOutputImage.
+// Turns interpreter values into display text and preview images.
 public static class HLSLValueDisplay
 {
     public static string Format(HLSLValue value, int threadIndex)
@@ -164,7 +163,6 @@ public static class HLSLValueDisplay
     }
 
     // Resolves an identifier against a debug step into a hover-tooltip payload.
-    // Returns null when there is no step or the name is not in scope.
     public static HoverInfo BuildHoverInfo(
         TraceStep step, int warpX, int warpY, int inspectedThread, int debugVertexIndex, string identifier)
     {
@@ -202,8 +200,7 @@ public static class HLSLValueDisplay
     }
 }
 
-// The tooltip payload Monaco's hover provider pulls for an identifier: the
-// formatted value, plus a per-thread preview image when one applies.
+// The tooltip payload for a hovered identifier.
 public sealed class HoverInfo
 {
     public string Value { get; set; } = "";

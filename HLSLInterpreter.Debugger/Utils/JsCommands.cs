@@ -3,11 +3,8 @@ using Microsoft.JSInterop;
 
 namespace HLSLInterpreter.Debugger.Utils;
 
-// The single door for calls arriving from JavaScript. Every [JSInvokable] the
-// app exposes lives here: a JS observer (a canvas click, a gutter click, a file
-// drop, a resize) becomes one Dispatch, so JS input enters the MVU loop the
-// same way a component action does. One DotNetObjectReference wraps this,
-// created once by the shell.
+// Every [JSInvokable] the app exposes. A JS event (click, gutter click, file
+// drop, resize) becomes one Dispatch into the MVU loop.
 public sealed class JsCommands
 {
     private readonly DebuggerProgram _program;
@@ -40,8 +37,7 @@ public sealed class JsCommands
     public void CanvasResized(int width, int height) =>
         _program.Dispatch(new CanvasResized(width, height));
 
-    // Monaco's hover provider pulls this when the user hovers an identifier. It
-    // is a query, not an event, so it returns rather than dispatching.
+    // Monaco's hover provider pulls this when the user hovers an identifier.
     [JSInvokable]
     public HoverInfo GetHoverInfo(string identifier)
     {

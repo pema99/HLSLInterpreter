@@ -175,8 +175,7 @@
         Dispatch(new AppStarted(Nav.Uri, Host.InitialName, Host.InitialPath, Host.TabsEnabled));
     }
 
-    // Load the monkey mesh before the first render so the auto-run on editor
-    // ready already has it. The fetch is plain prep for a single dispatch.
+    // Load the monkey mesh before the first render so the editor-ready auto-run has it.
     protected override async Task OnInitializedAsync()
     {
         try

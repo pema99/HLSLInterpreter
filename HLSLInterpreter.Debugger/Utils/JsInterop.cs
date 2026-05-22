@@ -3,14 +3,14 @@ using Microsoft.JSInterop;
 
 namespace HLSLInterpreter.Debugger.Utils;
 
-// Typed wrappers over the app's JS modules. The interop layer is static: there
-// is one IJSRuntime for the whole app, set once at startup by the host.
+// Typed wrappers over the app's JS modules. One IJSRuntime, set once at startup,
+// backs them all.
 public static class JsInterop
 {
     public static IJSRuntime Js { get; set; }
 }
 
-// Monaco editor — editor.js.
+// Monaco editor (editor.js).
 public static class EditorInterop
 {
     private const string ModulePath = "./_content/HLSLInterpreter.Debugger/js/editor.js";
@@ -55,7 +55,7 @@ public static class EditorInterop
         await (await Module()).InvokeAsync<bool>("dbgIsTabDropAfter", tabIndex, clientX);
 }
 
-// Host helpers — host.js: file IO, clipboard, glsl2hlsl, image rendering, DOM glue.
+// Host helpers in host.js: file IO, clipboard, glsl2hlsl, image rendering, DOM glue.
 public static class BrowserInterop
 {
     private const string ModulePath = "./_content/HLSLInterpreter.Debugger/js/host.js";
@@ -119,7 +119,7 @@ public sealed record GpuRenderRequest(
     IReadOnlyList<TextureBinding> Textures,
     IReadOnlyList<SamplerBinding> Samplers);
 
-// WebGPU preview loop — gpu.js.
+// WebGPU preview loop (gpu.js).
 public static class GpuInterop
 {
     private const string ModulePath = "./_content/HLSLInterpreter.Debugger/js/gpu.js";
@@ -152,7 +152,7 @@ public static class GpuInterop
     public static async ValueTask<float[]> Mouse() => await (await Module()).InvokeAsync<float[]>("gpuMouse");
 }
 
-// Color Output canvas — viewport.js.
+// Color output canvas (viewport.js).
 public static class CanvasInterop
 {
     private const string ModulePath = "./_content/HLSLInterpreter.Debugger/js/viewport.js";

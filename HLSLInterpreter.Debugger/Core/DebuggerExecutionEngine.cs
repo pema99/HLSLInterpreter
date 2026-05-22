@@ -7,17 +7,13 @@ using UnityShaderParser.HLSL;
 
 namespace HLSLInterpreter.Debugger.Core;
 
-// Runs the user's shader for the debugger: the CPU and GPU runs, trace
-// recording, immediate evaluation, and view-mode rendering, each wrapped as a
-// Cmd. The active run's cancellation source is the one piece of state that must
-// outlive a single command.
+// Builds the Cmds that run, trace, and evaluate shaders, and drive the GPU preview.
 public sealed class DebuggerExecutionEngine
 {
     private readonly ShaderExecutor _executor = new();
     private readonly HLSLRunner _hlslRunner = new();
 
-    // Gathers the per-frame inputs a ShaderInvocation needs (canvas size, camera
-    // matrices, mouse). Everything model-derived is passed in.
+    // Gathers the per-frame GPU inputs (camera matrices, mouse) a ShaderInvocation needs.
     private async Task<ShaderInvocation> BuildAsync(ShaderConfig config, FrameCapture captured, int debugVertexIndex)
     {
         int wx = Math.Max(1, config.WarpX);
@@ -63,8 +59,7 @@ public sealed class DebuggerExecutionEngine
             BasePath = docPath != null ? System.IO.Path.GetDirectoryName(docPath) ?? "" : "",
         };
 
-    // Aggressively reclaims memory between runs. Interpreting a full frame
-    // allocates heavily, so this keeps the working set down.
+    // Forces a GC between runs, since interpreting a full frame allocates heavily.
     private static void Reclaim()
     {
         if (OperatingSystem.IsBrowser())
@@ -218,7 +213,7 @@ public sealed class DebuggerExecutionEngine
     {
         try
         {
-            // viewport.js has not reported a size yet: fall back to a sane square.
+            // Fall back to a sane square if viewport.js has not reported a size yet.
             if (canvasW <= 0) canvasW = Math.Max(wx, 256);
             if (canvasH <= 0) canvasH = Math.Max(wy, 256);
             var invocation = (await BuildAsync(config, null, -1))
@@ -262,8 +257,8 @@ public sealed class DebuggerExecutionEngine
         }
     }
 
-    // Each tile re-visits the AST after a fresh Reset so interpreter state
-    // cannot leak between warps. Returns the first tile that failed, or null.
+    // Each tile re-visits the AST after a fresh Reset so interpreter state cannot
+    // leak between warps.
     private async Task<RunOutcome> RunTilesSerial(
         string code, HLSLParserConfig parserConfig, ShaderInvocation invocation,
         int wx, int wy, int canvasW, int canvasH, int tilesX, int tilesY,
@@ -306,8 +301,7 @@ public sealed class DebuggerExecutionEngine
         {
             workers[w] = Task.Run(async () =>
             {
-                // Each worker owns its own runner and AST copy to avoid
-                // cross-thread interpreter state.
+                // Each worker owns its runner and AST copy to avoid cross-thread state.
                 var runner = new HLSLRunner();
                 var program = ShaderProgram.FromParsedNodes(ShaderProgram.Parse(code, parserConfig));
                 await foreach (var (tx, ty) in workQueue.Reader.ReadAllAsync())
@@ -429,9 +423,8 @@ public sealed class DebuggerExecutionEngine
             }
         });
 
-    // A canvas click in GPU mode: snapshot the live frame, pause the preview,
-    // and start the debug session via the message `make` builds. CPU mode needs
-    // no effect, so update maps that click straight to a message.
+    // Snapshots the live GPU frame and pauses the preview, then starts a debug
+    // session via the message `make` builds.
     public Cmd SnapshotGpuFrame(Func<float, int, int, Msg> make) =>
         Cmd.OfEffect(async dispatch =>
         {

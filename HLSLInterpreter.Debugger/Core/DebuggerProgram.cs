@@ -5,12 +5,8 @@ using HLSLInterpreter.Debugger.Utils;
 
 namespace HLSLInterpreter.Debugger.Core;
 
-// The debugger's MVU runtime: it holds the single application model, runs the
-// dispatch loop, applies the update logic (in DebuggerProgram.Update.cs), and
-// interprets the resulting commands. Messages are queued and pumped one at a
-// time, so ordering is defined and the loop is never re-entered: a message
-// dispatched from within an effect (or a JS callback) is simply enqueued for
-// the running pump.
+// The debugger's MVU runtime. It holds the model and pumps queued messages one
+// at a time through update, interpreting the Cmd each step produces.
 public sealed class DebuggerProgram : IDisposable
 {
     private readonly DebuggerExecutionEngine _engine;
@@ -21,8 +17,7 @@ public sealed class DebuggerProgram : IDisposable
 
     public DebuggerModel Model { get; private set; }
 
-    // Raised after every model swap. Subscribers re-select their own slice and
-    // decide for themselves whether the change concerns them.
+    // Raised after every model swap, so subscribers can re-check their slice.
     public event Action Changed;
 
     public DebuggerProgram(DebuggerExecutionEngine engine, FileDialogService fileDialogs)
@@ -58,8 +53,7 @@ public sealed class DebuggerProgram : IDisposable
         }
     }
 
-    // The command interpreter. A fixed, exhaustive switch over the generic Cmd
-    // vocabulary. An effect must never break the pump, so failures are swallowed.
+    // Interprets one Cmd. A failing effect is logged but never breaks the pump.
     private async Task Execute(Cmd command)
     {
         try
@@ -263,9 +257,8 @@ public sealed class DebuggerProgram : IDisposable
             case DebugClicked x:
             {
                 next = model;
-                // A canvas click resolves to a debug request. GPU mode snapshots
-                // the live frame (an effect); CPU mode reads the image size from
-                // the model, so it is a plain message.
+                // A canvas click becomes a debug request. GPU mode must snapshot
+                // the live frame, CPU mode just reads the image size from the model.
                 if (model.Run.Backend == RunBackend.Gpu)
                     command = _engine.SnapshotGpuFrame(
                         (t, w, h) => new DebugAtRequested(x.Target, x.X, x.Y, t, w, h));
@@ -878,8 +871,7 @@ public sealed class DebuggerProgram : IDisposable
         Cmd.OfValueTask(() => EditorInterop.SetTheme(
             m.Ui.BonzomaticMode && !m.Debug.IsActive ? "hlsl-bonzomatic" : "hlsl-dark"));
 
-    // update needs the live editor text but cannot await, so it asks for the
-    // text and resumes in the XStarted message the continuation builds.
+    // update cannot await, so it fetches the editor text and resumes in a follow-up message.
     private Cmd FetchEditorText(Func<string, Msg> then) =>
         Cmd.OfTask(async () => then(await EditorInterop.GetValue()));
 }

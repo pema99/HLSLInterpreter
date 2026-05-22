@@ -46,8 +46,8 @@ public sealed record ExecutionTrace(
 }
 
 
-// Records an ExecutionTrace by running the shader through ShaderExecutor with a
-// before-statement hook that snapshots each step. Replaces DebuggerSession.Record.
+// Records an ExecutionTrace by running the shader with a before-statement hook
+// that snapshots each step.
 public static class TraceRecorder
 {
     public static ExecutionTrace Record(

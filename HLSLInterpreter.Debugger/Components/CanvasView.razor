@@ -1,8 +1,8 @@
 @inherits DebuggerComponent<DebuggerModel>
 @using HLSL
 
-@* The image canvas. Every render pushes the overlay state to JS; the image is
-   pushed when it changes or when this canvas first appears. JS keeps no copy. *@
+@* The image canvas. Every render pushes overlay state to JS, and the image
+   whenever it changes. JS keeps no copy. *@
 <div class="image-container @CssClass" id="@ContainerId" data-mode-target="@ModeTarget"
      style="@(Hidden ? "display:none" : "")"
      @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true" @oncontextmenu="@(() => {})">
@@ -28,8 +28,7 @@
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         await CanvasInterop.ApplyState(ContainerId, BuildOverlay(Slice));
-        // Push the image when this canvas first appears or when a new one is
-        // produced. JS keeps no copy; the model owns it.
+        // Push the image when this canvas first appears or when a new one is produced.
         var image = Slice.Run.Image;
         if (firstRender || !ReferenceEquals(image, _lastImage))
         {
@@ -39,8 +38,8 @@
         }
     }
 
-    // The canvas overlay derived from the model: warp size, viewport mode, the
-    // debug markers, and what a click should do.
+    // The canvas overlay derived from the model (warp size, viewport mode, debug
+    // markers, click behavior).
     private static Overlay BuildOverlay(DebuggerModel s)
     {
         var config = s.Editor.ActiveDocument?.Config ?? new ShaderConfig();

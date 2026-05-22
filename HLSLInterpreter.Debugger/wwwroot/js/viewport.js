@@ -631,8 +631,6 @@ export function setMeshData(positions, indices) {
     _meshIndices = indices;
 }
 
-// The main color-output container's device-pixel size, pushed to the model so a
-// full-frame CPU run knows its render target. Sends only on an actual change.
 function reportCanvasSize(container) {
     if (container.id !== 'image-container') return;
     const ref = getDebuggerRef();
