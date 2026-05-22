@@ -13,7 +13,22 @@ public sealed class DebuggerExecutionEngine
     private readonly ShaderExecutor _executor = new();
     private readonly HLSLRunner _hlslRunner = new();
 
-    // Gathers the per-frame GPU inputs (camera matrices, mouse) a ShaderInvocation needs.
+    // Forces a GC between runs, since interpreting a full frame allocates heavily!
+    private static void ReclaimMemory()
+    {
+        if (OperatingSystem.IsBrowser())
+        {
+            GC.Collect();
+            return;
+        }
+        var previous = GCSettings.LargeObjectHeapCompactionMode;
+        GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
+        GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+        GCSettings.LargeObjectHeapCompactionMode = previous;
+    }
+
     private async Task<ShaderInvocation> BuildAsync(ShaderConfig config, FrameCapture captured, int debugVertexIndex)
     {
         int wx = Math.Max(1, config.WarpX);
@@ -59,22 +74,6 @@ public sealed class DebuggerExecutionEngine
             BasePath = docPath != null ? System.IO.Path.GetDirectoryName(docPath) ?? "" : "",
         };
 
-    // Forces a GC between runs, since interpreting a full frame allocates heavily.
-    private static void Reclaim()
-    {
-        if (OperatingSystem.IsBrowser())
-        {
-            GC.Collect();
-            return;
-        }
-        var previous = GCSettings.LargeObjectHeapCompactionMode;
-        GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-        GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
-        GC.WaitForPendingFinalizers();
-        GC.Collect();
-        GCSettings.LargeObjectHeapCompactionMode = previous;
-    }
-
     private CancellationTokenSource _runCts;
 
     public Cmd RunCpu(string code, ShaderConfig config, string docPath, int canvasW, int canvasH) =>
@@ -82,7 +81,7 @@ public sealed class DebuggerExecutionEngine
         {
             var cts = BeginRun();
             try { await GpuInterop.Stop(); } catch { }
-            Reclaim();
+            ReclaimMemory();
 
             var parserConfig = MakeParserConfig(docPath);
             int wx = Math.Max(1, config.WarpX);
@@ -121,7 +120,7 @@ public sealed class DebuggerExecutionEngine
         {
             BeginRun();
             try { await GpuInterop.Stop(); } catch { }
-            Reclaim();
+            ReclaimMemory();
 
             if (!await GpuInterop.IsAvailable())
             {
@@ -213,7 +212,6 @@ public sealed class DebuggerExecutionEngine
     {
         try
         {
-            // Fall back to a sane square if viewport.js has not reported a size yet.
             if (canvasW <= 0) canvasW = Math.Max(wx, 256);
             if (canvasH <= 0) canvasH = Math.Max(wy, 256);
             var invocation = (await BuildAsync(config, null, -1))
@@ -257,8 +255,7 @@ public sealed class DebuggerExecutionEngine
         }
     }
 
-    // Each tile re-visits the AST after a fresh Reset so interpreter state cannot
-    // leak between warps.
+    // Each tile re-visits the AST after a fresh Reset so interpreter state cannot leak between warps.
     private async Task<RunOutcome> RunTilesSerial(
         string code, HLSLParserConfig parserConfig, ShaderInvocation invocation,
         int wx, int wy, int canvasW, int canvasH, int tilesX, int tilesY,
@@ -400,7 +397,7 @@ public sealed class DebuggerExecutionEngine
                     catch { }
                 }
                 try { await GpuInterop.Pause(); } catch { }
-                Reclaim();
+                ReclaimMemory();
 
                 var parserConfig = MakeParserConfig(docPath);
                 var invocation = await BuildAsync(config, captured, debugVertexIndex);
@@ -423,8 +420,7 @@ public sealed class DebuggerExecutionEngine
             }
         });
 
-    // Snapshots the live GPU frame and pauses the preview, then starts a debug
-    // session via the message `make` builds.
+    // Snapshots the live GPU frame and pauses the preview, then debug
     public Cmd SnapshotGpuFrame(Func<float, int, int, Msg> make) =>
         Cmd.OfEffect(async dispatch =>
         {
@@ -475,8 +471,6 @@ public sealed class DebuggerExecutionEngine
             try { await BrowserInterop.ScrollImmediateToBottom(); } catch { }
         });
 
-    // Re-runs the shader up to the target step and evaluates an expression in
-    // that scope. The hook aborts the run once the target step is reached.
     private async Task<(HLSLValue Value, string Error)> EvaluateExpression(
         string expression, string debugCode, int stepIndex, ShaderConfig config,
         FrameCapture captured, int debugVertexIndex, string docPath)

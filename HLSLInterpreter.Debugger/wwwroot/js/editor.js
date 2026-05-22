@@ -1,7 +1,7 @@
 import { rgbaToDataUrl, getDebuggerRef } from './host.js';
 
 let _monacoEditor = null;
-let _models = new Map();        // document id -> { model, bpIds, lineIds }
+let _models = new Map();
 let _currentModelId = -1;
 
 export function dbgIsTabDropAfter(tabIndex, clientX) {
@@ -518,9 +518,7 @@ export function initMonaco(containerId, docId, initialCode) {
     });
 };
 
-// Keyboard shortcuts: Escape closes a modal, Ctrl+Enter runs, and the debug
-// F-keys click the matching toolbar button. One listener handles every case,
-// including when the editor itself has focus (Monaco does not bind these keys).
+// Keyboard shortcuts
 document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') {
         var overlays = document.querySelectorAll('.modal-overlay');
@@ -580,7 +578,6 @@ document.addEventListener('keydown', function (e) {
     }
 });
 
-// Breakpoints are per document: each model carries only its own.
 export function setBreakpoints(docId, lines) {
     var e = _models.get(docId);
     if (!e) return;
@@ -597,8 +594,7 @@ export function setBreakpoints(docId, lines) {
     e.bpIds = e.model.deltaDecorations(e.bpIds, decorations);
 };
 
-// Highlight the current debug line (0 to clear). Only the visible model carries
-// the marker, so it is cleared from every model first.
+// Highlight the current debug line (0 to clear)
 export function highlightDebugLine(lineNumber) {
     _models.forEach(function (e) {
         if (e.lineIds.length) e.lineIds = e.model.deltaDecorations(e.lineIds, []);
@@ -622,9 +618,7 @@ export function getMonacoValue() {
     return _monacoEditor ? _monacoEditor.getValue() : '';
 };
 
-// One Monaco model per document: the model owns the text and undo history, so
-// switching tabs is just swapping which model the editor shows. Document 0 is
-// created by initMonaco; every later call here runs after Monaco has loaded.
+// One Monaco model per document/tab
 export function createModel(id, content) {
     var existing = _models.get(id);
     if (existing) { existing.model.setValue(content); return; }

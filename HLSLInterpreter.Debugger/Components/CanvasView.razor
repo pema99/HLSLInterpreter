@@ -38,8 +38,6 @@
         }
     }
 
-    // The canvas overlay derived from the model (warp size, viewport mode, debug
-    // markers, click behavior).
     private static Overlay BuildOverlay(DebuggerModel s)
     {
         var config = s.Editor.ActiveDocument?.Config ?? new ShaderConfig();

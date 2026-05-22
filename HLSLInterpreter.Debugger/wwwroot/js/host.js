@@ -1,5 +1,4 @@
-// Browser/host helpers backing the BrowserInterop facade: file IO, clipboard,
-// the glsl2hlsl transpiler, image decode/render, and panel resize handles.
+// Host helpers, stuff only JS can do
 
 let dotNetDebugRef = null;
 
@@ -153,7 +152,7 @@ export function downloadTextFile(filename, content) {
     URL.revokeObjectURL(url);
 }
 
-// --- glsl2hlsl transpiler (lazy-loaded WASM) ---
+// --- glsl2hlsl transpiler ---
 
 let _glsl2hlslPromise = null;
 function loadGlsl2Hlsl() {
@@ -224,7 +223,7 @@ export function disposeThreadGridResize() {
 
 // --- Panel resize handles ---
 
-// Inner horizontal resize: call stack / execution state divider.
+// Inner horizontal resize of call stack / execution state divider.
 (function () {
     var dragging = false;
     var startX, startW, pane;
@@ -258,7 +257,7 @@ export function disposeThreadGridResize() {
     });
 })();
 
-// Outer resize: the horizontal panel divider and the vertical section dividers.
+// Outer resize of the horizontal panel divider and the vertical section dividers.
 (function () {
     let activeHandle = null;  // null | 'horizontal' | 'horizontal-narrow' | { type: 'vertical', section }
     let startPos, startSize;
@@ -296,8 +295,6 @@ export function disposeThreadGridResize() {
             const newHeight = Math.max(120, startSize - (e.clientY - startPos));
             document.querySelector('.output-panel').style.height = newHeight + 'px';
         } else if (activeHandle.type === 'vertical') {
-            // Handle is at the bottom of the section: drag down = grow. A CSS
-            // custom property is used so .section-collapsed { height: auto } wins.
             const newHeight = Math.max(60, Math.min(800, startSize + (e.clientY - startPos)));
             activeHandle.section.style.setProperty('--section-h', newHeight + 'px');
         }

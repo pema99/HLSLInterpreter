@@ -1,6 +1,4 @@
-// Orbit camera state and projection math for the GPU preview. Kept in its own
-// module so gpu.js (rendering) and viewport.js (overlay/picking) can both use
-// it without importing each other.
+// Camera state
 
 const CAMERA_FOV_Y = 60 * Math.PI / 180;
 let cameraYaw = 0.6;

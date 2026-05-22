@@ -5,8 +5,7 @@ using HLSLInterpreter.Debugger.Utils;
 
 namespace HLSLInterpreter.Debugger.Core;
 
-// The debugger's MVU runtime. It holds the model and pumps queued messages one
-// at a time through update, interpreting the Cmd each step produces.
+// The main event loop.
 public sealed class DebuggerProgram : IDisposable
 {
     private readonly DebuggerExecutionEngine _engine;
@@ -18,7 +17,7 @@ public sealed class DebuggerProgram : IDisposable
     public DebuggerModel Model { get; private set; }
 
     // Raised after every model swap, so subscribers can re-check their slice.
-    public event Action Changed;
+    public event Action ModelChanged;
 
     public DebuggerProgram(DebuggerExecutionEngine engine, FileDialogService fileDialogs)
     {
@@ -43,7 +42,7 @@ public sealed class DebuggerProgram : IDisposable
                 var message = _queue.Dequeue();
                 var (model, command) = Update(Model, message);
                 Model = model;
-                Changed?.Invoke();
+                ModelChanged?.Invoke();
                 await Execute(command);
             }
         }
@@ -53,7 +52,6 @@ public sealed class DebuggerProgram : IDisposable
         }
     }
 
-    // Interprets one Cmd. A failing effect is logged but never breaks the pump.
     private async Task Execute(Cmd command)
     {
         try
@@ -84,7 +82,7 @@ public sealed class DebuggerProgram : IDisposable
         }
         catch (Exception ex)
         {
-            // An effect must never break the dispatch pump.
+            // An effect must never break the event loop.
             Console.WriteLine("[pump] effect threw: " + ex);
         }
     }
@@ -257,8 +255,6 @@ public sealed class DebuggerProgram : IDisposable
             case DebugClicked x:
             {
                 next = model;
-                // A canvas click becomes a debug request. GPU mode must snapshot
-                // the live frame, CPU mode just reads the image size from the model.
                 if (model.Run.Backend == RunBackend.Gpu)
                     command = _engine.SnapshotGpuFrame(
                         (t, w, h) => new DebugAtRequested(x.Target, x.X, x.Y, t, w, h));
@@ -777,8 +773,7 @@ public sealed class DebuggerProgram : IDisposable
         return (next, command);
     }
 
-    // ---- Shared helpers ----
-
+    // Helpers
     private static RunState BeginRunReset(RunState r, bool keepCaptured) => r with
     {
         Status = RunStatus.Running,
@@ -871,7 +866,6 @@ public sealed class DebuggerProgram : IDisposable
         Cmd.OfValueTask(() => EditorInterop.SetTheme(
             m.Ui.BonzomaticMode && !m.Debug.IsActive ? "hlsl-bonzomatic" : "hlsl-dark"));
 
-    // update cannot await, so it fetches the editor text and resumes in a follow-up message.
     private Cmd FetchEditorText(Func<string, Msg> then) =>
         Cmd.OfTask(async () => then(await EditorInterop.GetValue()));
 }

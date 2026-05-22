@@ -3,8 +3,6 @@ using Microsoft.JSInterop;
 
 namespace HLSLInterpreter.Debugger.Utils;
 
-// Typed wrappers over the app's JS modules. One IJSRuntime, set once at startup,
-// backs them all.
 public static class JsInterop
 {
     public static IJSRuntime Js { get; set; }
@@ -55,7 +53,7 @@ public static class EditorInterop
         await (await Module()).InvokeAsync<bool>("dbgIsTabDropAfter", tabIndex, clientX);
 }
 
-// Host helpers in host.js: file IO, clipboard, glsl2hlsl, image rendering, DOM glue.
+// Host helpers in host.js
 public static class BrowserInterop
 {
     private const string ModulePath = "./_content/HLSLInterpreter.Debugger/js/host.js";

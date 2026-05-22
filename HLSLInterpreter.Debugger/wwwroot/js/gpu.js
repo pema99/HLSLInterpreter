@@ -1,9 +1,6 @@
 // GPU preview + click-to-debug. ES module so it can import slang-wasm.js.
 import { dbgInitViewport, dbgSetViewportImageSize, dbgRefreshViewportOverlay } from './viewport.js';
 import { gpuView, gpuProjection, rotateCamera, zoomCamera } from './camera.js';
-
-// gpuView/gpuProjection are part of the GpuInterop surface; re-export them so
-// C# still imports a single gpu.js module.
 export { gpuView, gpuProjection };
 
 const SLANG_STAGE_VERTEX = 1;
@@ -353,7 +350,7 @@ export function gpuRestart() {
     if (!active.running) drawFrame(active, active.startTimeMs);
 }
 
-// Live canvas size, time, and camera state so a Debug-button entry can
+// Live canvas size, time, and camera state so a debug run can
 // reproduce the _Resolution, _Time, and view-projection matrix the GPU saw.
 export function gpuSnapshot() {
     if (!active) return null;
@@ -431,7 +428,7 @@ function attachCameraInput() {
     }, { capture: true, passive: false });
 }
 
-// Map (semanticBase, semanticIndex) → byte offset within the interleaved
+// Map (semanticBase, semanticIndex) + byte offset within the interleaved
 // vertex (matches Mesh.GetInterleavedVertices: pos3 + normal3 + uv2).
 const MESH_OFFSET_BY_SEMANTIC = {
     'POSITION_0': 0,

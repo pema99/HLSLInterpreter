@@ -2,8 +2,7 @@ using Microsoft.AspNetCore.Components;
 
 namespace HLSLInterpreter.Debugger.Core;
 
-// Base for components bound to a slice of the model. A component re-renders only
-// when its own slice changes.
+// Base for components bound to a slice of the model. A component re-renders only when its own slice changes.
 public abstract class DebuggerComponent<TSlice> : ComponentBase, IDisposable
 {
     [Inject] protected DebuggerProgram Program { get; set; } = null!;
@@ -17,7 +16,7 @@ public abstract class DebuggerComponent<TSlice> : ComponentBase, IDisposable
     protected override void OnInitialized()
     {
         Slice = Select(Program.Model);
-        Program.Changed += OnProgramChanged;
+        Program.ModelChanged += OnProgramChanged;
     }
 
     private void OnProgramChanged()
@@ -28,5 +27,5 @@ public abstract class DebuggerComponent<TSlice> : ComponentBase, IDisposable
         InvokeAsync(StateHasChanged);
     }
 
-    public virtual void Dispose() => Program.Changed -= OnProgramChanged;
+    public virtual void Dispose() => Program.ModelChanged -= OnProgramChanged;
 }

@@ -62,8 +62,6 @@
         }
     }
 
-    // ShaderToy shaders reference iChannel0..3 for texture inputs. Pre-create a
-    // binding for each one the transpiled code mentions.
     public static List<TextureBinding> DetectChannels(string hlsl)
     {
         var textures = new List<TextureBinding>();

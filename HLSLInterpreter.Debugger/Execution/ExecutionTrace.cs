@@ -20,8 +20,7 @@ public sealed record TraceStep(
     }
 }
 
-// An immutable recording of a shader run. The step cursor lives in DebugState,
-// not here, so the trace can be shared freely.
+// An immutable recording of a shader run. The step cursor lives in DebugState.
 public sealed record ExecutionTrace(
     IReadOnlyList<TraceStep> Steps,
     string Output,
@@ -46,8 +45,7 @@ public sealed record ExecutionTrace(
 }
 
 
-// Records an ExecutionTrace by running the shader with a before-statement hook
-// that snapshots each step.
+// Records an execution trace
 public static class TraceRecorder
 {
     public static ExecutionTrace Record(
@@ -94,8 +92,7 @@ public static class TraceRecorder
 }
 
 
-// Pure cursor math over a recorded ExecutionTrace. Each method takes the current
-// step index and returns the new one.
+// Stepping/cursor math for navigating a trace
 public static class TraceNavigator
 {
     public static int Clamp(ExecutionTrace trace, int index) =>

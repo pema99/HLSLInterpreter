@@ -200,7 +200,6 @@ public static class HLSLValueDisplay
     }
 }
 
-// The tooltip payload for a hovered identifier.
 public sealed class HoverInfo
 {
     public string Value { get; set; } = "";

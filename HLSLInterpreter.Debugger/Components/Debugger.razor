@@ -175,9 +175,9 @@
         Dispatch(new AppStarted(Nav.Uri, Host.InitialName, Host.InitialPath, Host.TabsEnabled));
     }
 
-    // Load the monkey mesh before the first render so the editor-ready auto-run has it.
     protected override async Task OnInitializedAsync()
     {
+        // Load the monkey mesh before the first render
         try
         {
             string objText = await BrowserInterop.FetchText("_content/HLSLInterpreter.Debugger/lib/monkey.obj");

@@ -3,13 +3,10 @@ using HLSLInterpreter.Debugger.Utils;
 
 namespace HLSLInterpreter.Debugger.Core;
 
-// The debugger's immutable model tree, and the per-document shader settings it
-// nests. Each update produces the next one.
-
 public enum DebugTarget { Pixel, Vertex }
 public enum CpuMode { SingleWarp, FullFrame, FullFrameWithMetrics }
 
-// Per-document shader settings, owned by the document that uses them.
+// Per-document shader settings, owned by the tab that uses them.
 public sealed record ShaderConfig
 {
     public ShaderRenderMode RenderMode { get; init; } = ShaderRenderMode.Pixel;
@@ -26,16 +23,12 @@ public sealed record ShaderConfig
     public IReadOnlyList<SamplerBinding> Samplers { get; init; } = Array.Empty<SamplerBinding>();
 }
 
-// The text is not kept here. Each document's content lives in its own Monaco
-// model keyed by Id, and update reads it on demand.
 public sealed record ShaderDocument
 {
     public int Id { get; init; }
     public string Name { get; init; } = "new.hlsl";
     public string Path { get; init; }
     public ShaderConfig Config { get; init; } = new();
-
-    // Breakpoints belong to the document, so they do not bleed across tabs.
     public IReadOnlySet<int> Breakpoints { get; init; } = new HashSet<int>();
 }
 
@@ -70,12 +63,11 @@ public sealed record RunState
     public bool GpuPaused { get; init; }
     public FrameCapture CapturedFrame { get; init; }
 
-    // The output canvas size in device pixels, pushed by viewport.js on resize.
+    // The output canvas size in device pixels, pushed by viewport.js on resize
     public int CanvasWidth { get; init; }
     public int CanvasHeight { get; init; }
 
-    // The interpreter's output image. CanvasView pushes it to the canvas, JS
-    // keeps no copy.
+    // The interpreter's output image
     public ShaderImage Image { get; init; }
 
     public ExecutionMetrics Metrics { get; init; }
@@ -105,9 +97,6 @@ public sealed record UiState
 {
     public ModalKind OpenModal { get; init; } = ModalKind.None;
     public bool BonzomaticMode { get; init; }
-
-    // Bumped on each permalink copy. The toast is keyed on this so its fade
-    // animation replays.
     public int PermalinkToastKey { get; init; }
 }
 

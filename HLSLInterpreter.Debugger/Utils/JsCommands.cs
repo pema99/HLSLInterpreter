@@ -3,8 +3,7 @@ using Microsoft.JSInterop;
 
 namespace HLSLInterpreter.Debugger.Utils;
 
-// Every [JSInvokable] the app exposes. A JS event (click, gutter click, file
-// drop, resize) becomes one Dispatch into the MVU loop.
+// Every [JSInvokable] the app exposes
 public sealed class JsCommands
 {
     private readonly DebuggerProgram _program;
@@ -37,7 +36,6 @@ public sealed class JsCommands
     public void CanvasResized(int width, int height) =>
         _program.Dispatch(new CanvasResized(width, height));
 
-    // Monaco's hover provider pulls this when the user hovers an identifier.
     [JSInvokable]
     public HoverInfo GetHoverInfo(string identifier)
     {

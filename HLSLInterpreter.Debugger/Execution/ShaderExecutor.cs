@@ -14,11 +14,10 @@ public sealed class ExecutionOptions
     public Action<StatementEvent> AfterStatement { get; init; }
 
     // Attach the hooks before the program is loaded so global initializers are
-    // observed. The trace recorder needs this, plain runs and metrics do not.
+    // observed. Debug runs need this, plain runs and metrics do not.
     public bool ObserveProgramLoad { get; init; }
 
-    // Redirect Console.Out for this run. Disabled for tiled full-frame tiles,
-    // where one outer redirect spans all tiles instead.
+    // Redirect Console.Out for this run?
     public bool CaptureConsole { get; init; } = true;
 }
 
@@ -36,8 +35,7 @@ public sealed record RunOutcome(
         new(null, output, true, message, exception);
 }
 
-// Runs one shader invocation on the CPU interpreter and returns a RunOutcome.
-// Single-warp runs, tiled full-frame runs, and trace recording all go through here.
+// Runs one shader invocation on the CPU interpreter and returns a RunOutcome
 public sealed class ShaderExecutor
 {
     public RunOutcome Execute(

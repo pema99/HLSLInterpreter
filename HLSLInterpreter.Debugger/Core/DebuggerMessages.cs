@@ -3,8 +3,7 @@ using HLSLInterpreter.Debugger.Utils;
 
 namespace HLSLInterpreter.Debugger.Core;
 
-// Every event the app can produce is a Msg. The XStarted messages carry editor
-// text fetched by a preceding command.
+// Every event the app can produce is a Msg.
 public abstract record Msg;
 
 public enum StepKind { In, Over, Out, InBack, OverBack, OutBack, Continue, ContinueBack }
@@ -56,8 +55,6 @@ public sealed record SaveFileStarted(string Code, bool AsNew) : Msg;
 public sealed record FileSaved(string Path) : Msg;
 public sealed record DownloadRequested : Msg;
 public sealed record DownloadStarted(string Code) : Msg;
-
-// ---- Content loading (examples, new file, ShaderToy import) ----
 public sealed record DocumentLoaded(
     string Name, string Code, ShaderRenderMode? Mode, string FragEntry, string VertEntry,
     IReadOnlyList<TextureBinding> Textures, IReadOnlyList<SamplerBinding> Samplers, bool Run) : Msg;

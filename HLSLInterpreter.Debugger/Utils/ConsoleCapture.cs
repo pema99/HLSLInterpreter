@@ -1,7 +1,5 @@
 namespace HLSLInterpreter.Debugger.Utils;
 
-// Redirects Console.Out for the instance's lifetime, capturing what the
-// interpreter writes as shader output.
 public sealed class ConsoleCapture : IDisposable
 {
     private readonly TextWriter _previous;

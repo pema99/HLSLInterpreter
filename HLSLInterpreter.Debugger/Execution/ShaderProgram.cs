@@ -4,8 +4,7 @@ using UnityShaderParser.HLSL;
 
 namespace HLSLInterpreter.Debugger.Execution;
 
-// A shader either parsed lazily from source or supplied as pre-parsed nodes.
-// Pre-parsed nodes let a tiled run reuse one parse across many warps.
+// A shader either parsed from source or supplied as pre-parsed nodes
 public sealed class ShaderProgram
 {
     private readonly string _source;

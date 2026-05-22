@@ -1,7 +1,4 @@
-// The Color Output image canvas: painting, zoom/pan, and the overlay. The image
-// canvas is transformed in CSS for zoom/pan; the overlay canvas is drawn in
-// device pixels so its rings stay crisp at any DPR. This module is the JS side
-// of CanvasInterop; C# owns the image and the overlay projection.
+// The Color Output image canvas. Painting, zoom/pan, and the overlay. 
 import { gpuViewProjection, gpuPickRay } from './camera.js';
 import { getDebuggerRef } from './host.js';
 
@@ -317,7 +314,7 @@ function refreshOverlay(container, s) {
     if ((s.mode === 'debug' || s.mode === 'both') && s.debugPixel) {
         drawHighlight(ctx, dpr, s, s.debugPixel.x, s.debugPixel.y, 1, 1, '#f00');
     }
-    // Hover indicator: shown in any clickable mode.
+    // Hover indicator shown in any clickable mode.
     if ((s.mode === 'gpu' || s.mode === 'cpu' || s.mode === 'debug' || s.mode === 'both') && s.hoverPixel) {
         if (s.pickMode === 'vertex' && s.hoverVertex) {
             drawTrianglesAroundVertex(ctx, dpr, s, s.hoverVertex.index);
@@ -535,10 +532,7 @@ function dbgResetView(containerId) {
     applyLayout(container, s);
 };
 
-// ---- Painting + the C#-facing API (the JS side of CanvasInterop) ----
-
-// The picking mesh is retained here: applyCanvasState passes it on every call
-// and it changes only rarely.
+// ---- Painting and C# api ----
 let _meshPositions = null;
 let _meshIndices = null;
 
@@ -565,8 +559,7 @@ export function applyCanvasState(containerId, p) {
         if (p.threadStates) dbgSetViewportThreadStates(containerId, p.threadStates);
     }
 
-    // The click handler just reports the click; C# resolves the GPU snapshot or
-    // the CPU image size and starts the debug session.
+    // The click handler just reports the click. C# resolves
     if (target === 'regular' && p.pickMode === 'vertex') {
         dbgSetClickHandler(containerId, (px, py, vertexIndex) => {
             const ref = getDebuggerRef();
@@ -616,7 +609,7 @@ export function allocPixels(width, height) {
     dbgResetView(container.id);
 }
 
-// Paint one tile straight onto the canvas; the canvas accumulates the frame.
+// Paint one tile straight onto the canvas. The canvas accumulates the frame.
 export function setPixelsRect(pixels, x, y, rectW, rectH) {
     const canvas = the2dCanvas();
     if (!canvas) return;
