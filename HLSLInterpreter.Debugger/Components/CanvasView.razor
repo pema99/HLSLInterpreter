@@ -1,5 +1,4 @@
 @inherits DebuggerComponent<DebuggerModel>
-@inject CanvasInterop Canvas
 @using HLSL
 
 @* The image canvas. Every render pushes the overlay state to JS; the image is
@@ -28,7 +27,7 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        await Canvas.ApplyState(ContainerId, BuildOverlay(Slice));
+        await CanvasInterop.ApplyState(ContainerId, BuildOverlay(Slice));
         // Push the image when this canvas first appears or when a new one is
         // produced. JS keeps no copy; the model owns it.
         var image = Slice.Run.Image;
@@ -36,7 +35,7 @@
         {
             _lastImage = image;
             if (image != null)
-                await Canvas.SetPixels(image.Pixels, image.Width, image.Height);
+                await CanvasInterop.SetPixels(image.Pixels, image.Width, image.Height);
         }
     }
 

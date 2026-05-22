@@ -1,7 +1,6 @@
 @using HLSL
 @using Microsoft.JSInterop
 @inherits DebuggerComponent<EditorState>
-@inject EditorInterop Editor
 
 <div class="editor-panel">
     @if (Slice.TabsEnabled)
@@ -49,8 +48,8 @@
     {
         if (!firstRender) return;
         _selfRef = DotNetObjectReference.Create(this);
-        await Editor.Init("monaco-container", _selfRef, Slice.ActiveDocument?.Id ?? 0, InitialCode ?? "");
-        await Editor.SetFontSize(Slice.FontSize);
+        await EditorInterop.Init("monaco-container", _selfRef, Slice.ActiveDocument?.Id ?? 0, InitialCode ?? "");
+        await EditorInterop.SetFontSize(Slice.FontSize);
         await OnReady.InvokeAsync();
     }
 
@@ -59,7 +58,7 @@
         int from = _draggedTab;
         _draggedTab = -1;
         if (from < 0) return;
-        bool after = await Editor.IsTabDropAfter(targetIndex, e.ClientX);
+        bool after = await EditorInterop.IsTabDropAfter(targetIndex, e.ClientX);
         Dispatch(new TabMoveRequested(from, after ? targetIndex + 1 : targetIndex));
     }
 

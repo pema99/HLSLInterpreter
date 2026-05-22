@@ -1,5 +1,6 @@
 using HLSL;
 using HLSLInterpreter.Debugger.Core;
+using HLSLInterpreter.Debugger.Interop;
 using HLSLInterpreter.Debugger.Services;
 
 namespace HLSLInterpreter.Debugger.Mvu;
@@ -20,9 +21,9 @@ public sealed partial class DebuggerEffects
     public Cmd SnapshotGpuFrame(Func<float, int, int, Msg> make) =>
         Cmd.OfEffect(async dispatch =>
         {
-            var snap = await _gpu.Snapshot();
+            var snap = await GpuInterop.Snapshot();
             if (snap == null || snap.Length < 3) return;
-            await _gpu.Pause();
+            await GpuInterop.Pause();
             dispatch(make(snap[0], (int)snap[1], (int)snap[2]));
         });
 
@@ -43,17 +44,17 @@ public sealed partial class DebuggerEffects
             {
                 try
                 {
-                    var snap = await _gpu.Snapshot();
+                    var snap = await GpuInterop.Snapshot();
                     if (snap != null && snap.Length >= 3 && snap[1] > 0 && snap[2] > 0)
                         captured = new FrameCapture(snap[0], (int)snap[1], (int)snap[2]);
                 }
                 catch { }
             }
-            try { await _gpu.Pause(); } catch { }
+            try { await GpuInterop.Pause(); } catch { }
             RuntimeMemory.Reclaim();
 
-            var parserConfig = ShaderInvocationBuilder.MakeParserConfig(docPath);
-            var invocation = await _invocationBuilder.BuildAsync(config, captured, debugVertexIndex);
+            var parserConfig = MakeParserConfig(docPath);
+            var invocation = await BuildAsync(config, captured, debugVertexIndex);
             var program = ShaderProgram.FromSource(code, parserConfig);
             var trace = TraceRecorder.Record(_executor, new HLSLRunner(), program, invocation);
 
@@ -102,7 +103,7 @@ public sealed partial class DebuggerEffects
             {
                 try
                 {
-                    imageDataUrl = await _browser.RgbaToDataUrl(
+                    imageDataUrl = await BrowserInterop.RgbaToDataUrl(
                         rgba, wx, wy, inspectedThread % wx, inspectedThread / wx, 0.7);
                 }
                 catch { }
@@ -110,7 +111,7 @@ public sealed partial class DebuggerEffects
         }
 
         dispatch(new ImmediateEvalFinished(new ImmediateEntry(expression, resultStr, isError, imageDataUrl)));
-        try { await _browser.ScrollImmediateToBottom(); } catch { }
+        try { await BrowserInterop.ScrollImmediateToBottom(); } catch { }
     }
 
     // Re-runs the shader up to the target step and evaluates an expression in
@@ -121,8 +122,8 @@ public sealed partial class DebuggerEffects
     {
         try
         {
-            var parserConfig = ShaderInvocationBuilder.MakeParserConfig(docPath);
-            var invocation = await _invocationBuilder.BuildAsync(config, captured, debugVertexIndex);
+            var parserConfig = MakeParserConfig(docPath);
+            var invocation = await BuildAsync(config, captured, debugVertexIndex);
             var runner = new HLSLRunner(Math.Max(1, config.WarpX), Math.Max(1, config.WarpY));
             invocation.SetUniforms(runner);
 

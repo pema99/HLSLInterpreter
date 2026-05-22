@@ -1,12 +1,9 @@
 @page "/"
 @inherits DebuggerComponent<DebuggerModel>
 @inject NavigationManager Nav
-@inject InitialCodeOptions InitialCode
-@inject PermalinkOptions PermalinkBase
-@inject TabbedEditorOptions TabbedEditor
-@inject BrowserInterop Browser
+@inject DebuggerHostOptions Host
 @inject FileDialogService FileDialogs
-@inject DebuggerEffects DebuggerEffects
+@inject IJSRuntime JS
 @using Microsoft.JSInterop
 
 @{
@@ -30,7 +27,7 @@
                     <div class="menu-backdrop" @onclick="() => _menuOpen = false"></div>
                     @* Any click inside the dropdown bubbles here and closes the menu. *@
                     <div class="menu-dropdown" @onclick="() => _menuOpen = false">
-                        @if (TabbedEditor.Enabled)
+                        @if (Host.TabsEnabled)
                         {
                             <button class="menu-item" @onclick="@(() => Dispatch(new ModalRequested(ModalKind.NewFile)))">New file</button>
                             <button class="menu-item" @onclick="@(() => Dispatch(new OpenFileRequested()))">Open file</button>
@@ -151,10 +148,11 @@
     protected override void OnInitialized()
     {
         base.OnInitialized();
+        Interop.Js = JS;
         _dotNetRef = DotNetObjectReference.Create(this);
-        DebuggerEffects.DotNetRef = _dotNetRef;
+        GpuInterop.DotNetRef = _dotNetRef;
 
-        if (TabbedEditor.Enabled)
+        if (Host.TabsEnabled)
             FileDialogs.FileDropped = (name, content, path) =>
             {
                 Dispatch(new FileDropped(name, content, path));
@@ -168,7 +166,7 @@
             catch (Exception ex) { Console.WriteLine("[shadertoy-url] decode failed: " + ex.Message); }
         }
 
-        _initialCode = string.IsNullOrEmpty(InitialCode.Code) ? DefaultShader.Code : InitialCode.Code;
+        _initialCode = string.IsNullOrEmpty(Host.InitialCode) ? DefaultShader.Code : Host.InitialCode;
         var codeParam = PermalinkCodec.GetQueryParam(Nav.Uri, "c");
         if (!string.IsNullOrEmpty(codeParam))
         {
@@ -176,7 +174,7 @@
             catch (Exception ex) { Console.WriteLine("[permalink] code decode failed: " + ex.Message); }
         }
 
-        Dispatch(new AppStarted(Nav.Uri, InitialCode.Name, InitialCode.Path, TabbedEditor.Enabled));
+        Dispatch(new AppStarted(Nav.Uri, Host.InitialName, Host.InitialPath, Host.TabsEnabled));
     }
 
     // Load the monkey mesh before the first render so the auto-run on editor
@@ -185,7 +183,7 @@
     {
         try
         {
-            string objText = await Browser.FetchText("_content/HLSLInterpreter.Debugger/lib/monkey.obj");
+            string objText = await BrowserInterop.FetchText("_content/HLSLInterpreter.Debugger/lib/monkey.obj");
             Dispatch(new DefaultMeshLoaded(Mesh.ParseObj(objText)));
         }
         catch (Exception ex) { Console.WriteLine("[default-mesh] " + ex.Message); }
@@ -195,7 +193,7 @@
     {
         if (firstRender)
         {
-            await Browser.SetDebuggerRef(_dotNetRef);
+            await BrowserInterop.SetDebuggerRef(_dotNetRef);
         }
     }
 
@@ -207,7 +205,7 @@
             _pendingShaderToy = null;
             try
             {
-                string hlsl = await Browser.TranspileGlsl(glsl);
+                string hlsl = await BrowserInterop.TranspileGlsl(glsl);
                 Dispatch(new ShaderToyImported(hlsl));
                 return;
             }
@@ -224,7 +222,7 @@
 
     private void CopyPermalink()
     {
-        string baseUrl = PermalinkBase.Url ?? new Uri(Nav.Uri).GetLeftPart(UriPartial.Path);
+        string baseUrl = Host.PermalinkUrl ?? new Uri(Nav.Uri).GetLeftPart(UriPartial.Path);
         Dispatch(new PermalinkCopyRequested(baseUrl));
     }
 

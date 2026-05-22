@@ -1,6 +1,5 @@
 @inject DebuggerProgram Program
 @inject ImageLibrary Library
-@inject BrowserInterop Browser
 
 <div class="modal-overlay" @onclick="Close">
     <div class="modal-dialog" @onclick:stopPropagation="true" style="max-width: 480px; width: 90vw; max-height: 85vh;">
@@ -102,7 +101,7 @@
     {
         try
         {
-            var picked = await Browser.PickImage();
+            var picked = await BrowserInterop.PickImage();
             if (picked == null) return;
             var binding = picked.ToTextureBinding();
             ApplyPicked(idx, binding);

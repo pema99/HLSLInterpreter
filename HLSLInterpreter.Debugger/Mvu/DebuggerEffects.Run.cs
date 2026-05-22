@@ -26,13 +26,13 @@ public sealed partial class DebuggerEffects
         Cmd.OfTask(() => RenderViewModeImpl(mode, metrics, image));
 
     public Cmd SetMeshData(Mesh mesh) =>
-        Cmd.OfTask(() => _canvas.SetMeshData(mesh?.Positions, mesh?.Indices).AsTask());
+        Cmd.OfTask(() => CanvasInterop.SetMeshData(mesh?.Positions, mesh?.Indices).AsTask());
 
     public Cmd SetGpuPaused(bool paused) =>
         Cmd.OfTask(() => SetGpuPausedImpl(paused));
 
     public Cmd RestartGpuTime() =>
-        Cmd.OfTask(() => _gpu.Restart().AsTask());
+        Cmd.OfTask(() => GpuInterop.Restart().AsTask());
 
     public Cmd CancelRun() =>
         Cmd.OfTask(() => { try { _runCts?.Cancel(); } catch { } return Task.CompletedTask; });
@@ -48,10 +48,10 @@ public sealed partial class DebuggerEffects
     private async Task RunCpuImpl(string code, ShaderConfig config, string docPath, Action<Msg> dispatch)
     {
         var cts = BeginRun();
-        try { await _gpu.Stop(); } catch { }
+        try { await GpuInterop.Stop(); } catch { }
         RuntimeMemory.Reclaim();
 
-        var parserConfig = ShaderInvocationBuilder.MakeParserConfig(docPath);
+        var parserConfig = MakeParserConfig(docPath);
         int wx = Math.Max(1, config.WarpX);
         int wy = Math.Max(1, config.WarpY);
 
@@ -63,7 +63,7 @@ public sealed partial class DebuggerEffects
 
         try
         {
-            var invocation = await _invocationBuilder.BuildAsync(config, null, -1);
+            var invocation = await BuildAsync(config, null, -1);
             var program = ShaderProgram.FromSource(code, parserConfig);
             var outcome = _executor.Execute(_runner, program, invocation, ExecutionOptions.None);
 
@@ -99,17 +99,17 @@ public sealed partial class DebuggerEffects
         int wx, int wy, Action<Msg> dispatch, CancellationTokenSource cts)
     {
         var (canvasW, canvasH) = await GetCanvasSizeAsync(wx, wy);
-        var invocation = (await _invocationBuilder.BuildAsync(config, null, -1))
+        var invocation = (await BuildAsync(config, null, -1))
             with { CanvasW = canvasW, CanvasH = canvasH };
         if (config.RenderMode == ShaderRenderMode.VertFrag)
-            invocation = invocation with { Projection = await _gpu.Projection(canvasW, canvasH) };
+            invocation = invocation with { Projection = await GpuInterop.Projection(canvasW, canvasH) };
 
         int tilesX = (canvasW + wx - 1) / wx;
         int tilesY = (canvasH + wy - 1) / wy;
 
         var fullPixels = new byte[canvasW * canvasH * 4];
         for (int i = 3; i < fullPixels.Length; i += 4) fullPixels[i] = 255;
-        await _canvas.AllocPixels(canvasW, canvasH);
+        await CanvasInterop.AllocPixels(canvasW, canvasH);
 
         var metrics = config.CpuMode == CpuMode.FullFrameWithMetrics
             ? new ExecutionMetrics(canvasW, canvasH, wx, wy)
@@ -154,7 +154,7 @@ public sealed partial class DebuggerEffects
                 var tilePixels = HLSLValueDisplay.RenderOutputImage(outcome.Result, wx, wy);
                 if (tilePixels == null) continue;
                 BlitTile(tilePixels, tx * wx, ty * wy, wx, wy, canvasW, canvasH, fullPixels);
-                await _canvas.SetPixelsRect(tilePixels, tx * wx, ty * wy, wx, wy);
+                await CanvasInterop.SetPixelsRect(tilePixels, tx * wx, ty * wy, wx, wy);
                 await Task.Yield();
             }
         }
@@ -206,7 +206,7 @@ public sealed partial class DebuggerEffects
             var tilePixels = HLSLValueDisplay.RenderOutputImage(outcome.Result, wx, wy);
             if (tilePixels == null) continue;
             BlitTile(tilePixels, tx * wx, ty * wy, wx, wy, canvasW, canvasH, fullPixels);
-            await _canvas.SetPixelsRect(tilePixels, tx * wx, ty * wy, wx, wy);
+            await CanvasInterop.SetPixelsRect(tilePixels, tx * wx, ty * wy, wx, wy);
         }
         await allWorkers;
         return error;
@@ -270,7 +270,7 @@ public sealed partial class DebuggerEffects
     {
         try
         {
-            var size = await _canvas.GetCpuCanvasSize();
+            var size = await CanvasInterop.GetCpuCanvasSize();
             if (size != null && size.Length >= 2 && size[0] > 0 && size[1] > 0)
                 return (size[0], size[1]);
         }
@@ -282,10 +282,10 @@ public sealed partial class DebuggerEffects
         string code, ShaderConfig config, float initialTime, bool paused, string docPath, Action<Msg> dispatch)
     {
         BeginRun();
-        try { await _gpu.Stop(); } catch { }
+        try { await GpuInterop.Stop(); } catch { }
         RuntimeMemory.Reclaim();
 
-        if (!await _gpu.IsAvailable())
+        if (!await GpuInterop.IsAvailable())
         {
             dispatch(new RunFinished("", new RunError(
                 "WebGPU is not available in this browser. Use Debug to step through on the CPU interpreter instead.",
@@ -296,7 +296,7 @@ public sealed partial class DebuggerEffects
         {
             int wx = Math.Max(1, config.WarpX);
             int wy = Math.Max(1, config.WarpY);
-            var parserConfig = ShaderInvocationBuilder.MakeParserConfig(docPath);
+            var parserConfig = MakeParserConfig(docPath);
             var assembled = ShaderReflection.AssembleVertexShader(
                 code, config.VertexEntryPoint, config.FragmentEntryPoint, config.RenderMode, parserConfig);
             string mode = config.RenderMode == ShaderRenderMode.VertFrag ? "vertfrag" : "pixel";
@@ -307,13 +307,12 @@ public sealed partial class DebuggerEffects
                 meshVertices = config.Mesh.GetInterleavedVertices();
                 meshIndices = config.Mesh.Indices;
             }
-            await _gpu.Render(new GpuRenderRequest(
+            await GpuInterop.Render(new GpuRenderRequest(
                 CanvasId: "color-canvas-gpu",
                 Source: assembled.Source,
                 FragmentEntryPoint: config.FragmentEntryPoint,
                 WarpX: wx,
                 WarpY: wy,
-                DotNetRef: DotNetRef,
                 Mode: mode,
                 VertexEntryPoint: assembled.VertexEntry,
                 VertexInputs: assembled.VertexInputs,
@@ -324,7 +323,7 @@ public sealed partial class DebuggerEffects
                 Samplers: config.Samplers));
             if (paused)
             {
-                try { await _gpu.Pause(); } catch { }
+                try { await GpuInterop.Pause(); } catch { }
             }
             dispatch(new RunFinished("", null, null, null));
         }
@@ -339,11 +338,11 @@ public sealed partial class DebuggerEffects
         if (mode != DebugViewMode.Color && metrics != null)
         {
             var pixels = metrics.Render(mode);
-            if (pixels != null) await _canvas.SetPixels(pixels, metrics.CanvasW, metrics.CanvasH);
+            if (pixels != null) await CanvasInterop.SetPixels(pixels, metrics.CanvasW, metrics.CanvasH);
         }
         else if (image != null)
         {
-            await _canvas.SetPixels(image.Pixels, image.Width, image.Height);
+            await CanvasInterop.SetPixels(image.Pixels, image.Width, image.Height);
         }
     }
 
@@ -351,8 +350,8 @@ public sealed partial class DebuggerEffects
     {
         try
         {
-            if (paused) await _gpu.Pause();
-            else await _gpu.Resume();
+            if (paused) await GpuInterop.Pause();
+            else await GpuInterop.Resume();
         }
         catch { }
     }

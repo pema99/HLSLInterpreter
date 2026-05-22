@@ -5,13 +5,10 @@ namespace HLSLInterpreter.Debugger.Services;
 
 public sealed class ImageLibrary
 {
-    private readonly BrowserInterop _browser;
     private Task _examplesLoad;
 
     public List<TextureBinding> Examples { get; } = new();
     public List<TextureBinding> RecentUploads { get; } = new();
-
-    public ImageLibrary(BrowserInterop browser) => _browser = browser;
 
     public Task EnsureExamplesLoadingAsync() => _examplesLoad ??= LoadExamplesAsync();
 
@@ -19,7 +16,7 @@ public sealed class ImageLibrary
     {
         const string baseUrl = "_content/HLSLInterpreter.Debugger/ExampleTextures/";
         string index;
-        try { index = await _browser.FetchText(baseUrl + "index.txt"); }
+        try { index = await BrowserInterop.FetchText(baseUrl + "index.txt"); }
         catch (Exception ex) { Console.WriteLine($"[examples-tex] index fetch failed: {ex.Message}"); return; }
 
         foreach (var line in index.Split('\n'))
@@ -47,7 +44,7 @@ public sealed class ImageLibrary
     {
         try
         {
-            var picked = await _browser.FetchImage(url);
+            var picked = await BrowserInterop.FetchImage(url);
             if (picked == null) return;
             var img = picked.ToTextureBinding();
             if (img.Rgba8 == null || img.Rgba8.Length == 0) return;
@@ -80,6 +77,6 @@ public sealed class ImageLibrary
     private void Revoke(string url)
     {
         if (string.IsNullOrEmpty(url)) return;
-        _ = _browser.RevokeBlobUrl(url);
+        _ = BrowserInterop.RevokeBlobUrl(url);
     }
 }

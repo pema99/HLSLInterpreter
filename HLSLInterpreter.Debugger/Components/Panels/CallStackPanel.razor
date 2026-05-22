@@ -1,6 +1,5 @@
 @using HLSL
 @inherits DebuggerComponent<DebuggerModel>
-@inject BrowserInterop Browser
 
 @{
     var debug = Slice.Debug;
@@ -128,14 +127,14 @@
         if (next == _gridState) return;
         _gridState = next;
         if (gridShown)
-            await Browser.InitThreadGridResize("thread-grid-container", config.WarpX, config.WarpY);
+            await BrowserInterop.InitThreadGridResize("thread-grid-container", config.WarpX, config.WarpY);
         else
-            await Browser.DisposeThreadGridResize();
+            await BrowserInterop.DisposeThreadGridResize();
     }
 
     public override void Dispose()
     {
-        _ = Browser.DisposeThreadGridResize();
+        _ = BrowserInterop.DisposeThreadGridResize();
         base.Dispose();
     }
 }
