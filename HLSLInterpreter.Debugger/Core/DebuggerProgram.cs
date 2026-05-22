@@ -23,9 +23,9 @@ public sealed class DebuggerProgram : IDisposable
     // decide for themselves whether the change concerns them.
     public event Action Changed;
 
-    public DebuggerProgram(DebuggerModel initial, DebuggerEffects effects)
+    public DebuggerProgram(DebuggerEffects effects)
     {
-        Model = initial;
+        Model = new();
         _effects = effects;
     }
 

@@ -114,6 +114,4 @@ public sealed record DebuggerModel
     public RunState Run { get; init; } = new();
     public DebugState Debug { get; init; } = new();
     public UiState Ui { get; init; } = new();
-
-    public static DebuggerModel Initial => new();
 }

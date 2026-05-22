@@ -9,7 +9,6 @@ builder.Services.AddSingleton(new HostOptionsService());
 builder.Services.AddSingleton<FileDialogService>();
 builder.Services.AddSingleton<ImageLibraryService>();
 builder.Services.AddSingleton(sp => new DebuggerProgram(
-    DebuggerModel.Initial,
     new DebuggerEffects(sp.GetRequiredService<FileDialogService>())));
 
 await builder.Build().RunAsync();
