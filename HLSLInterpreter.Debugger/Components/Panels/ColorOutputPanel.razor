@@ -126,12 +126,12 @@
 
     private static string ModeBlurb(DebugViewMode mode) => mode switch
     {
-        DebugViewMode.WarpExecutionDivergence => "Fraction of executed statements where threads within the warp took different paths. Lower is better.",
-        DebugViewMode.WarpInstructionCount => "Total statements executed per warp, normalized to the busiest warp.",
-        DebugViewMode.WarpAverageUtilization => "Average fraction of inactive threads across the warp's execution. Less red means the warp kept more threads busy.",
-        DebugViewMode.PixelActiveInstructionCount => "Statements executed while this pixel's thread was active, normalized to the busiest pixel.",
-        DebugViewMode.NanDetection => "Highlights pixels whose declared or assigned values became NaN or infinite.",
-        DebugViewMode.TextureFetches => "Texture and buffer fetches per pixel, normalized to the most-fetched pixel.",
+        DebugViewMode.WarpExecutionDivergence => "Fraction of executed statements where some threads in the warp were inactive.",
+        DebugViewMode.WarpInstructionCount => "Total statements executed per warp.",
+        DebugViewMode.WarpAverageUtilization => "Average fraction of inactive threads across the warp's execution.",
+        DebugViewMode.PixelActiveInstructionCount => "Total statements executed while each pixel's thread was active.",
+        DebugViewMode.NanDetection => "Highlights pixels that used non-finite values in computations.",
+        DebugViewMode.TextureFetches => "Total texture and buffer fetches per pixel.",
         _ => "",
     };
 }

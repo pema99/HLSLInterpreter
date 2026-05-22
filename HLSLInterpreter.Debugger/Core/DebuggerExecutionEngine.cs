@@ -10,7 +10,6 @@ namespace HLSLInterpreter.Debugger.Core;
 // Builds the Cmds that run, trace, and evaluate shaders, and drive the GPU preview.
 public sealed class DebuggerExecutionEngine
 {
-    private readonly ShaderExecutor _executor = new();
     private readonly HLSLRunner _hlslRunner = new();
 
     // Forces a GC between runs, since interpreting a full frame allocates heavily!
@@ -97,7 +96,7 @@ public sealed class DebuggerExecutionEngine
             {
                 var invocation = await BuildAsync(config, null, -1);
                 var program = ShaderProgram.FromSource(code, parserConfig);
-                var outcome = _executor.Execute(_hlslRunner, program, invocation, ExecutionOptions.None);
+                var outcome = ShaderExecutor.Execute(_hlslRunner, program, invocation, ExecutionOptions.None);
 
                 if (outcome.HasError)
                 {
@@ -343,26 +342,29 @@ public sealed class DebuggerExecutionEngine
             options = new ExecutionOptions
             {
                 CaptureConsole = false,
-                BeforeStatement = e => before(e.Node),
-                AfterStatement = e => after(e.Node),
+                BeforeStatement = (node, _) => before(node),
+                AfterStatement = (node, _) => after(node),
             };
             int threadCount = metrics.WarpX * metrics.WarpY;
             int warpW = metrics.WarpX, warpH = metrics.WarpY;
             int canvasW = metrics.CanvasW, canvasH = metrics.CanvasH;
-            tileInvocation.OnTextureFetch = () =>
+            tileInvocation = tileInvocation with
             {
-                var state = runner.GetExecutionState();
-                for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
+                OnTextureFetch = () =>
                 {
-                    if (!state.IsThreadActive(threadIndex)) continue;
-                    int px = tx * warpW + (threadIndex % warpW);
-                    int py = ty * warpH + (threadIndex / warpW);
-                    if (px < canvasW && py < canvasH)
-                        metrics.PixelFetches[py * canvasW + px]++;
+                    var state = runner.GetExecutionState();
+                    for (int threadIndex = 0; threadIndex < threadCount; threadIndex++)
+                    {
+                        if (!state.IsThreadActive(threadIndex)) continue;
+                        int px = tx * warpW + (threadIndex % warpW);
+                        int py = ty * warpH + (threadIndex / warpW);
+                        if (px < canvasW && py < canvasH)
+                            metrics.PixelFetches[py * canvasW + px]++;
+                    }
                 }
             };
         }
-        return _executor.Execute(runner, program, tileInvocation, options);
+        return ShaderExecutor.Execute(runner, program, tileInvocation, options);
     }
 
     private static void BlitTile(
@@ -402,7 +404,7 @@ public sealed class DebuggerExecutionEngine
                 var parserConfig = MakeParserConfig(docPath);
                 var invocation = await BuildAsync(config, captured, debugVertexIndex);
                 var program = ShaderProgram.FromSource(code, parserConfig);
-                var trace = TraceRecorder.Record(_executor, new HLSLRunner(), program, invocation);
+                var trace = TraceRecorder.Record(new HLSLRunner(), program, invocation);
 
                 int wx = Math.Max(1, config.WarpX);
                 int wy = Math.Max(1, config.WarpY);

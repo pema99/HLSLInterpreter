@@ -1,4 +1,5 @@
 using HLSL;
+using UnityShaderParser.HLSL;
 
 namespace HLSLInterpreter.Debugger.Execution;
 
@@ -49,28 +50,27 @@ public sealed record ExecutionTrace(
 public static class TraceRecorder
 {
     public static ExecutionTrace Record(
-        ShaderExecutor executor, HLSLRunner runner, ShaderProgram program, ShaderInvocation invocation)
+        HLSLRunner runner, ShaderProgram program, ShaderInvocation invocation)
     {
         var steps = new List<TraceStep>();
         var options = new ExecutionOptions
         {
             ObserveProgramLoad = true,
-            BeforeStatement = e => steps.Add(BuildStep(e)),
+            BeforeStatement = (node, outputLength) => steps.Add(BuildStep(node, runner, outputLength)),
         };
-        var outcome = executor.Execute(runner, program, invocation, options);
+        var outcome = ShaderExecutor.Execute(runner, program, invocation, options);
         return new ExecutionTrace(steps, outcome.Output, outcome.HasError,
             outcome.ErrorMessage, outcome.Exception, outcome.Result);
     }
 
-    private static TraceStep BuildStep(StatementEvent e)
+    private static TraceStep BuildStep(HLSLSyntaxNode node, HLSLRunner runner, int outputLength)
     {
-        var runner = e.Runner;
         return new TraceStep(
-            Line: e.Node.Span.Start.Line,
+            Line: node.Span.Start.Line,
             CallStack: runner.GetCallStack(),
             FrameVariables: runner.GetVariablesPerFrame().Select(CopyFrame).ToArray(),
             GlobalVariables: CopyFrame(runner.GetGlobalVariables()),
-            OutputOffset: e.OutputLength,
+            OutputOffset: outputLength,
             FrameThreadStates: runner.GetThreadStatesPerFrame());
     }
 
