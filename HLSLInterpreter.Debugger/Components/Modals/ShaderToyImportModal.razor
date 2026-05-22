@@ -48,7 +48,9 @@
         try
         {
             string hlsl = await BrowserInterop.TranspileGlsl(_paste);
-            Program.Dispatch(new ShaderToyImported(hlsl));
+            Program.Dispatch(new DocumentLoaded(
+                "shadertoy.hlsl", hlsl, ShaderRenderMode.Pixel, "frag", null,
+                DetectChannels(hlsl), Array.Empty<SamplerBinding>(), Run: true));
         }
         catch (Exception ex)
         {
@@ -58,5 +60,19 @@
         {
             _busy = false;
         }
+    }
+
+    // ShaderToy shaders reference iChannel0..3 for their texture inputs; pre-create
+    // a binding for each one the transpiled code mentions.
+    public static List<TextureBinding> DetectChannels(string hlsl)
+    {
+        var textures = new List<TextureBinding>();
+        for (int i = 0; i < 4; i++)
+        {
+            string name = $"iChannel{i}";
+            if (System.Text.RegularExpressions.Regex.IsMatch(hlsl, $@"\b{name}\b"))
+                textures.Add(new TextureBinding { Name = name });
+        }
+        return textures;
     }
 }

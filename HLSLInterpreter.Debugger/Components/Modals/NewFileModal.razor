@@ -57,5 +57,6 @@ float4 frag(VSOut i) : SV_Target
     private void Close() => Program.Dispatch(new ModalDismissed());
 
     private void Pick(NewFileTemplate t) =>
-        Program.Dispatch(new NewFileRequested(t.FileName, t.Content, t.Mode, t.FragEntry, t.VertEntry));
+        Program.Dispatch(new DocumentLoaded(
+            t.FileName, t.Content, t.Mode, t.FragEntry, t.VertEntry, null, null, Run: false));
 }

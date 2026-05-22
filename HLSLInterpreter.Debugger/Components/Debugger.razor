@@ -154,7 +154,7 @@
         if (Host.TabsEnabled)
             FileDialogs.FileDropped = (name, content, path) =>
             {
-                Dispatch(new FileDropped(name, content, path));
+                Dispatch(new FileOpened(name, path, content));
                 return Task.CompletedTask;
             };
 
@@ -205,7 +205,9 @@
             try
             {
                 string hlsl = await BrowserInterop.TranspileGlsl(glsl);
-                Dispatch(new ShaderToyImported(hlsl));
+                Dispatch(new DocumentLoaded(
+                    "shadertoy.hlsl", hlsl, ShaderRenderMode.Pixel, "frag", null,
+                    ShaderToyImportModal.DetectChannels(hlsl), Array.Empty<SamplerBinding>(), Run: true));
                 return;
             }
             catch (Exception ex) { Console.WriteLine("[shadertoy-url] " + ex.Message); }
@@ -232,10 +234,10 @@
     public void SetInspectedPixel(int px, int py) => Dispatch(new InspectedPixelChanged(px, py));
 
     [JSInvokable]
-    public void StartDebugAtPixel(int px, int py) => Dispatch(new DebugPixelClicked(px, py));
+    public void StartDebugAtPixel(int px, int py) => Dispatch(new DebugClicked(DebugTarget.Pixel, px, py));
 
     [JSInvokable]
-    public void StartDebugAtVertex(int vertexIndex) => Dispatch(new DebugVertexClicked(vertexIndex));
+    public void StartDebugAtVertex(int vertexIndex) => Dispatch(new DebugClicked(DebugTarget.Vertex, vertexIndex, 0));
 
     public override void Dispose()
     {

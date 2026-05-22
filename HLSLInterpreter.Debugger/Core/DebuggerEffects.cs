@@ -621,7 +621,7 @@ public sealed class DebuggerEffects
         Cmd.OfTask(async () =>
         {
             var (path, content) = await _fileDialogs.OpenFile();
-            return (Msg)new FileOpened(path, content);
+            return (Msg)new FileOpened(System.IO.Path.GetFileName(path), path, content);
         });
 
     public Cmd SaveFileDialog(string code, string currentPath, bool asNew) =>

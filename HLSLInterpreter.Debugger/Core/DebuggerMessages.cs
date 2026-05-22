@@ -3,7 +3,7 @@ using HLSLInterpreter.Debugger.Utils;
 
 namespace HLSLInterpreter.Debugger.Core;
 
-// Every event the app can produce is a Msg. A message named XWithCode is the
+// Every event the app can produce is a Msg. A message named XStarted is the
 // continuation of a FetchEditorText command: update needs the live editor text,
 // so it asks for it and resumes here.
 public abstract record Msg;
@@ -18,7 +18,7 @@ public sealed record DefaultMeshLoaded(Mesh Mesh) : Msg;
 // ---- Run ----
 public sealed record RunRequested : Msg;
 public sealed record RunCancelRequested : Msg;
-public sealed record RunWithCode(string Code) : Msg;
+public sealed record RunStarted(string Code) : Msg;
 public sealed record RunBecameCancellable : Msg;
 public sealed record RunFinished(string Output, RunError Error, ShaderImage Image, ExecutionMetrics Metrics) : Msg;
 public sealed record GpuPauseToggled : Msg;
@@ -28,11 +28,9 @@ public sealed record ViewModeChanged(DebugViewMode Mode) : Msg;
 
 // ---- Debug ----
 public sealed record DebugRequested : Msg;
-public sealed record DebugWithCode(string Code) : Msg;
-public sealed record DebugPixelClicked(int Px, int Py) : Msg;
-public sealed record DebugVertexClicked(int VertexIndex) : Msg;
-public sealed record DebugAtPixelRequested(int Px, int Py, float Time, int CanvasW, int CanvasH) : Msg;
-public sealed record DebugAtVertexRequested(int VertexIndex, float Time, int CanvasW, int CanvasH) : Msg;
+public sealed record DebugStarted(string Code) : Msg;
+public sealed record DebugClicked(DebugTarget Target, int X, int Y) : Msg;
+public sealed record DebugAtRequested(DebugTarget Target, int X, int Y, float Time, int CanvasW, int CanvasH) : Msg;
 public sealed record DebugTraceRecorded(
     ExecutionTrace Trace, string Code, int DocumentId, FrameCapture Captured, ShaderImage Image) : Msg;
 public sealed record DebugExitRequested : Msg;
@@ -52,21 +50,17 @@ public sealed record TabMoveRequested(int From, int Desired) : Msg;
 public sealed record ObjPickRequested : Msg;
 public sealed record ObjMeshLoaded(string ObjText) : Msg;
 public sealed record OpenFileRequested : Msg;
-public sealed record FileOpened(string Path, string Content) : Msg;
-public sealed record FileDropped(string Name, string Content, string Path) : Msg;
+public sealed record FileOpened(string Name, string Path, string Content) : Msg;
 public sealed record SaveFileRequested(bool AsNew) : Msg;
-public sealed record SaveFileWithCode(string Code, bool AsNew) : Msg;
+public sealed record SaveFileStarted(string Code, bool AsNew) : Msg;
 public sealed record FileSaved(string Path) : Msg;
 public sealed record DownloadRequested : Msg;
-public sealed record DownloadWithCode(string Code) : Msg;
+public sealed record DownloadStarted(string Code) : Msg;
 
 // ---- Content loading (examples, new file, ShaderToy import) ----
-public sealed record NewFileRequested(
-    string Name, string Content, ShaderRenderMode? Mode, string FragEntry, string VertEntry) : Msg;
-public sealed record ExampleLoaded(
+public sealed record DocumentLoaded(
     string Name, string Code, ShaderRenderMode? Mode, string FragEntry, string VertEntry,
-    IReadOnlyList<TextureBinding> Textures, IReadOnlyList<SamplerBinding> Samplers) : Msg;
-public sealed record ShaderToyImported(string Hlsl) : Msg;
+    IReadOnlyList<TextureBinding> Textures, IReadOnlyList<SamplerBinding> Samplers, bool Run) : Msg;
 
 // ---- Config ----
 public sealed record RenderModeChanged(ShaderRenderMode Mode) : Msg;
@@ -85,4 +79,4 @@ public sealed record ModalRequested(ModalKind Kind) : Msg;
 public sealed record ModalDismissed : Msg;
 public sealed record BonzomaticToggled : Msg;
 public sealed record PermalinkCopyRequested(string BaseUrl) : Msg;
-public sealed record PermalinkCopyWithCode(string Code, string BaseUrl) : Msg;
+public sealed record PermalinkCopyStarted(string Code, string BaseUrl) : Msg;

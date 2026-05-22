@@ -120,8 +120,8 @@
                 });
             }
         }
-        Program.Dispatch(new ExampleLoaded(
-            ex.Name, ex.Cleaned, ex.Mode, ex.FragEntry, ex.VertEntry, newTextures, new List<SamplerBinding>()));
+        Program.Dispatch(new DocumentLoaded(
+            ex.Name, ex.Cleaned, ex.Mode, ex.FragEntry, ex.VertEntry, newTextures, new List<SamplerBinding>(), Run: true));
     }
 
     private static Example ParseHeader(string content)

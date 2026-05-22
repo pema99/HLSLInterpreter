@@ -151,7 +151,7 @@ public sealed class DebuggerProgram : IDisposable
                 next = model;
                 command = model.Run.Status != RunStatus.Idle
                     ? Cmd.None
-                    : _effects.FetchEditorText(code => new RunWithCode(code));
+                    : _effects.FetchEditorText(code => new RunStarted(code));
                 break;
 
             case RunCancelRequested:
@@ -159,7 +159,7 @@ public sealed class DebuggerProgram : IDisposable
                 command = _effects.CancelRun();
                 break;
 
-            case RunWithCode x:
+            case RunStarted x:
                 (next, command) = StartRunWithCode(model, x.Code);
                 break;
 
@@ -195,7 +195,7 @@ public sealed class DebuggerProgram : IDisposable
 
             case GpuPreviewToggled x:
                 next = model with { Run = model.Run with { GpuPreviewEnabled = x.Enabled } };
-                command = _effects.FetchEditorText(code => new RunWithCode(code));
+                command = _effects.FetchEditorText(code => new RunStarted(code));
                 break;
 
             case ViewModeChanged x:
@@ -212,7 +212,7 @@ public sealed class DebuggerProgram : IDisposable
                 {
                     var cap = model.Run.CapturedFrame;
                     next = model;
-                    command = Cmd.OfMsg(new DebugAtVertexRequested(0,
+                    command = Cmd.OfMsg(new DebugAtRequested(DebugTarget.Vertex, 0, 0,
                         cap?.Time ?? 0f,
                         cap?.CanvasW ?? Math.Max(1, config.WarpX),
                         cap?.CanvasH ?? Math.Max(1, config.WarpY)));
@@ -221,11 +221,11 @@ public sealed class DebuggerProgram : IDisposable
                 next = model;
                 command = model.Editor.ActiveDocument == null
                     ? Cmd.None
-                    : _effects.FetchEditorText(code => new DebugWithCode(code));
+                    : _effects.FetchEditorText(code => new DebugStarted(code));
                 break;
             }
 
-            case DebugWithCode x:
+            case DebugStarted x:
             {
                 var doc = model.Editor.ActiveDocument;
                 if (doc == null) { next = model; command = Cmd.None; break; }
@@ -237,18 +237,18 @@ public sealed class DebuggerProgram : IDisposable
                 break;
             }
 
-            case DebugPixelClicked x:
+            case DebugClicked x:
                 next = model;
-                command = DebugClickCmd(model, (t, w, h) => new DebugAtPixelRequested(x.Px, x.Py, t, w, h));
+                command = DebugClickCmd(model, (t, w, h) => new DebugAtRequested(x.Target, x.X, x.Y, t, w, h));
                 break;
 
-            case DebugVertexClicked x:
-                next = model;
-                command = DebugClickCmd(model, (t, w, h) => new DebugAtVertexRequested(x.VertexIndex, t, w, h));
-                break;
-
-            case DebugAtPixelRequested x:
+            case DebugAtRequested x:
             {
+                if (x.Target == DebugTarget.Vertex)
+                {
+                    (next, command) = DebugAtVertex(model, x.X, x.Time, x.CanvasW, x.CanvasH);
+                    break;
+                }
                 var config = ActiveConfig(model);
                 int wx = Math.Max(1, config.WarpX);
                 int wy = Math.Max(1, config.WarpY);
@@ -259,16 +259,12 @@ public sealed class DebuggerProgram : IDisposable
                         SavedGroupOffset = (config.GroupOffsetX, config.GroupOffsetY),
                     }
                 };
-                next = WithActiveConfig(next, c => c with { GroupOffsetX = x.Px / wx, GroupOffsetY = x.Py / wy });
-                next = WithInspectedThread(next, (x.Py % wy) * wx + (x.Px % wx));
+                next = WithActiveConfig(next, c => c with { GroupOffsetX = x.X / wx, GroupOffsetY = x.Y / wy });
+                next = WithInspectedThread(next, (x.Y % wy) * wx + (x.X % wx));
                 next = next with { Run = next.Run with { CapturedFrame = new FrameCapture(x.Time, x.CanvasW, x.CanvasH) } };
-                command = _effects.FetchEditorText(code => new DebugWithCode(code));
+                command = _effects.FetchEditorText(code => new DebugStarted(code));
                 break;
             }
-
-            case DebugAtVertexRequested x:
-                (next, command) = DebugAtVertex(model, x.VertexIndex, x.Time, x.CanvasW, x.CanvasH);
-                break;
 
             case DebugTraceRecorded x:
             {
@@ -313,7 +309,7 @@ public sealed class DebuggerProgram : IDisposable
                     _effects.SetEditorReadOnly(false),
                     _effects.HighlightLine(0),
                     ThemeCmd(next),
-                    _effects.FetchEditorText(code => new RunWithCode(code)));
+                    _effects.FetchEditorText(code => new RunStarted(code)));
                 break;
 
             case StepRequested x:
@@ -522,7 +518,7 @@ public sealed class DebuggerProgram : IDisposable
                 next = WithActiveConfig(model, c => c with { Mesh = mesh });
                 command = Cmd.Batch(
                     _effects.SetMeshData(mesh),
-                    _effects.FetchEditorText(code => new RunWithCode(code)));
+                    _effects.FetchEditorText(code => new RunStarted(code)));
                 break;
             }
 
@@ -533,23 +529,7 @@ public sealed class DebuggerProgram : IDisposable
 
             case FileOpened x:
             {
-                if (x.Path == null || x.Content == null) { next = model; command = Cmd.None; break; }
-                int existing = IndexOfPath(model, x.Path);
-                if (existing >= 0)
-                {
-                    if (existing == model.Editor.ActiveIndex) { next = model; command = Cmd.None; break; }
-                    next = model with { Editor = model.Editor with { ActiveIndex = existing } };
-                    command = Cmd.Batch(_effects.ShowModel(next.Editor.ActiveDocument.Id), HighlightCmd(next));
-                    break;
-                }
-                next = AddDoc(model, System.IO.Path.GetFileName(x.Path), x.Path);
-                int newId = next.Editor.ActiveDocument.Id;
-                command = Cmd.Batch(_effects.CreateModel(newId, x.Content), _effects.ShowModel(newId));
-                break;
-            }
-
-            case FileDropped x:
-            {
+                if (x.Content == null) { next = model; command = Cmd.None; break; }
                 int existing = string.IsNullOrEmpty(x.Path) ? -1 : IndexOfPath(model, x.Path);
                 if (existing >= 0)
                 {
@@ -566,10 +546,10 @@ public sealed class DebuggerProgram : IDisposable
 
             case SaveFileRequested x:
                 next = model;
-                command = _effects.FetchEditorText(code => new SaveFileWithCode(code, x.AsNew));
+                command = _effects.FetchEditorText(code => new SaveFileStarted(code, x.AsNew));
                 break;
 
-            case SaveFileWithCode x:
+            case SaveFileStarted x:
                 next = model;
                 command = _effects.SaveFileDialog(x.Code, ActiveDocPath(model), x.AsNew);
                 break;
@@ -585,10 +565,10 @@ public sealed class DebuggerProgram : IDisposable
 
             case DownloadRequested:
                 next = model;
-                command = _effects.FetchEditorText(code => new DownloadWithCode(code));
+                command = _effects.FetchEditorText(code => new DownloadStarted(code));
                 break;
 
-            case DownloadWithCode x:
+            case DownloadStarted x:
             {
                 next = model;
                 var doc = model.Editor.ActiveDocument;
@@ -597,29 +577,7 @@ public sealed class DebuggerProgram : IDisposable
                 break;
             }
 
-            case NewFileRequested x:
-            {
-                next = model with { Ui = model.Ui with { OpenModal = ModalKind.None } };
-                var cmds = new List<Cmd>();
-                if (next.Debug.IsActive)
-                {
-                    next = ExitDebugCore(next);
-                    cmds.Add(_effects.SetEditorReadOnly(false));
-                    cmds.Add(_effects.HighlightLine(0));
-                }
-                Cmd loadCmd;
-                (next, loadCmd) = LoadContent(next, x.Name, x.Content);
-                cmds.Add(loadCmd);
-                if (x.Mode.HasValue) next = WithActiveConfig(next, c => c with { RenderMode = x.Mode.Value });
-                if (!string.IsNullOrWhiteSpace(x.FragEntry))
-                    next = WithActiveConfig(next, c => c with { FragmentEntryPoint = x.FragEntry });
-                if (!string.IsNullOrWhiteSpace(x.VertEntry))
-                    next = WithActiveConfig(next, c => c with { VertexEntryPoint = x.VertEntry });
-                command = Cmd.Batch(cmds);
-                break;
-            }
-
-            case ExampleLoaded x:
+            case DocumentLoaded x:
             {
                 next = model with { Ui = model.Ui with { OpenModal = ModalKind.None } };
                 var cmds = new List<Cmd>();
@@ -639,39 +597,7 @@ public sealed class DebuggerProgram : IDisposable
                     next = WithActiveConfig(next, c => c with { VertexEntryPoint = x.VertEntry });
                 if (x.Textures != null) next = WithActiveConfig(next, c => c with { Textures = x.Textures });
                 if (x.Samplers != null) next = WithActiveConfig(next, c => c with { Samplers = x.Samplers });
-                cmds.Add(Cmd.OfMsg(new RunWithCode(x.Code)));
-                command = Cmd.Batch(cmds);
-                break;
-            }
-
-            case ShaderToyImported x:
-            {
-                var textures = new List<TextureBinding>();
-                for (int i = 0; i < 4; i++)
-                {
-                    string name = $"iChannel{i}";
-                    if (System.Text.RegularExpressions.Regex.IsMatch(x.Hlsl, $@"\b{name}\b"))
-                        textures.Add(new TextureBinding { Name = name });
-                }
-                next = model with { Ui = model.Ui with { OpenModal = ModalKind.None } };
-                var cmds = new List<Cmd>();
-                if (next.Debug.IsActive)
-                {
-                    next = ExitDebugCore(next);
-                    cmds.Add(_effects.SetEditorReadOnly(false));
-                    cmds.Add(_effects.HighlightLine(0));
-                }
-                Cmd loadCmd;
-                (next, loadCmd) = LoadContent(next, "shadertoy.hlsl", x.Hlsl);
-                cmds.Add(loadCmd);
-                next = WithActiveConfig(next, c => c with
-                {
-                    RenderMode = ShaderRenderMode.Pixel,
-                    FragmentEntryPoint = "frag",
-                    Textures = textures,
-                    Samplers = Array.Empty<SamplerBinding>(),
-                });
-                cmds.Add(Cmd.OfMsg(new RunWithCode(x.Hlsl)));
+                if (x.Run) cmds.Add(Cmd.OfMsg(new RunStarted(x.Code)));
                 command = Cmd.Batch(cmds);
                 break;
             }
@@ -725,7 +651,7 @@ public sealed class DebuggerProgram : IDisposable
                 next = WithActiveConfig(
                     model with { Ui = model.Ui with { OpenModal = ModalKind.None } },
                     c => c with { Textures = x.Textures, Samplers = x.Samplers });
-                command = _effects.FetchEditorText(code => new RunWithCode(code));
+                command = _effects.FetchEditorText(code => new RunStarted(code));
                 break;
 
             case ModalRequested x:
@@ -753,7 +679,7 @@ public sealed class DebuggerProgram : IDisposable
                 if (enabled && !next.Run.GpuPreviewEnabled)
                 {
                     next = next with { Run = next.Run with { GpuPreviewEnabled = true } };
-                    cmds.Add(_effects.FetchEditorText(code => new RunWithCode(code)));
+                    cmds.Add(_effects.FetchEditorText(code => new RunStarted(code)));
                 }
                 cmds.Add(ThemeCmd(next));
                 command = Cmd.Batch(cmds);
@@ -762,10 +688,10 @@ public sealed class DebuggerProgram : IDisposable
 
             case PermalinkCopyRequested x:
                 next = model;
-                command = _effects.FetchEditorText(code => new PermalinkCopyWithCode(code, x.BaseUrl));
+                command = _effects.FetchEditorText(code => new PermalinkCopyStarted(code, x.BaseUrl));
                 break;
 
-            case PermalinkCopyWithCode x:
+            case PermalinkCopyStarted x:
             {
                 var config = ActiveConfig(model);
                 var settings = new PermalinkSettings(
@@ -826,7 +752,7 @@ public sealed class DebuggerProgram : IDisposable
         next = next with { Run = next.Run with { CapturedFrame = new FrameCapture(time, canvasW, canvasH) } };
         if (next.Debug.BottomMode != DebugBottomMode.ThreadStates)
             next = next with { Debug = next.Debug with { BottomMode = DebugBottomMode.ThreadStates } };
-        return (next, _effects.FetchEditorText(code => new DebugWithCode(code)));
+        return (next, _effects.FetchEditorText(code => new DebugStarted(code)));
     }
 
     private static DebuggerModel ExitDebugCore(DebuggerModel m)
