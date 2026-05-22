@@ -202,13 +202,13 @@ public sealed class DebuggerExecutionEngine
         });
 
     public Cmd CancelRun() =>
-        Cmd.OfTask(() => { try { _runCts?.Cancel(); } catch { } return Task.CompletedTask; });
+        Cmd.OfTask(() => { _runCts?.Cancel(); return Task.CompletedTask; });
 
     private CancellationTokenSource BeginRun()
     {
         var previous = _runCts;
         _runCts = new CancellationTokenSource();
-        try { previous?.Cancel(); } catch { }
+        previous?.Cancel();
         return _runCts;
     }
 
@@ -326,7 +326,7 @@ public sealed class DebuggerExecutionEngine
         {
             if (outcome.HasError)
             {
-                if (error == null) { error = outcome; try { cts.Cancel(); } catch { } }
+                if (error == null) { error = outcome; cts.Cancel(); }
                 continue;
             }
             if (cts.IsCancellationRequested) continue;

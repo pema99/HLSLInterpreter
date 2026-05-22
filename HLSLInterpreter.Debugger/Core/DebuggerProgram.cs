@@ -88,9 +88,10 @@ public sealed class DebuggerProgram : IDisposable
         catch (OperationCanceledException)
         {
         }
-        catch
+        catch (Exception ex)
         {
             // An effect must never break the dispatch pump.
+            Console.WriteLine("[pump] effect threw: " + ex);
         }
     }
 
@@ -880,11 +881,5 @@ public sealed class DebuggerProgram : IDisposable
     // update needs the live editor text but cannot await, so it asks for the
     // text and resumes in the XStarted message the continuation builds.
     private Cmd FetchEditorText(Func<string, Msg> then) =>
-        Cmd.OfTask(async () =>
-        {
-            string code;
-            try { code = await EditorInterop.GetValue(); }
-            catch { code = ""; }
-            return then(code);
-        });
+        Cmd.OfTask(async () => then(await EditorInterop.GetValue()));
 }

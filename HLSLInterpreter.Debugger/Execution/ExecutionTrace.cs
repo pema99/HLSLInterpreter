@@ -83,7 +83,11 @@ public static class TraceRecorder
         {
             HLSLValue value = kvp.Value is ReferenceValue reference ? reference.Get() : kvp.Value;
             try { copy[kvp.Key] = value?.Copy() ?? value!; }
-            catch { copy[kvp.Key] = value!; }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[trace] copy of '{kvp.Key}' failed: {ex.Message}");
+                copy[kvp.Key] = value!;
+            }
         }
         return copy;
     }
