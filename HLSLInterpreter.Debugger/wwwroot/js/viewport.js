@@ -444,6 +444,7 @@ export function dbgInitViewport(containerId) {
         s.resizeObserver = new ResizeObserver(() => {
             s.box = fitImageBox(container, s);
             applyLayout(container, s);
+            reportCanvasSize(container);
         });
         s.resizeObserver.observe(container);
     }
@@ -550,6 +551,7 @@ export function applyCanvasState(containerId, p) {
     const container = document.getElementById(containerId);
     if (!container) return;
     dbgInitViewport(containerId);
+    reportCanvasSize(container);
 
     const target = container.dataset.modeTarget;
     const mode = target === 'regular' ? p.regularMode : p.debugMode;
@@ -629,11 +631,18 @@ export function setMeshData(positions, indices) {
     _meshIndices = indices;
 }
 
-export function cpuCanvasSize() {
-    const el = document.querySelector('.image-container');
-    if (!el) return [256, 256];
+// The main color-output container's device-pixel size, pushed to the model so a
+// full-frame CPU run knows its render target. Sends only on an actual change.
+function reportCanvasSize(container) {
+    if (container.id !== 'image-container') return;
+    const ref = getDebuggerRef();
+    if (!ref) return;
     const dpr = window.devicePixelRatio || 1;
-    const cw = Math.max(1, Math.floor(el.clientWidth * dpr));
-    const ch = Math.max(1, Math.floor(el.clientHeight * dpr));
-    return [cw, ch];
+    const w = Math.max(1, Math.floor(container.clientWidth * dpr));
+    const h = Math.max(1, Math.floor(container.clientHeight * dpr));
+    const s = getState(container);
+    if (s.reportedW === w && s.reportedH === h) return;
+    s.reportedW = w;
+    s.reportedH = h;
+    ref.invokeMethodAsync('CanvasResized', w, h);
 }

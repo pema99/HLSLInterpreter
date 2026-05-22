@@ -25,6 +25,7 @@ public sealed record GpuPauseToggled : Msg;
 public sealed record GpuTimeRestartRequested : Msg;
 public sealed record GpuPreviewToggled(bool Enabled) : Msg;
 public sealed record ViewModeChanged(DebugViewMode Mode) : Msg;
+public sealed record CanvasResized(int Width, int Height) : Msg;
 
 // ---- Debug ----
 public sealed record DebugRequested : Msg;

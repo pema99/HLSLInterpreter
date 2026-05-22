@@ -139,7 +139,7 @@
 @code {
     protected override DebuggerModel Select(DebuggerModel s) => s;
 
-    private DotNetObjectReference<Debugger> _dotNetRef;
+    private DotNetObjectReference<JsCommands> _dotNetRef;
     private string _pendingShaderToy;
     private string _initialCode = "";
     private bool _menuOpen;
@@ -148,8 +148,7 @@
     {
         base.OnInitialized();
         JsInterop.Js = JS;
-        _dotNetRef = DotNetObjectReference.Create(this);
-        GpuInterop.DotNetRef = _dotNetRef;
+        _dotNetRef = DotNetObjectReference.Create(new JsCommands(Program));
 
         if (Host.TabsEnabled)
             FileDialogs.FileDropped = (name, content, path) =>
@@ -226,18 +225,6 @@
         string baseUrl = Host.PermalinkUrl ?? new Uri(Nav.Uri).GetLeftPart(UriPartial.Path);
         Dispatch(new PermalinkCopyRequested(baseUrl));
     }
-
-    [JSInvokable]
-    public void LoadObjMesh(string objText) => Dispatch(new ObjMeshLoaded(objText));
-
-    [JSInvokable]
-    public void SetInspectedPixel(int px, int py) => Dispatch(new InspectedPixelChanged(px, py));
-
-    [JSInvokable]
-    public void StartDebugAtPixel(int px, int py) => Dispatch(new DebugClicked(DebugTarget.Pixel, px, py));
-
-    [JSInvokable]
-    public void StartDebugAtVertex(int vertexIndex) => Dispatch(new DebugClicked(DebugTarget.Vertex, vertexIndex, 0));
 
     public override void Dispose()
     {

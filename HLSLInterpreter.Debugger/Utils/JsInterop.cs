@@ -18,8 +18,8 @@ public static class EditorInterop
     private static async ValueTask<IJSObjectReference> Module() =>
         _module ??= await JsInterop.Js.InvokeAsync<IJSObjectReference>("import", ModulePath);
 
-    public static async ValueTask Init(string containerId, object editorRef, int docId, string initialCode) =>
-        await (await Module()).InvokeVoidAsync("initMonaco", containerId, editorRef, docId, initialCode);
+    public static async ValueTask Init(string containerId, int docId, string initialCode) =>
+        await (await Module()).InvokeVoidAsync("initMonaco", containerId, docId, initialCode);
 
     public static async ValueTask<string> GetValue() =>
         await (await Module()).InvokeAsync<string>("getMonacoValue");
@@ -127,10 +127,6 @@ public static class GpuInterop
     private static async ValueTask<IJSObjectReference> Module() =>
         _module ??= await JsInterop.Js.InvokeAsync<IJSObjectReference>("import", ModulePath);
 
-    // Set once by the shell so the GPU render loop can report click-to-debug
-    // back into .NET.
-    public static object DotNetRef { get; set; }
-
     public static async ValueTask<bool> IsAvailable()
     {
         try { return await (await Module()).InvokeAsync<bool>("gpuIsAvailable"); }
@@ -139,7 +135,7 @@ public static class GpuInterop
 
     public static async ValueTask Render(GpuRenderRequest r) =>
         await (await Module()).InvokeVoidAsync("gpuRender", r.CanvasId, r.Source, r.FragmentEntryPoint,
-            r.WarpX, r.WarpY, DotNetRef, r.Mode, r.VertexEntryPoint, r.VertexInputs,
+            r.WarpX, r.WarpY, r.Mode, r.VertexEntryPoint, r.VertexInputs,
             r.MeshVertices, r.MeshIndices, r.Time, r.Textures, r.Samplers);
 
     public static async ValueTask Stop() => await (await Module()).InvokeVoidAsync("gpuStop");
@@ -172,9 +168,6 @@ public static class CanvasInterop
 
     public static async ValueTask AllocPixels(int width, int height) =>
         await (await Module()).InvokeVoidAsync("allocPixels", width, height);
-
-    public static async ValueTask<int[]> GetCpuCanvasSize() =>
-        await (await Module()).InvokeAsync<int[]>("cpuCanvasSize");
 
     public static async ValueTask ApplyState(string containerId, object projection) =>
         await (await Module()).InvokeVoidAsync("applyCanvasState", containerId, projection);

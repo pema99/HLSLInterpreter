@@ -1,7 +1,6 @@
-import { rgbaToDataUrl } from './host.js';
+import { rgbaToDataUrl, getDebuggerRef } from './host.js';
 
 let _monacoEditor = null;
-let dotNetEditorRef = null;
 let _models = new Map();        // document id -> { model, bpIds, lineIds }
 let _currentModelId = -1;
 
@@ -13,8 +12,7 @@ export function dbgIsTabDropAfter(tabIndex, clientX) {
     return clientX > r.left + r.width / 2;
 };
 
-export function initMonaco(containerId, editorRef, docId, initialCode) {
-    if (editorRef) dotNetEditorRef = editorRef;
+export function initMonaco(containerId, docId, initialCode) {
     require.config({
         paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs' }
     });
@@ -361,10 +359,11 @@ export function initMonaco(containerId, editorRef, docId, initialCode) {
 
             monaco.languages.registerHoverProvider('hlsl', {
                 provideHover: async function (model, position) {
-                    if (!dotNetEditorRef) return null;
+                    var ref = getDebuggerRef();
+                    if (!ref) return null;
                     var word = model.getWordAtPosition(position);
                     if (!word) return null;
-                    var info = await dotNetEditorRef.invokeMethodAsync('GetHoverInfo', word.word);
+                    var info = await ref.invokeMethodAsync('GetHoverInfo', word.word);
                     if (info == null) return null;
                     var contents = [{ value: '```\n' + word.word + ' = ' + info.value + '\n```' }];
                     if (info.perThreadValues) {
@@ -487,8 +486,9 @@ export function initMonaco(containerId, editorRef, docId, initialCode) {
                 // On the web, read via FileReader since the filesystem path isn't available
                 var reader = new FileReader();
                 reader.onload = function (ev) {
-                    if (dotNetEditorRef)
-                        dotNetEditorRef.invokeMethodAsync('OpenFileInTab', file.name, ev.target.result, '');
+                    var ref = getDebuggerRef();
+                    if (ref)
+                        ref.invokeMethodAsync('OnFileDropped', file.name, ev.target.result);
                     else
                         _monacoEditor.setValue(ev.target.result);
                 };
@@ -499,10 +499,11 @@ export function initMonaco(containerId, editorRef, docId, initialCode) {
         // Gutter click to toggle a breakpoint
         _monacoEditor.onMouseDown(function (e) {
             var t = e.target.type;
+            var ref = getDebuggerRef();
             if ((t === monaco.editor.MouseTargetType.GUTTER_LINE_NUMBERS ||
                  t === monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) &&
-                e.target.position && dotNetEditorRef) {
-                dotNetEditorRef.invokeMethodAsync('ToggleBreakpoint', e.target.position.lineNumber);
+                e.target.position && ref) {
+                ref.invokeMethodAsync('ToggleBreakpoint', e.target.position.lineNumber);
             }
         });
 
@@ -554,9 +555,10 @@ document.addEventListener('keydown', function (e) {
             break;
         case 'F9':
             e.preventDefault();
-            if (_monacoEditor && dotNetEditorRef) {
+            var bpRef = getDebuggerRef();
+            if (_monacoEditor && bpRef) {
                 var pos = _monacoEditor.getPosition();
-                if (pos) dotNetEditorRef.invokeMethodAsync('ToggleBreakpoint', pos.lineNumber);
+                if (pos) bpRef.invokeMethodAsync('ToggleBreakpoint', pos.lineNumber);
             }
             break;
         case 'F10':

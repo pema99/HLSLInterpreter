@@ -71,6 +71,11 @@ public sealed record RunState
     public bool GpuPaused { get; init; }
     public FrameCapture CapturedFrame { get; init; }
 
+    // The output canvas size in device pixels, pushed by viewport.js whenever it
+    // resizes. A full-frame CPU run renders to this.
+    public int CanvasWidth { get; init; }
+    public int CanvasHeight { get; init; }
+
     // The interpreter's output image. Owned by the model; CanvasView pushes it
     // to the canvas. JS keeps no copy.
     public ShaderImage Image { get; init; }

@@ -540,7 +540,7 @@ function createSamplerFromBinding(device, binding) {
     });
 }
 
-export async function gpuRender(canvasId, hlslSource, entryPoint, warpX, warpY, dotNetRef, renderMode, vertexEntryName, vertexInputs, meshVertices, meshIndices, initialTime, texturePayload, samplerPayload) {
+export async function gpuRender(canvasId, hlslSource, entryPoint, warpX, warpY, renderMode, vertexEntryName, vertexInputs, meshVertices, meshIndices, initialTime, texturePayload, samplerPayload) {
     if (!('gpu' in navigator)) throw new Error('WebGPU is not supported in this browser.');
 
     const canvas = document.getElementById(canvasId);
@@ -676,7 +676,7 @@ export async function gpuRender(canvasId, hlslSource, entryPoint, warpX, warpY, 
 
     active = {
         canvas, context, device, pipeline, bindGroup, uniformBuffer,
-        warpX, warpY, dotNetRef,
+        warpX, warpY,
         renderMode: mode,
         meshVB, meshIB, meshIndexCount,
         ownedTextures,

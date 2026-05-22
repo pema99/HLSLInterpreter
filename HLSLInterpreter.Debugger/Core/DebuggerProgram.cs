@@ -203,6 +203,11 @@ public sealed class DebuggerProgram : IDisposable
                 command = _effects.RenderViewMode(x.Mode, model.Run.Metrics, model.Run.Image);
                 break;
 
+            case CanvasResized x:
+                next = model with { Run = model.Run with { CanvasWidth = x.Width, CanvasHeight = x.Height } };
+                command = Cmd.None;
+                break;
+
             case DebugRequested:
             {
                 var config = ActiveConfig(model);
@@ -728,7 +733,7 @@ public sealed class DebuggerProgram : IDisposable
             next = next with { Run = next.Run with { Backend = RunBackend.Gpu } };
             return (next, _effects.RunGpu(code, config, initialTime, next.Run.GpuPaused, ActiveDocPath(m)));
         }
-        return (next, _effects.RunCpu(code, config, ActiveDocPath(m)));
+        return (next, _effects.RunCpu(code, config, ActiveDocPath(m), m.Run.CanvasWidth, m.Run.CanvasHeight));
     }
 
     private static RunState BeginRunReset(RunState r, bool keepCaptured) => r with

@@ -1,5 +1,3 @@
-@using HLSL
-@using Microsoft.JSInterop
 @inherits DebuggerComponent<EditorState>
 
 <div class="editor-panel">
@@ -41,14 +39,12 @@
 
     protected override EditorState Select(DebuggerModel s) => s.Editor;
 
-    private DotNetObjectReference<EditorPanel> _selfRef;
     private int _draggedTab = -1;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
-        _selfRef = DotNetObjectReference.Create(this);
-        await EditorInterop.Init("monaco-container", _selfRef, Slice.ActiveDocument?.Id ?? 0, InitialCode ?? "");
+        await EditorInterop.Init("monaco-container", Slice.ActiveDocument?.Id ?? 0, InitialCode ?? "");
         await EditorInterop.SetFontSize(Slice.FontSize);
         await OnReady.InvokeAsync();
     }
@@ -69,63 +65,4 @@
         if (from >= 0) Dispatch(new TabMoveRequested(from, Slice.Documents.Count));
     }
 
-    [JSInvokable]
-    public HoverInfo GetHoverInfo(string identifier)
-    {
-        var debug = Program.Model.Debug;
-        if (!debug.IsActive || debug.CurrentStep is not { } step) return null;
-
-        HLSLValue value = null;
-        if (step.FrameVariables.Length > 0 && step.FrameVariables[0].TryGetValue(identifier, out var local))
-            value = local;
-        else if (step.GlobalVariables.TryGetValue(identifier, out var global))
-            value = global;
-        if (value == null) return null;
-
-        var config = Program.Model.Editor.ActiveDocument?.Config ?? new ShaderConfig();
-        int wx = Math.Max(1, config.WarpX);
-        int wy = Math.Max(1, config.WarpY);
-        var resolved = value is ReferenceValue rv ? rv.Get() : value;
-
-        byte[] rgba = null;
-        try { rgba = HLSLValueDisplay.RenderPreviewImage(resolved, wx, wy); }
-        catch (Exception ex) { Console.WriteLine($"[hover] image render failed for '{identifier}': {ex.Message}"); }
-
-        string[] perThread = null;
-        if (debug.DebugVertexIndex >= 0)
-            perThread = Enumerable.Range(0, wx * wy)
-                .Select(i => HLSLValueDisplay.Format(resolved, i)).ToArray();
-
-        return new HoverInfo
-        {
-            Value = HLSLValueDisplay.Format(value, debug.InspectedThread),
-            Width = wx,
-            Height = wy,
-            Rgba = rgba,
-            PerThreadValues = perThread,
-            InspectedX = debug.InspectedThread % wx,
-            InspectedY = debug.InspectedThread / wx,
-        };
-    }
-
-    [JSInvokable]
-    public void ToggleBreakpoint(int line) => Dispatch(new BreakpointToggled(line));
-
-    public override void Dispose()
-    {
-        _selfRef?.Dispose();
-        base.Dispose();
-    }
-
-    // Hover tooltip payload sent to JS by GetHoverInfo.
-    public sealed class HoverInfo
-    {
-        public string Value { get; set; } = "";
-        public int Width { get; set; }
-        public int Height { get; set; }
-        public byte[] Rgba { get; set; }
-        public int InspectedX { get; set; }
-        public int InspectedY { get; set; }
-        public string[] PerThreadValues { get; set; }
-    }
 }

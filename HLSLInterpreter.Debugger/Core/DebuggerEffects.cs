@@ -85,8 +85,8 @@ public sealed class DebuggerEffects
 
     private CancellationTokenSource _runCts;
 
-    public Cmd RunCpu(string code, ShaderConfig config, string docPath) =>
-        Cmd.OfEffect((dispatch, _) => RunCpuImpl(code, config, docPath, dispatch));
+    public Cmd RunCpu(string code, ShaderConfig config, string docPath, int canvasW, int canvasH) =>
+        Cmd.OfEffect((dispatch, _) => RunCpuImpl(code, config, docPath, canvasW, canvasH, dispatch));
 
     public Cmd RunGpu(string code, ShaderConfig config, float initialTime, bool paused, string docPath) =>
         Cmd.OfEffect((dispatch, _) => RunGpuImpl(code, config, initialTime, paused, docPath, dispatch));
@@ -114,7 +114,8 @@ public sealed class DebuggerEffects
         return _runCts;
     }
 
-    private async Task RunCpuImpl(string code, ShaderConfig config, string docPath, Action<Msg> dispatch)
+    private async Task RunCpuImpl(
+        string code, ShaderConfig config, string docPath, int canvasW, int canvasH, Action<Msg> dispatch)
     {
         var cts = BeginRun();
         try { await GpuInterop.Stop(); } catch { }
@@ -126,7 +127,7 @@ public sealed class DebuggerEffects
 
         if (config.CpuMode != CpuMode.SingleWarp)
         {
-            _ = RunCpuFullFrameSafe(code, config, parserConfig, wx, wy, dispatch, cts);
+            _ = RunCpuFullFrameSafe(code, config, parserConfig, wx, wy, canvasW, canvasH, dispatch, cts);
             return;
         }
 
@@ -154,9 +155,9 @@ public sealed class DebuggerEffects
 
     private async Task RunCpuFullFrameSafe(
         string code, ShaderConfig config, HLSLParserConfig parserConfig,
-        int wx, int wy, Action<Msg> dispatch, CancellationTokenSource cts)
+        int wx, int wy, int canvasW, int canvasH, Action<Msg> dispatch, CancellationTokenSource cts)
     {
-        try { await RunCpuFullFrame(code, config, parserConfig, wx, wy, dispatch, cts); }
+        try { await RunCpuFullFrame(code, config, parserConfig, wx, wy, canvasW, canvasH, dispatch, cts); }
         catch (Exception ex)
         {
             dispatch(new RunFinished("", new RunError(ex.Message, ex), null, null));
@@ -165,9 +166,11 @@ public sealed class DebuggerEffects
 
     private async Task RunCpuFullFrame(
         string code, ShaderConfig config, HLSLParserConfig parserConfig,
-        int wx, int wy, Action<Msg> dispatch, CancellationTokenSource cts)
+        int wx, int wy, int canvasW, int canvasH, Action<Msg> dispatch, CancellationTokenSource cts)
     {
-        var (canvasW, canvasH) = await GetCanvasSizeAsync(wx, wy);
+        // viewport.js has not reported a size yet: fall back to a sane square.
+        if (canvasW <= 0) canvasW = Math.Max(wx, 256);
+        if (canvasH <= 0) canvasH = Math.Max(wy, 256);
         var invocation = (await BuildAsync(config, null, -1))
             with { CanvasW = canvasW, CanvasH = canvasH };
         if (config.RenderMode == ShaderRenderMode.VertFrag)
@@ -333,18 +336,6 @@ public sealed class DebuggerEffects
             int dstOffset = ((y0 + row) * canvasW + x0) * 4;
             Buffer.BlockCopy(tile, srcOffset, full, dstOffset, copyW * 4);
         }
-    }
-
-    private async Task<(int W, int H)> GetCanvasSizeAsync(int wx, int wy)
-    {
-        try
-        {
-            var size = await CanvasInterop.GetCpuCanvasSize();
-            if (size != null && size.Length >= 2 && size[0] > 0 && size[1] > 0)
-                return (size[0], size[1]);
-        }
-        catch { }
-        return (Math.Max(wx, 256), Math.Max(wy, 256));
     }
 
     private async Task RunGpuImpl(

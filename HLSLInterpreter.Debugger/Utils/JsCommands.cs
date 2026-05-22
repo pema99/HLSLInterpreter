@@ -1,0 +1,54 @@
+using HLSLInterpreter.Debugger.Core;
+using Microsoft.JSInterop;
+
+namespace HLSLInterpreter.Debugger.Utils;
+
+// The single door for calls arriving from JavaScript. Every [JSInvokable] the
+// app exposes lives here: a JS observer (a canvas click, a gutter click, a file
+// drop, a resize) becomes one Dispatch, so JS input enters the MVU loop the
+// same way a component action does. One DotNetObjectReference wraps this,
+// created once by the shell.
+public sealed class JsCommands
+{
+    private readonly DebuggerProgram _program;
+
+    public JsCommands(DebuggerProgram program) => _program = program;
+
+    [JSInvokable]
+    public void ToggleBreakpoint(int line) => _program.Dispatch(new BreakpointToggled(line));
+
+    [JSInvokable]
+    public void LoadObjMesh(string objText) => _program.Dispatch(new ObjMeshLoaded(objText));
+
+    [JSInvokable]
+    public void StartDebugAtPixel(int px, int py) =>
+        _program.Dispatch(new DebugClicked(DebugTarget.Pixel, px, py));
+
+    [JSInvokable]
+    public void StartDebugAtVertex(int vertexIndex) =>
+        _program.Dispatch(new DebugClicked(DebugTarget.Vertex, vertexIndex, 0));
+
+    [JSInvokable]
+    public void SetInspectedPixel(int px, int py) =>
+        _program.Dispatch(new InspectedPixelChanged(px, py));
+
+    [JSInvokable]
+    public void OnFileDropped(string name, string content) =>
+        _program.Dispatch(new FileOpened(name, "", content));
+
+    [JSInvokable]
+    public void CanvasResized(int width, int height) =>
+        _program.Dispatch(new CanvasResized(width, height));
+
+    // Monaco's hover provider pulls this when the user hovers an identifier. It
+    // is a query, not an event, so it returns rather than dispatching.
+    [JSInvokable]
+    public HoverInfo GetHoverInfo(string identifier)
+    {
+        var debug = _program.Model.Debug;
+        var config = _program.Model.Editor.ActiveDocument?.Config ?? new ShaderConfig();
+        return HLSLValueDisplay.BuildHoverInfo(
+            debug.CurrentStep, config.WarpX, config.WarpY,
+            debug.InspectedThread, debug.DebugVertexIndex, identifier);
+    }
+}

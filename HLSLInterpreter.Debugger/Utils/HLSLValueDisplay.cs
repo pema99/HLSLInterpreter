@@ -1,5 +1,6 @@
 using System.Globalization;
 using HLSL;
+using HLSLInterpreter.Debugger.Execution;
 using UnityShaderParser.HLSL;
 
 namespace HLSLInterpreter.Debugger.Utils;
@@ -161,4 +162,55 @@ public static class HLSLValueDisplay
         }
         return null;
     }
+
+    // Resolves an identifier against a debug step into a hover-tooltip payload.
+    // Returns null when there is no step or the name is not in scope.
+    public static HoverInfo BuildHoverInfo(
+        TraceStep step, int warpX, int warpY, int inspectedThread, int debugVertexIndex, string identifier)
+    {
+        if (step == null) return null;
+
+        HLSLValue value = null;
+        if (step.FrameVariables.Length > 0 && step.FrameVariables[0].TryGetValue(identifier, out var local))
+            value = local;
+        else if (step.GlobalVariables.TryGetValue(identifier, out var global))
+            value = global;
+        if (value == null) return null;
+
+        int wx = Math.Max(1, warpX);
+        int wy = Math.Max(1, warpY);
+        var resolved = value is ReferenceValue rv ? rv.Get() : value;
+
+        byte[] rgba = null;
+        try { rgba = RenderPreviewImage(resolved, wx, wy); }
+        catch (Exception ex) { Console.WriteLine($"[hover] image render failed for '{identifier}': {ex.Message}"); }
+
+        string[] perThread = null;
+        if (debugVertexIndex >= 0)
+            perThread = Enumerable.Range(0, wx * wy).Select(i => Format(resolved, i)).ToArray();
+
+        return new HoverInfo
+        {
+            Value = Format(value, inspectedThread),
+            Width = wx,
+            Height = wy,
+            Rgba = rgba,
+            PerThreadValues = perThread,
+            InspectedX = inspectedThread % wx,
+            InspectedY = inspectedThread / wx,
+        };
+    }
+}
+
+// The tooltip payload Monaco's hover provider pulls for an identifier: the
+// formatted value, plus a per-thread preview image when one applies.
+public sealed class HoverInfo
+{
+    public string Value { get; set; } = "";
+    public int Width { get; set; }
+    public int Height { get; set; }
+    public byte[] Rgba { get; set; }
+    public int InspectedX { get; set; }
+    public int InspectedY { get; set; }
+    public string[] PerThreadValues { get; set; }
 }
