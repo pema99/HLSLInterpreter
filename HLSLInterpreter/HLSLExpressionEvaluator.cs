@@ -34,7 +34,9 @@ namespace HLSL
             return evaluator.Visit(node);
         }
 
-        public HLSLValue CallFunction(string name, params HLSLValue[] args)
+        public HLSLValue CallFunction(string name, params HLSLValue[] args) => CallFunction(name, args, null);
+
+        private HLSLValue CallFunction(string name, HLSLValue[] args, HLSLSyntaxNode callSite)
         {
             // Enter namespace
             string[] namespaces = null;
@@ -49,9 +51,9 @@ namespace HLSL
             if (func != null)
             {
                 if (args.Length > func.Parameters.Count)
-                    throw Error($"Argument count mismatch in call to '{name}'.");
+                    throw Error(callSite, $"Argument count mismatch in call to '{name}'.");
 
-                args = AppendDefaultParameterInitializers(func.Parameters, args, name);
+                args = AppendDefaultParameterInitializers(func.Parameters, args, name, callSite);
 
                 // Call function
                 context.PushScope(isFunction: true, functionName: name);
@@ -80,7 +82,7 @@ namespace HLSL
                 return result;
 
             if (HLSLIntrinsics.IsUnsupportedIntrinsic(name))
-                throw Error($"Intrinsic function '{name}' is not supported.");
+                throw Error(callSite, $"Intrinsic function '{name}' is not supported.");
 
             // Check if name is a typedef alias for a numeric type used as a constructor.
             if (context.TryLookupTypeAlias(name, out TypeNode aliasedType) && aliasedType is NumericTypeNode numericAliasType)
@@ -88,7 +90,7 @@ namespace HLSL
                 foreach (var arg in  args)
                 {
                     if (arg is not NumericValue)
-                        Error("Expected numeric value arguments to constructor.");
+                        throw Error(callSite, "Expected numeric value arguments to constructor.");
                 }
                 return ConstructNumericValue(numericAliasType, args.Select(a => (NumericValue)a).ToArray());
             }
@@ -97,18 +99,21 @@ namespace HLSL
             if (context.GetReference("this")?.Get() is StructValue thisStruct)
             {
                 if (TryFindMethod(thisStruct.Name, name, args, out var method))
-                    return CallMethodNode(thisStruct, method, args, context.IsGroupShared("this"));
+                    return CallMethodNode(thisStruct, method, args, context.IsGroupShared("this"), callSite);
             }
 
-            throw Error($"Unknown function '{name}' called.");
+            throw Error(callSite, $"Unknown function '{name}' called.");
         }
 
-        public HLSLValue CallMethod(StructValue str, string methodName, HLSLValue[] args, bool groupShared = false)
+        public HLSLValue CallMethod(StructValue str, string methodName, HLSLValue[] args, bool groupShared = false) =>
+            CallMethod(str, methodName, args, groupShared, null);
+
+        private HLSLValue CallMethod(StructValue str, string methodName, HLSLValue[] args, bool groupShared, HLSLSyntaxNode callSite)
         {
             if (TryFindMethod(str.Name, methodName, args, out var method))
-                return CallMethodNode(str, method, args, groupShared);
+                return CallMethodNode(str, method, args, groupShared, callSite);
 
-            throw Error($"Unknown method '{methodName}' called.");
+            throw Error(callSite, $"Unknown method '{methodName}' called.");
         }
 
         public TypeNode ResolveType(TypeNode type) => context.ResolveType(type);
@@ -116,7 +121,9 @@ namespace HLSL
         // Helpers
         private static Exception Error(HLSLSyntaxNode node, string message)
         {
-            return new Exception($"Error at line {node.Span.Start.Line}, column {node.Span.Start.Column}: {message}");
+            return node != null
+                ? new Exception(PrintingUtil.FormatError(node.Span, message))
+                : new Exception($"Error: {message}");
         }
 
         private static Exception Error(string message)
@@ -166,7 +173,7 @@ namespace HLSL
             }
         }
 
-        private HLSLValue[] AppendDefaultParameterInitializers(List<FormalParameterNode> parameters, HLSLValue[] args, string functionName)
+        private HLSLValue[] AppendDefaultParameterInitializers(List<FormalParameterNode> parameters, HLSLValue[] args, string functionName, HLSLSyntaxNode callSite = null)
         {
             if (args.Length == parameters.Count)
                 return args;
@@ -176,7 +183,7 @@ namespace HLSL
             for (int i = args.Length; i < parameters.Count; i++)
             {
                 if (parameters[i].Declarator.Initializer is not ValueInitializerNode init)
-                    throw Error($"Argument count mismatch in call to '{functionName}'.");
+                    throw Error(callSite ?? (HLSLSyntaxNode)parameters[i], $"Argument count mismatch in call to '{functionName}'.");
                 filled[i] = Visit(init.Expression);
             }
             return filled;
@@ -552,7 +559,7 @@ namespace HLSL
                     if (maxThreadCount == 1) return new MatrixValue(type.Kind, d1.AsInt(), d2.AsInt(), new HLSLRegister<RawValue[]>(lanes[0]));
                     else return new MatrixValue(type.Kind, d1.AsInt(), d2.AsInt(), new HLSLRegister<RawValue[]>(lanes));
                 default:
-                    throw Error($"Unknown numeric constructor type.");
+                    throw Error(type, $"Unknown numeric constructor type.");
             }
         }
 
@@ -639,12 +646,12 @@ namespace HLSL
             return false;
         }
 
-        private HLSLValue CallMethodNode(StructValue str, FunctionDefinitionNode method, HLSLValue[] args, bool groupShared = false)
+        private HLSLValue CallMethodNode(StructValue str, FunctionDefinitionNode method, HLSLValue[] args, bool groupShared = false, HLSLSyntaxNode callSite = null)
         {
             if (args.Length > method.Parameters.Count)
-                throw Error($"Argument count mismatch in call to '{method.Name.GetName()}'.");
+                throw Error(callSite ?? method, $"Argument count mismatch in call to '{method.Name.GetName()}'.");
 
-            args = AppendDefaultParameterInitializers(method.Parameters, args, method.Name.GetName());
+            args = AppendDefaultParameterInitializers(method.Parameters, args, method.Name.GetName(), callSite);
 
             context.PushScope(isFunction: true, functionName: method.Name.GetName());
             context.PushReturn(ScalarValue.Null);
@@ -1017,7 +1024,7 @@ namespace HLSL
             if (target is VectorValue vec)
             {
                 if (field.Length > 4)
-                    throw Error($"Invalid vector swizzle '{field}'.");
+                    throw Error(node, $"Invalid vector swizzle '{field}'.");
                 return vec.Swizzle(field);
             }
             // Scalar swizzle
@@ -1077,7 +1084,7 @@ namespace HLSL
                         }
                     }
 
-                    return CallMethodNode(str, method, args, targetIsGroupshared);
+                    return CallMethodNode(str, method, args, targetIsGroupshared, node);
                 }
 
                 throw Error(node, $"Couldn't find method '{node.Name.Identifier}' on type '{str.Name}'.");
@@ -1155,7 +1162,7 @@ namespace HLSL
                     context.ExitNamespace();
             }
 
-            return CallFunction(name, args);
+            return CallFunction(name, args, node);
         }
 
         public override HLSLValue VisitNumericConstructorCallExpressionNode(NumericConstructorCallExpressionNode node)

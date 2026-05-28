@@ -135,7 +135,7 @@ namespace HLSL
         // Helpers
         private Exception Error(HLSLSyntaxNode node, string message)
         {
-            return new Exception($"Error at line {node.Span.Start.Line}, column {node.Span.Start.Column}: {message}");
+            return new Exception(PrintingUtil.FormatError(node.Span, message));
         }
 
         private Exception Error(string message)

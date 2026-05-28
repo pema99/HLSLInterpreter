@@ -261,12 +261,12 @@ namespace HLSL
                     throw new Exception("MOCK_RESOURCE requires exactly 2 arguments: MOCK_RESOURCE(resource, MockStructType).");
 
                 string resourceName = (args[0] as IdentifierExpressionNode)?.GetName()
-                    ?? throw new Exception("First argument to MOCK_RESOURCE must be a resource variable name.");
+                    ?? throw new Exception(PrintingUtil.FormatError(args[0].Span, "First argument to MOCK_RESOURCE must be a resource variable name."));
                 string mockStructName = (args[1] as IdentifierExpressionNode)?.GetName()
-                    ?? throw new Exception("Second argument to MOCK_RESOURCE must be a mock struct type name.");
+                    ?? throw new Exception(PrintingUtil.FormatError(args[1].Span, "Second argument to MOCK_RESOURCE must be a mock struct type name."));
 
                 var existing = interpreter.GetVariable(resourceName) as ResourceValue
-                    ?? throw new Exception($"MOCK_RESOURCE: '{resourceName}' is not a resource variable.");
+                    ?? throw new Exception(PrintingUtil.FormatError(args[0].Span, $"MOCK_RESOURCE: '{resourceName}' is not a resource variable."));
 
                 var mock = interpreter.CreateMockResource(mockStructName, existing.Type, existing.TemplateArguments);
                 interpreter.SetVariable(resourceName, mock);
