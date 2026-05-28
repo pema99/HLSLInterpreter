@@ -5,6 +5,7 @@
 
     #pragma warning (disable : 3081)
     #pragma warning (disable : 3554)
+    #pragma warning (disable : 41024)
 
     // These should do nothing when not running tests.
     #ifndef __HLSL_TEST_RUNNER__
