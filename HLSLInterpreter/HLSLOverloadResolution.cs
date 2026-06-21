@@ -150,18 +150,18 @@ namespace HLSL
                 // Anything can be demoted to an scalar
                 if (toNum is ScalarTypeNode)
                     return true;
-                // If both are the same type, compare sizes - the from type must be strictly larger
+                // Target size must fit inside source size
                 if (fromNum is VectorValue fromVec && toNum is VectorTypeNode toVec)
-                    return fromVec.Size > toVec.Dimension;
+                    return fromVec.Size >= toVec.Dimension;
                 if (fromNum is MatrixValue fromMat && toNum is MatrixTypeNode toMat)
-                    return fromMat.Rows > toMat.FirstDimension && fromMat.Columns > toMat.SecondDimension;
+                    return fromMat.Rows >= toMat.FirstDimension && fromMat.Columns >= toMat.SecondDimension;
                 if (fromNum is VectorValue fromVecGen && toNum is GenericVectorTypeNode toVecGen)
-                    return fromVecGen.Size > ((ScalarValue)evaluator.Visit(toVecGen.Dimension)).AsInt();
+                    return fromVecGen.Size >= ((ScalarValue)evaluator.Visit(toVecGen.Dimension)).AsInt();
                 if (fromNum is MatrixValue fromMatGen && toNum is GenericMatrixTypeNode toMatGen)
                 {
                     int rows = ((ScalarValue)evaluator.Visit(toMatGen.FirstDimension)).AsInt();
                     int cols = ((ScalarValue)evaluator.Visit(toMatGen.SecondDimension)).AsInt();
-                    return fromMatGen.Rows > rows && fromMatGen.Columns > cols;
+                    return fromMatGen.Rows >= rows && fromMatGen.Columns >= cols;
                 }
             }
             return false;
